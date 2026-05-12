@@ -7,8 +7,10 @@ async function request(path, options = {}) {
     ...options,
   });
 
-  if (resp.status === 401 && !path.startsWith("/api/auth/login")) {
-    window.location.href = "/login.html";
+  if (resp.status === 401 && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/me")) {
+    if (!window.location.pathname.endsWith("/login.html")) {
+      window.location.href = "/login.html";
+    }
     throw new Error("Unauthorized");
   }
 
