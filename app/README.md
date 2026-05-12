@@ -1,0 +1,130 @@
+# Bemanningssystem
+
+Webbaserad ersättning för Excel-bemanningsfilen. Arbetsledare planerar bemanning per vecka/dag/område i en matris (personer × timmar) där varje cell anger ställe/aktivitet.
+
+## Funktioner i MVP
+
+- **Bemanningsvy** – matris med personer som rader och 06:00–23:00 som kolumner. Välj år/vecka/dag/område. Cellerna är dropdowns med alla aktiva aktiviteter (färgkodade).
+- **Personregister** – lägg till, redigera och inaktivera personer.
+- **Ställeregister** – lägg till, redigera och inaktivera aktiviteter med egen färg och sortering.
+- **Summering** – visar timmar och uppskattat antal personer per aktivitet för vald dag.
+- **Kopiera dag** – kopiera bemanningen från en dag till en annan, valfritt inom samma område.
+- **Rensa dag** – tömmer alla celler för vald dag/område.
+- **Fyll från vänster** – fyller tomma celler med samma aktivitet som föregående timme för varje person.
+- **Multi-user-säkerhet** – varje cell har en versionskolumn. Två arbetsledare kan jobba samtidigt; om samma cell ändras visas ett meddelande och dagen läses om.
+- **Historik förberedd** – alla ändringar loggas i `audit_log` (historik-vy byggs i v1.1).
+
+## Stack
+
+- **Backend:** Python 3 + FastAPI + SQLAlchemy 2 + Alembic
+- **Databas:** PostgreSQL (Render managed)
+- **Frontend:** Vanilla HTML/CSS/JS, ingen build-process
+- **Auth:** Session-cookie (FastAPI SessionMiddleware) + bcrypt
+- **Hosting:** Render via `render.yaml` Blueprint
+
+## Default-inlogg
+
+Seeden skapar en admin-användare:
+- **Användarnamn:** `admin`
+- **Lösenord:** `admin123`
+
+**Byt lösenordet direkt efter första inloggning** (admin-UI för users kommer i v1.1; tills dess ändra `seed.py` lokalt eller uppdatera via SQL i Render-konsolen).
+
+## Deploya till Render
+
+1. Initiera git-repo och pusha till GitHub:
+   ```powershell
+   cd "C:\Users\emikad\OneDrive - Dole Nordic AB\Skrivbordet\projects\Bemanningsfil"
+   git init
+   git add app/ demo/ referens/
+   git commit -m "Initial commit: bemanningssystem MVP"
+   git remote add origin https://github.com/<DITT_NAMN>/bemanningsfil.git
+   git push -u origin main
+   ```
+2. På [render.com](https://render.com): **New → Blueprint** → välj GitHub-repot. Render läser `app/render.yaml` automatiskt.
+3. Render skapar databasen `bemanning-db` och web-servicen `bemanning-web`, sätter `DATABASE_URL` och auto-genererar `SECRET_KEY`.
+4. Build-steget kör `pip install`, `alembic upgrade head` och `python -m backend.seed`. Vid varje deploy uppdateras seed-data (idempotent).
+5. När deploy är klar: öppna `https://bemanning-web.onrender.com` och logga in.
+
+**Kostnad:** Starter web (~7 USD/mån) + PostgreSQL free 90 dagar → basic-256mb (~7 USD/mån).
+
+## Lokal utveckling (kräver Python + Docker)
+
+```powershell
+# Starta Postgres
+docker run -d --name bemanning-pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=bemanning postgres:16
+
+cd app
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy .env.example .env
+alembic upgrade head
+python -m backend.seed
+uvicorn backend.main:app --reload
+```
+Öppna http://localhost:8000.
+
+## Mappstruktur
+
+```
+app/
+├── backend/                FastAPI-app
+│   ├── main.py             app, middleware, router-mounts
+│   ├── config.py           env-variabler
+│   ├── database.py         engine + session
+│   ├── models.py           SQLAlchemy-modeller
+│   ├── schemas.py          Pydantic request/response
+│   ├── deps.py             get_db, get_current_user
+│   ├── security.py         bcrypt
+│   ├── audit.py            audit_log-helper
+│   ├── seed.py             initial data (idempotent)
+│   └── routers/
+│       ├── auth.py         /api/auth/{login,logout,me}
+│       ├── areas.py        /api/areas
+│       ├── activities.py   /api/activities
+│       ├── persons.py      /api/persons
+│       ├── schedule.py     /api/schedule + cell-PUT + summary
+│       └── bulk.py         /api/schedule/{copy,clear,fill-from-left}
+├── frontend/               statiska filer (serveras av FastAPI)
+│   ├── index.html          bemanningsvyn
+│   ├── personer.html
+│   ├── stallen.html
+│   ├── login.html
+│   ├── css/styles.css
+│   └── js/{api,common,schedule,persons,activities}.js
+├── alembic/                migrations
+├── requirements.txt
+└── render.yaml             Render Blueprint
+```
+
+## Multi-user-modell
+
+Varje cell i `schedule_cells` har en `version`-kolumn. Klienten skickar `expected_version` vid varje cell-uppdatering. Servern kör `UPDATE … WHERE version = expected_version` (under `SELECT … FOR UPDATE`). Om versionen inte matchar returneras `409 Conflict` med serverns aktuella cell. Klienten visar en toast och läser in dagen igen.
+
+Detta innebär:
+- Två arbetsledare på olika celler arbetar parallellt utan att märka varandra.
+- Två arbetsledare som ändrar exakt samma cell samtidigt → den senare får ett meddelande och ser den första ändringen.
+- Bulk-operationer (kopiera, rensa, fyll-från-vänster) skriver utan version-check men kräver UI-bekräftelse innan de körs.
+
+## Status
+
+- [x] Steg 1: Skelett + deploy-pipeline
+- [x] Steg 2: Modeller + migrations + seed
+- [x] Steg 3: Auth + personregister
+- [x] Steg 4: Bemanningsvyn med multi-user-säkerhet
+- [x] Steg 5: Bulk-operationer + ställeregister + audit_log
+- [x] Steg 6: README + polish
+
+## Skjutet till v1.1 / v2
+
+Schemat är förberett för dessa funktioner – de kräver bara nytt UI, inte refactor:
+
+- Historikvy ("vem ändrade vad och när?") – läs `audit_log`
+- Kompetensvalidering – `persons.competencies` och `activities.required_competency` finns redan
+- Admin-UI för användarhantering – `users`-tabellen finns
+- Realtidsuppdateringar via WebSockets
+- Rapporter (timmar per person/månad, närvarostatistik)
+- Excel-import från `Bemanning Huset - 2026.xlsx`
+- Halvtimmar/kvartstimmar (kräver migration)
+- Tauri/Electron Windows-app (frontend/ är redan statisk)

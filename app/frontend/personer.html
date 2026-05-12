@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Personer – Bemanning</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <header class="topbar"></header>
+
+  <section class="controls">
+    <button class="primary" id="new-person">+ Ny person</button>
+    <label><input type="checkbox" id="show-inactive" /> Visa inaktiva</label>
+  </section>
+
+  <main>
+    <div class="section-title">Personregister</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Namn</th>
+            <th>Hemområde</th>
+            <th>Kommentar</th>
+            <th>Aktiv</th>
+            <th>Sortering</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="persons-body"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/persons.js"></script>
+</body>
+</html>

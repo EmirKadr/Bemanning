@@ -1,0 +1,23 @@
+databases:
+  - name: bemanning-db
+    plan: free
+    databaseName: bemanning
+    user: bemanning
+
+services:
+  - type: web
+    name: bemanning-web
+    runtime: python
+    plan: starter
+    rootDir: app
+    buildCommand: "pip install -r requirements.txt && alembic upgrade head && python -m backend.seed"
+    startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bemanning-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production

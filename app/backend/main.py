@@ -1,0 +1,36 @@
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
+
+from .config import settings
+from .routers import activities, areas, auth, bulk, persons, schedule
+
+app = FastAPI(title="Bemanningssystem", version="0.1.0")
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SECRET_KEY,
+    session_cookie="bemanning_session",
+    https_only=settings.is_production,
+    same_site="lax",
+)
+
+
+@app.get("/api/health")
+def health() -> dict:
+    return {"status": "ok", "environment": settings.ENVIRONMENT}
+
+
+app.include_router(auth.router)
+app.include_router(areas.router)
+app.include_router(activities.router)
+app.include_router(persons.router)
+app.include_router(schedule.router)
+app.include_router(bulk.router)
+
+
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+if FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

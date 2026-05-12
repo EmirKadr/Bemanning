@@ -1,0 +1,334 @@
+// Bemanningsvy – matris person × timme.
+
+const HOURS = Array.from({ length: 18 }, (_, i) => 6 + i);   // 6..23
+const DAYS = { 1: "Måndag", 2: "Tisdag", 3: "Onsdag", 4: "Torsdag", 5: "Fredag", 6: "Lördag", 7: "Söndag" };
+
+const state = {
+  year: 0,
+  week: 0,
+  weekday: 1,
+  areaId: null,
+  areas: [],
+  activities: [],   // alla, inkl. inaktiva för befintliga celler
+  activitiesActive: [],
+  persons: [],
+  cells: new Map(), // key = `${person_id}:${hour}` → {activity_id, version}
+};
+
+
+// ---- ISO-vecka för "nu" ----
+function isoWeek(d = new Date()) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
+  return { year: date.getUTCFullYear(), week, weekday: dayNum };
+}
+
+
+// ---- Rendering ----
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
+  );
+}
+
+function buildHeader() {
+  const header = document.getElementById("headerRow");
+  while (header.children.length > 2) header.removeChild(header.lastChild);
+  HOURS.forEach((h) => {
+    const th = document.createElement("th");
+    th.textContent = String(h).padStart(2, "0") + ":00";
+    header.appendChild(th);
+  });
+}
+
+function activityById(id) {
+  return state.activities.find((a) => a.id === id);
+}
+
+function colorFor(activityId) {
+  const a = activityById(activityId);
+  return a ? a.color : "#ffffff";
+}
+
+function buildRows() {
+  const body = document.getElementById("scheduleBody");
+  body.innerHTML = "";
+
+  state.persons.forEach((person) => {
+    const tr = document.createElement("tr");
+    tr.dataset.personId = person.id;
+
+    const name = document.createElement("td");
+    name.className = "name";
+    name.textContent = person.name;
+    tr.appendChild(name);
+
+    const base = document.createElement("td");
+    base.className = "base";
+    const homeArea = state.areas.find((a) => a.id === person.home_area_id);
+    base.textContent = homeArea ? homeArea.name : "";
+    tr.appendChild(base);
+
+    HOURS.forEach((hour) => {
+      const td = document.createElement("td");
+      const select = document.createElement("select");
+      select.dataset.personId = person.id;
+      select.dataset.hour = hour;
+      select.dataset.version = 0;
+      select.dataset.activityId = "";
+
+      // Tom-option
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = "–";
+      select.appendChild(empty);
+
+      state.activitiesActive.forEach((act) => {
+        const opt = document.createElement("option");
+        opt.value = String(act.id);
+        opt.textContent = act.label;
+        opt.style.background = act.color;
+        select.appendChild(opt);
+      });
+
+      select.addEventListener("change", () => onCellChange(select));
+
+      td.appendChild(select);
+      tr.appendChild(td);
+    });
+
+    body.appendChild(tr);
+  });
+
+  applyCells();
+}
+
+function applyCells() {
+  // Töm alla först
+  document.querySelectorAll("#scheduleBody select").forEach((sel) => {
+    sel.value = "";
+    sel.dataset.version = 0;
+    sel.dataset.activityId = "";
+    sel.style.background = "#ffffff";
+  });
+
+  state.cells.forEach((info, key) => {
+    const [pid, hour] = key.split(":");
+    const sel = document.querySelector(
+      `#scheduleBody select[data-person-id="${pid}"][data-hour="${hour}"]`
+    );
+    if (!sel) return;
+    sel.value = info.activity_id ? String(info.activity_id) : "";
+    sel.dataset.version = info.version;
+    sel.dataset.activityId = info.activity_id || "";
+    sel.style.background = colorFor(info.activity_id);
+  });
+}
+
+
+// ---- Cell-update flow ----
+async function onCellChange(sel) {
+  const personId = Number(sel.dataset.personId);
+  const hour = Number(sel.dataset.hour);
+  const expectedVersion = Number(sel.dataset.version) || 0;
+  const newActivityId = sel.value ? Number(sel.value) : null;
+
+  try {
+    const resp = await api.put("/api/schedule/cell", {
+      year: state.year,
+      week: state.week,
+      weekday: state.weekday,
+      hour,
+      person_id: personId,
+      activity_id: newActivityId,
+      expected_version: expectedVersion,
+    });
+
+    const c = resp.cell;
+    sel.dataset.version = c.version;
+    sel.dataset.activityId = c.activity_id || "";
+    sel.style.background = colorFor(c.activity_id);
+    state.cells.set(`${personId}:${hour}`, {
+      activity_id: c.activity_id,
+      version: c.version,
+    });
+    refreshSummary();
+  } catch (err) {
+    if (err.status === 409) {
+      showToast("Cellen ändrades av någon annan – läste in på nytt", "warn");
+      await loadSchedule();
+    } else {
+      showToast("Kunde inte spara: " + err.message, "error");
+      // Ångra dropdown-värdet
+      const stored = state.cells.get(`${personId}:${hour}`);
+      sel.value = stored?.activity_id ? String(stored.activity_id) : "";
+    }
+  }
+}
+
+
+// ---- Summary ----
+async function refreshSummary() {
+  const rows = await api.get(
+    `/api/schedule/summary?year=${state.year}&week=${state.week}&weekday=${state.weekday}` +
+      (state.areaId ? `&area_id=${state.areaId}` : "")
+  );
+  const tbody = document.getElementById("summaryBody");
+  tbody.innerHTML = "";
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="background: ${r.color}; padding: 5px;">${escapeHtml(r.activity_label)}</td>
+      <td>${r.hours}</td>
+      <td>${r.persons_equiv.toFixed(1)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+
+// ---- Load ----
+async function loadAreasAndActivities() {
+  const [areas, activities, activitiesAll] = await Promise.all([
+    api.get("/api/areas"),
+    api.get("/api/activities"),
+    api.get("/api/activities?include_inactive=true"),
+  ]);
+  state.areas = areas;
+  state.activitiesActive = activities;
+  state.activities = activitiesAll;
+
+  const sel = document.getElementById("areaSelect");
+  sel.innerHTML = "";
+  areas.forEach((a) => {
+    const opt = document.createElement("option");
+    opt.value = a.id;
+    opt.textContent = a.name;
+    sel.appendChild(opt);
+  });
+  if (areas.length > 0) state.areaId = areas[0].id;
+  sel.value = state.areaId || "";
+}
+
+async function loadSchedule() {
+  const data = await api.get(
+    `/api/schedule?year=${state.year}&week=${state.week}&weekday=${state.weekday}` +
+      (state.areaId ? `&area_id=${state.areaId}` : "")
+  );
+  state.persons = data.persons;
+  state.cells = new Map();
+  data.cells.forEach((c) => {
+    state.cells.set(`${c.person_id}:${c.hour}`, {
+      activity_id: c.activity_id,
+      version: c.version,
+    });
+  });
+
+  document.getElementById("sectionTitle").textContent =
+    `${DAYS[state.weekday]} – ${state.areas.find((a) => a.id === state.areaId)?.name || ""} – V${state.week}/${state.year}`;
+
+  buildRows();
+  refreshSummary();
+}
+
+
+// ---- Init ----
+(async () => {
+  await initPage("schedule");
+  await loadAreasAndActivities();
+
+  const now = isoWeek();
+  state.year = now.year;
+  state.week = now.week;
+  state.weekday = now.weekday <= 5 ? now.weekday : 1;
+
+  document.getElementById("yearInput").value = state.year;
+  document.getElementById("weekInput").value = state.week;
+  document.getElementById("daySelect").value = String(state.weekday);
+
+  buildHeader();
+  await loadSchedule();
+
+  const onControlChange = async () => {
+    state.year = Number(document.getElementById("yearInput").value) || state.year;
+    state.week = Number(document.getElementById("weekInput").value) || state.week;
+    state.weekday = Number(document.getElementById("daySelect").value);
+    state.areaId = Number(document.getElementById("areaSelect").value) || null;
+    await loadSchedule();
+  };
+
+  document.getElementById("yearInput").addEventListener("change", onControlChange);
+  document.getElementById("weekInput").addEventListener("change", onControlChange);
+  document.getElementById("daySelect").addEventListener("change", onControlChange);
+  document.getElementById("areaSelect").addEventListener("change", onControlChange);
+  document.getElementById("reloadBtn").addEventListener("click", onControlChange);
+
+  document.getElementById("fillLeftBtn").addEventListener("click", async () => {
+    if (!confirm("Fyll tomma celler från vänster för alla personer i området?")) return;
+    try {
+      const r = await api.post("/api/schedule/fill-from-left", {
+        year: state.year, week: state.week, weekday: state.weekday, area_id: state.areaId,
+      });
+      showToast(`Fyllde ${r.updated} celler`);
+      await loadSchedule();
+    } catch (e) { showToast("Fel: " + e.message, "error"); }
+  });
+
+  document.getElementById("clearBtn").addEventListener("click", async () => {
+    if (!confirm("Rensa hela dagen för det valda området?")) return;
+    try {
+      const r = await api.post("/api/schedule/clear", {
+        year: state.year, week: state.week, weekday: state.weekday, area_id: state.areaId,
+      });
+      showToast(`Rensade ${r.cleared} celler`);
+      await loadSchedule();
+    } catch (e) { showToast("Fel: " + e.message, "error"); }
+  });
+
+  document.getElementById("copyBtn").addEventListener("click", () => openCopyModal());
+})();
+
+
+function openCopyModal() {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal">
+      <h2>Kopiera dag</h2>
+      <p class="note">Kopierar från en dag till en annan inom området <b>${escapeHtml(state.areas.find(a => a.id === state.areaId)?.name || '')}</b>.</p>
+      <label>Från år</label><input id="cp-fy" type="number" value="${state.year}" />
+      <label>Från vecka</label><input id="cp-fw" type="number" value="${state.week}" />
+      <label>Från dag</label>
+      <select id="cp-fd">${[1,2,3,4,5,6,7].map(d=>`<option value="${d}" ${d===state.weekday?'selected':''}>${DAYS[d]}</option>`).join("")}</select>
+      <label>Till år</label><input id="cp-ty" type="number" value="${state.year}" />
+      <label>Till vecka</label><input id="cp-tw" type="number" value="${state.week}" />
+      <label>Till dag</label>
+      <select id="cp-td">${[1,2,3,4,5,6,7].map(d=>`<option value="${d}">${DAYS[d]}</option>`).join("")}</select>
+      <label><input id="cp-ow" type="checkbox" /> Skriv över befintliga celler i målet</label>
+      <div class="actions">
+        <button id="cp-cancel">Avbryt</button>
+        <button id="cp-go" class="primary">Kopiera</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  document.getElementById("cp-cancel").addEventListener("click", () => backdrop.remove());
+  document.getElementById("cp-go").addEventListener("click", async () => {
+    try {
+      const r = await api.post("/api/schedule/copy", {
+        from_year: Number(document.getElementById("cp-fy").value),
+        from_week: Number(document.getElementById("cp-fw").value),
+        from_weekday: Number(document.getElementById("cp-fd").value),
+        to_year: Number(document.getElementById("cp-ty").value),
+        to_week: Number(document.getElementById("cp-tw").value),
+        to_weekday: Number(document.getElementById("cp-td").value),
+        area_id: state.areaId,
+        overwrite: document.getElementById("cp-ow").checked,
+      });
+      showToast(`Kopierade ${r.copied} celler`);
+      backdrop.remove();
+      await loadSchedule();
+    } catch (e) { showToast("Fel: " + e.message, "error"); }
+  });
+}

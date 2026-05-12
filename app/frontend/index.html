@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bemanning</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <header class="topbar"></header>
+
+  <section class="controls">
+    <label>År
+      <input id="yearInput" type="number" min="2000" max="2100" style="width: 80px;" />
+    </label>
+    <label>Vecka
+      <input id="weekInput" type="number" min="1" max="53" style="width: 60px;" />
+    </label>
+    <label>Dag
+      <select id="daySelect">
+        <option value="1">Måndag</option>
+        <option value="2">Tisdag</option>
+        <option value="3">Onsdag</option>
+        <option value="4">Torsdag</option>
+        <option value="5">Fredag</option>
+        <option value="6">Lördag</option>
+        <option value="7">Söndag</option>
+      </select>
+    </label>
+    <label>Område
+      <select id="areaSelect"></select>
+    </label>
+    <button id="reloadBtn">Uppdatera</button>
+    <button id="fillLeftBtn">Fyll tomma från vänster</button>
+    <button id="copyBtn">Kopiera dag…</button>
+    <button id="clearBtn" class="danger">Rensa dag</button>
+  </section>
+
+  <main>
+    <div class="section-title" id="sectionTitle">Bemanning</div>
+    <div class="table-wrap">
+      <table class="matrix" id="scheduleTable">
+        <thead>
+          <tr id="headerRow">
+            <th class="name">Namn</th>
+            <th class="base">Hemområde</th>
+          </tr>
+        </thead>
+        <tbody id="scheduleBody"></tbody>
+      </table>
+    </div>
+
+    <div class="summary-grid">
+      <div class="card">
+        <h3>Summering per aktivitet</h3>
+        <table class="small-table">
+          <thead>
+            <tr><th>Aktivitet</th><th>Timmar</th><th>Pers.</th></tr>
+          </thead>
+          <tbody id="summaryBody"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Tips</h3>
+        <p class="note">
+          Ändringar sparas automatiskt. Om en kollega ändrar samma cell samtidigt
+          läses dagen om och du får ett meddelande.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/schedule.js"></script>
+</body>
+</html>
