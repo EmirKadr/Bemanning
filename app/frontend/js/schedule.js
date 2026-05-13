@@ -92,17 +92,12 @@ function setCellVisual(td, activityId, version) {
     td.classList.remove("scheduled-empty");
   }
 
-  // Drag-handle – bara på celler med värde
-  const existing = td.querySelector(".drag-handle");
-  if (activityId) {
-    if (!existing) {
-      const h = document.createElement("span");
-      h.className = "drag-handle";
-      h.title = "Dra för att fylla flera celler";
-      td.appendChild(h);
-    }
-  } else if (existing) {
-    existing.remove();
+  // Drag-handle på alla celler (även tomma → dra för att tömma andra)
+  if (!td.querySelector(".drag-handle")) {
+    const h = document.createElement("span");
+    h.className = "drag-handle";
+    h.title = "Dra för att fylla flera celler";
+    td.appendChild(h);
   }
 }
 
@@ -155,6 +150,14 @@ function buildRows() {
 
       select.addEventListener("change", () => onCellChange(td));
       select.addEventListener("focus", () => focusCell(td));
+      // Två-klick-flöde: första klick = bara fokus (förhindra dropdown), andra klick på samma cell = öppna dropdown
+      select.addEventListener("mousedown", (e) => {
+        const isFocused = state.focusedCell && state.focusedCell.td === td;
+        if (!isFocused) {
+          e.preventDefault();
+          focusCell(td);
+        }
+      });
       // Försök fånga Ctrl+C/V/X även när dropdown är öppen
       select.addEventListener("keydown", (e) => {
         if (!(e.ctrlKey || e.metaKey)) return;
@@ -398,11 +401,11 @@ function setupDrag() {
     const handle = e.target.closest(".drag-handle");
     if (!handle) return;
     const td = handle.parentElement;
-    if (!td.dataset.activityId) return;
     e.preventDefault();
+    e.stopPropagation();
     drag.active = true;
     drag.sourceTd = td;
-    drag.sourceActivityId = Number(td.dataset.activityId);
+    drag.sourceActivityId = td.dataset.activityId ? Number(td.dataset.activityId) : null;
     drag.sourceRow = Number(td.dataset.rowIndex);
     drag.sourceCol = Number(td.dataset.colIndex);
     drag.currentRow = drag.sourceRow;

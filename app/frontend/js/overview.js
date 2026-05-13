@@ -104,13 +104,11 @@ function styleCell(td, cell) {
   else info.textContent = `Schemalagd (${cell.template_hours}h)`;
   td.appendChild(info);
 
-  // Drag-handle
-  if (cell.activity_id) {
-    const h = document.createElement("span");
-    h.className = "ov-drag-handle";
-    h.title = "Dra för att fylla flera celler";
-    td.appendChild(h);
-  }
+  // Drag-handle på alla celler (utom is_off där cellen inte har select)
+  const h = document.createElement("span");
+  h.className = "ov-drag-handle";
+  h.title = "Dra för att fylla flera celler";
+  td.appendChild(h);
 }
 
 
@@ -248,12 +246,12 @@ function setupDrag() {
     const handle = e.target.closest(".ov-drag-handle");
     if (!handle) return;
     const td = handle.parentElement;
-    if (!td.dataset.activityId) return;
     e.preventDefault();
+    e.stopPropagation();
     drag.active = true;
     drag.sourceTd = td;
     drag.sourceCell = {
-      activity_id: Number(td.dataset.activityId),
+      activity_id: td.dataset.activityId ? Number(td.dataset.activityId) : null,
     };
     document.body.classList.add("dragging-ov");
     td.classList.add("drag-target");
