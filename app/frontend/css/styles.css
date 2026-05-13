@@ -141,6 +141,30 @@ table.matrix th.name, table.matrix td.name {
   padding-left: 6px;
   font-weight: bold;
 }
+.header-filter-cell {
+  padding: 6px !important;
+  white-space: normal !important;
+  vertical-align: top;
+}
+.header-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+.header-filter-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.header-filter-input {
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: normal;
+  padding: 5px 6px;
+}
 table.matrix th[data-sort] { cursor: pointer; user-select: none; }
 table.matrix th[data-sort]:hover { background: #333; }
 table.matrix th.name[data-sort]:hover { background: #d0d0d0; }

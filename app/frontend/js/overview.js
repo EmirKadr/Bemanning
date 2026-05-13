@@ -16,6 +16,7 @@ const state = {
   persons: [],         // filtrerad + sorterad
   cells: [],
   days: [],
+  focusedCell: null,
   nameFilter: "",
   sortKey: "sort_order",
   sortAsc: true,
@@ -95,6 +96,23 @@ function refreshPersons() {
   });
 }
 
+function focusDayCell(td) {
+  if (state.focusedCell?.td) state.focusedCell.td.classList.remove("focused");
+  state.focusedCell = {
+    td,
+    personId: Number(td.dataset.personId),
+    year: Number(td.dataset.year),
+    week: Number(td.dataset.week),
+    weekday: Number(td.dataset.weekday),
+    date: td.dataset.date || null,
+  };
+  td.classList.add("focused");
+  if (document.activeElement && document.activeElement.tagName === "SELECT") {
+    document.activeElement.blur();
+  }
+  setTimeout(() => { try { td.focus({ preventScroll: true }); } catch (e) {} }, 0);
+}
+
 
 // ---- Cell rendering ----
 function styleCell(td, cell) {
@@ -132,6 +150,14 @@ function styleCell(td, cell) {
   sel.value = cell.activity_id ? String(cell.activity_id) : "";
 
   sel.addEventListener("change", () => onDayChange(td, sel, cell));
+  sel.addEventListener("focus", () => focusDayCell(td));
+  sel.addEventListener("mousedown", (e) => {
+    const isFocused = state.focusedCell && state.focusedCell.td === td;
+    if (!isFocused) {
+      e.preventDefault();
+      focusDayCell(td);
+    }
+  });
   td.appendChild(sel);
 
   const info = document.createElement("div");
@@ -182,6 +208,7 @@ function buildWeekBody() {
       td.dataset.week = state.week;
       td.dataset.activityId = cell.activity_id || "";
       td.dataset.templateHours = cell.template_hours;
+      td.tabIndex = -1;
       styleCell(td, cell);
       tr.appendChild(td);
     }
@@ -228,6 +255,7 @@ function buildMonthBody() {
       td.dataset.date = dInfo.date;
       td.dataset.activityId = cell.activity_id || "";
       td.dataset.templateHours = cell.template_hours;
+      td.tabIndex = -1;
       styleCell(td, cell);
       tr.appendChild(td);
     });
@@ -397,6 +425,20 @@ function setupDrag() {
     e.stopPropagation();
     drag.suppressClick = false;
   }, true);
+
+  body.addEventListener("click", (e) => {
+    if (drag.suppressClick) return;
+    const td = e.target.closest("td.day");
+    if (!td || td.classList.contains("is-off")) return;
+    focusDayCell(td);
+  });
+
+  body.addEventListener("change", (e) => {
+    const td = e.target.closest("td.day");
+    if (!td) return;
+    focusDayCell(td);
+    setTimeout(() => { try { td.focus(); } catch (err) {} }, 0);
+  });
 }
 
 
@@ -436,6 +478,7 @@ async function load() {
     refreshPersons();
     state.cells = data.matrix;
     state.days = [];
+    state.focusedCell = null;
     const areaName = state.areaId == null ? "Alla" : (state.areas.find((a) => a.id === state.areaId)?.name || "");
     document.getElementById("sectionTitle").textContent = `Översikt – ${areaName} – V${state.week}/${state.year}`;
     buildWeekHeader();
@@ -449,6 +492,7 @@ async function load() {
     refreshPersons();
     state.cells = data.matrix;
     state.days = data.days;
+    state.focusedCell = null;
     const areaName = state.areaId == null ? "Alla" : (state.areas.find((a) => a.id === state.areaId)?.name || "");
     const monthName = document.querySelector(`#monthSelect option[value="${state.month}"]`)?.textContent || state.month;
     document.getElementById("sectionTitle").textContent = `Översikt – ${areaName} – ${monthName} ${state.year}`;
@@ -528,6 +572,8 @@ function updateViewVisibility() {
     if (state.view === "week") buildWeekBody();
     else buildMonthBody();
   });
+  document.getElementById("nameFilter").addEventListener("mousedown", (e) => e.stopPropagation());
+  document.getElementById("nameFilter").addEventListener("click", (e) => e.stopPropagation());
 
   // Klick på Person-rubrik → sort
   document.addEventListener("click", (e) => {

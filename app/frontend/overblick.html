@@ -42,6 +42,10 @@
       outline: 2px solid var(--green);
       outline-offset: -2px;
     }
+    table.overview td.day.focused {
+      outline: 2px solid #ff7a00;
+      outline-offset: -2px;
+    }
     body.dragging-ov { cursor: crosshair; user-select: none; }
     body.dragging-ov select { pointer-events: none; }
   </style>
@@ -70,14 +74,13 @@
     <button id="next">▶</button>
     <label>Område <select id="areaSelect"></select></label>
     <button id="reloadBtn">Uppdatera</button>
-    <label>Sök person <input id="nameFilter" placeholder="Sök…" style="width: 140px;" /></label>
   </section>
 
   <main>
     <div class="section-title" id="sectionTitle">Översikt</div>
     <div class="table-wrap">
       <table class="overview" id="overviewTable">
-        <thead><tr id="headerRow"><th class="name" data-sort="name" data-filter-trigger="nameFilter" title="Klicka för att söka på person. Shift-klick sorterar.">Person <span class="sort-ind"></span></th></tr></thead>
+        <thead><tr id="headerRow"><th class="name header-filter-cell" data-sort="name" data-filter-trigger="nameFilter" title="Klicka för att söka på person. Shift-klick sorterar."><div class="header-filter"><span class="header-filter-label">Person <span class="sort-ind"></span></span><input id="nameFilter" class="header-filter-input" aria-label="Filtrera person" autocomplete="off" /></div></th></tr></thead>
         <tbody id="overviewBody"></tbody>
       </table>
     </div>

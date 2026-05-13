@@ -699,6 +699,8 @@ async function loadSchedule() {
     refreshPersons();
     buildRows();
   });
+  document.getElementById("nameFilter").addEventListener("mousedown", (e) => e.stopPropagation());
+  document.getElementById("nameFilter").addEventListener("click", (e) => e.stopPropagation());
 
   document.querySelectorAll("table.matrix th[data-sort]").forEach((th) => {
     th.addEventListener("click", (e) => {
