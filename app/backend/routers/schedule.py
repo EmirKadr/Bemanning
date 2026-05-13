@@ -279,6 +279,18 @@ def split_cell(
         old_preferred = _cell_to_dict(preferred)
         old_other = _cell_to_dict(other)
 
+        audit_log(
+            db,
+            entity_type="schedule_cell",
+            entity_id=other.id,
+            action="split_merge_delete",
+            old_value=old_other,
+            new_value=None,
+            user_id=user.id,
+        )
+        db.delete(other)
+        db.flush()
+
         preferred.minute_start = 0
         preferred.minute_end = 60
         preferred.version += 1
@@ -293,17 +305,6 @@ def split_cell(
             new_value=_cell_to_dict(preferred),
             user_id=user.id,
         )
-
-        audit_log(
-            db,
-            entity_type="schedule_cell",
-            entity_id=other.id,
-            action="split_merge_delete",
-            old_value=old_other,
-            new_value=None,
-            user_id=user.id,
-        )
-        db.delete(other)
         db.commit()
         db.refresh(preferred)
         return {"segments": [_cell_to_dict(preferred)]}
