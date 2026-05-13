@@ -155,6 +155,19 @@ function buildRows() {
 
       select.addEventListener("change", () => onCellChange(td));
       select.addEventListener("focus", () => focusCell(td));
+      // Försök fånga Ctrl+C/V/X även när dropdown är öppen
+      select.addEventListener("keydown", (e) => {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const key = e.key.toLowerCase();
+        if (!["c", "x", "v"].includes(key)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        select.blur();
+        if (!state.focusedCell) return;
+        if (key === "c") copyFocused(false);
+        else if (key === "x") copyFocused(true);
+        else if (key === "v") pasteFocused();
+      }, true);
 
       td.appendChild(select);
       tr.appendChild(td);
