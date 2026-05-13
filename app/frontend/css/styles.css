@@ -262,7 +262,7 @@ table.matrix td.split-hour {
 
 .calc-card-header {
   display: flex;
-  align-items: end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
@@ -274,10 +274,15 @@ table.matrix td.split-hour {
 
 .calc-area-picker {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
   font-weight: bold;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.calc-area-picker select {
   min-width: 180px;
 }
 
@@ -403,7 +408,7 @@ table.matrix td.split-hour {
   }
 
   .calc-area-picker {
-    min-width: 0;
+    margin-left: 0;
   }
 }
 

@@ -527,7 +527,9 @@ function renderFullHourCell(td, segment, isScheduled) {
 
   const select = buildActivitySelect();
   select.className = "cell-select";
-  select.value = explicitActivityId != null ? String(explicitActivityId) : "";
+  select.value = explicitActivityId != null
+    ? String(explicitActivityId)
+    : (showScheduledDefault ? String(scheduledActivityId) : "");
   select.dataset.minuteStart = "0";
   select.dataset.minuteEnd = "60";
   select.dataset.version = String(segment?.version || 0);
