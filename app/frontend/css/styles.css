@@ -394,6 +394,83 @@ table.matrix td select {
   cursor: pointer;
 }
 
+/* Display-label – visas ovanpå dropdown så implicit standardschema renderas
+   med rätt aktivitetstext utan att förlita sig på <select> textrendering */
+table.matrix td.with-display-label {
+  position: relative;
+}
+table.matrix td.with-display-label > .cell-display-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  padding: 0 4px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+}
+table.matrix td.with-display-label > select.cell-select {
+  color: transparent;
+  text-shadow: none;
+}
+table.matrix td.with-display-label > select.cell-select option {
+  color: var(--text);
+}
+
+.hour-segment.with-display-label { position: relative; }
+.hour-segment.with-display-label > .hour-segment-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  padding: 0 2px;
+}
+.hour-segment.with-display-label > select.half-select {
+  color: transparent;
+  text-shadow: none;
+}
+.hour-segment.with-display-label > select.half-select option {
+  color: var(--text);
+}
+table.matrix td.with-display-label select,
+.hour-segment.with-display-label select {
+  color: transparent;
+}
+.cell-display-label,
+.hour-segment-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cell-display-label {
+  padding: 0 3px;
+  font-size: 11px;
+}
+.hour-segment-label {
+  padding: 0 2px;
+  font-size: 9px;
+}
+
 /* Header filter (integrerad input i namnkolumn) */
 .header-filter-cell {
   padding: 4px 6px !important;
@@ -662,6 +739,22 @@ body.dragging-ov select { pointer-events: none; }
 }
 
 .summary-card, .calc-card { min-width: 0; }
+.summary-card { position: relative; }
+.summary-card.loading table {
+  opacity: 0.72;
+  transition: opacity 0.14s ease;
+}
+.summary-card.loading::after {
+  content: "Uppdaterar";
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 
 .summary-card table { font-size: 12px; }
 .summary-card table th {
