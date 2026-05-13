@@ -507,18 +507,20 @@ function renderFullHourCell(td, segment, isScheduled) {
   td.oncontextmenu = (e) => handleFullHourContextMenu(e, td);
 
   const person = personById(Number(td.dataset.personId));
-  const explicitActivityId = segment?.activity_id ?? null;
-  const effectiveActivityId = explicitActivityId != null
-    ? explicitActivityId
-    : (isScheduled ? (person?.home_activity_id || null) : null);
-  const isBase = explicitActivityId == null && effectiveActivityId != null;
+  const hasExplicitSegment = !!segment;
+  const explicitActivityId = hasExplicitSegment ? segment.activity_id : null;
+  const scheduledActivityId = isScheduled ? (person?.home_activity_id || null) : null;
+  const showScheduledDefault = !hasExplicitSegment && scheduledActivityId != null;
+  const showExplicitEmptyOnSchedule = hasExplicitSegment && explicitActivityId == null && scheduledActivityId != null;
 
   if (explicitActivityId != null) {
     td.style.background = colorFor(explicitActivityId);
-  } else if (isBase) {
-    td.style.background = colorFor(effectiveActivityId);
-    td.classList.add("base-value");
+  } else if (showScheduledDefault) {
+    td.style.background = colorFor(scheduledActivityId);
     td.dataset.isBase = "1";
+  } else if (showExplicitEmptyOnSchedule) {
+    td.style.background = colorFor(scheduledActivityId);
+    td.classList.add("base-value");
   } else if (isScheduled) {
     td.classList.add("scheduled-empty");
   }
