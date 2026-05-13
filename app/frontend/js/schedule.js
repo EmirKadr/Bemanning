@@ -92,6 +92,11 @@ function colorFor(activityId) {
   return a ? a.color : "#ffffff";
 }
 
+function activityLabel(activityId) {
+  const a = activityById(activityId);
+  return a ? a.label : "";
+}
+
 function focusNameFilter() {
   const input = document.getElementById("nameFilter");
   if (!input) return;
@@ -590,6 +595,38 @@ function buildActivitySelect(includeActivityIds = []) {
   return select;
 }
 
+function ensureSelectHasActivityOption(select, activityId) {
+  if (activityId == null) return;
+  const value = String(activityId);
+  const exists = Array.from(select.options).some((option) => option.value === value);
+  if (exists) return;
+
+  const activity = activityById(activityId);
+  if (!activity) return;
+
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = activity.label;
+  option.style.background = activity.color;
+  select.appendChild(option);
+}
+
+function setSelectActivityValue(select, activityId) {
+  if (activityId == null) {
+    select.value = "";
+    return;
+  }
+  ensureSelectHasActivityOption(select, activityId);
+  select.value = String(activityId);
+}
+
+function buildDisplayLabel(text, className) {
+  const label = document.createElement("div");
+  label.className = className;
+  label.textContent = text;
+  return label;
+}
+
 function scheduledActivityIdForHour(personId, hour) {
   if (!isScheduledHour(personId, hour)) return null;
   const person = personById(personId);
@@ -697,11 +734,15 @@ function armHalfHourDrag(td, minuteStart, minuteEnd, event) {
   startPendingDrag(td, event, minuteStart, minuteEnd);
 }
 
-function renderFullHourCell(td, segment, isScheduled) {
-  td.dataset.split = "0";
-  td.classList.remove("split-hour", "scheduled-empty", "base-value");
+function resetRenderedHourState(td) {
+  td.classList.remove("split-hour", "scheduled-empty", "base-value", "with-display-label");
   td.style.background = "#fff";
   td.dataset.isBase = "";
+}
+
+function renderFullHourCell(td, segment, isScheduled) {
+  td.dataset.split = "0";
+  resetRenderedHourState(td);
   td.oncontextmenu = (e) => handleFullHourContextMenu(e, td);
 
   const person = personById(Number(td.dataset.personId));
@@ -710,25 +751,22 @@ function renderFullHourCell(td, segment, isScheduled) {
   const explicitEmptyOverride = !!segment?.empty_override;
   const scheduledActivityId = isScheduled ? (person?.home_activity_id || null) : null;
   const showScheduledDefault = explicitActivityId == null && !explicitEmptyOverride && scheduledActivityId != null;
-  const showExplicitEmptyOnSchedule = explicitEmptyOverride && scheduledActivityId != null;
 
   if (explicitActivityId != null) {
     td.style.background = colorFor(explicitActivityId);
   } else if (showScheduledDefault) {
     td.style.background = colorFor(scheduledActivityId);
     td.dataset.isBase = "1";
-  } else if (showExplicitEmptyOnSchedule) {
-    td.style.background = colorFor(scheduledActivityId);
-    td.classList.add("base-value");
   } else if (isScheduled) {
     td.classList.add("scheduled-empty");
   }
 
   const select = buildActivitySelect([explicitActivityId, scheduledActivityId]);
   select.className = "cell-select";
-  select.value = explicitActivityId != null
-    ? String(explicitActivityId)
-    : (showScheduledDefault ? String(scheduledActivityId) : "");
+  const selectedActivityId = explicitActivityId != null
+    ? explicitActivityId
+    : (showScheduledDefault ? scheduledActivityId : null);
+  setSelectActivityValue(select, selectedActivityId);
   select.dataset.minuteStart = "0";
   select.dataset.minuteEnd = "60";
   select.dataset.version = String(segment?.version || 0);
@@ -751,14 +789,16 @@ function renderFullHourCell(td, segment, isScheduled) {
   select.addEventListener("contextmenu", (e) => handleFullHourContextMenu(e, td), true);
 
   td.appendChild(select);
+  if (showScheduledDefault && scheduledActivityId != null) {
+    td.classList.add("with-display-label");
+    td.appendChild(buildDisplayLabel(activityLabel(scheduledActivityId), "cell-display-label"));
+  }
 }
 
 function renderSplitHourCell(td, segments, isScheduled) {
   td.dataset.split = "1";
-  td.dataset.isBase = "";
+  resetRenderedHourState(td);
   td.classList.add("split-hour");
-  td.classList.remove("scheduled-empty", "base-value");
-  td.style.background = "#fff";
   td.oncontextmenu = (e) => {
     const part = splitPartFromEvent(td, e);
     if (!part) return;
@@ -796,9 +836,10 @@ function renderSplitHourCell(td, segments, isScheduled) {
 
     const select = buildActivitySelect([segment.activity_id, scheduledActivityId]);
     select.className = "half-select";
-    select.value = segment.activity_id != null
-      ? String(segment.activity_id)
-      : (!segment.empty_override && scheduledActivityId != null ? String(scheduledActivityId) : "");
+    const selectedActivityId = segment.activity_id != null
+      ? segment.activity_id
+      : (!segment.empty_override && scheduledActivityId != null ? scheduledActivityId : null);
+    setSelectActivityValue(select, selectedActivityId);
     select.dataset.minuteStart = String(minute_start);
     select.dataset.minuteEnd = String(minute_end);
     select.dataset.version = String(segment.version || 0);
@@ -830,6 +871,10 @@ function renderSplitHourCell(td, segments, isScheduled) {
     );
 
     part.appendChild(select);
+    if (segment.activity_id == null && !segment.empty_override && scheduledActivityId != null) {
+      part.classList.add("with-display-label");
+      part.appendChild(buildDisplayLabel(activityLabel(scheduledActivityId), "hour-segment-label"));
+    }
     wrapper.appendChild(part);
   });
 
