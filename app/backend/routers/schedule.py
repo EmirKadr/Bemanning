@@ -626,37 +626,49 @@ def get_summary(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[SummaryRow]:
-    q = (
-        select(
-            Activity.id,
-            Activity.code,
-            Activity.label,
-            Activity.color,
-            Activity.sort_order,
-            Activity.summary_activity_id,
-            func.sum(ScheduleCell.minute_end - ScheduleCell.minute_start).label("minutes"),
-        )
-        .join(ScheduleCell, ScheduleCell.activity_id == Activity.id)
-        .where(
-            ScheduleCell.year == year,
-            ScheduleCell.week == week,
-            ScheduleCell.weekday == weekday,
-        )
-        .group_by(
-            Activity.id,
-            Activity.code,
-            Activity.label,
-            Activity.color,
-            Activity.sort_order,
-            Activity.summary_activity_id,
-        )
-        .order_by(Activity.sort_order)
-    )
+    persons_q = select(Person).where(Person.is_active.is_(True))
     if area_id is not None:
-        q = q.join(Person, Person.id == ScheduleCell.person_id).where(Person.home_area_id == area_id)
+        persons_q = persons_q.where(Person.home_area_id == area_id)
+    persons = db.execute(persons_q).scalars().all()
+    person_ids = [person.id for person in persons]
 
-    rows = db.execute(q).all()
     activities = {activity.id: activity for activity in db.query(Activity).all()}
+    minutes_by_activity: dict[int, int] = {}
+
+    if person_ids:
+        explicit_rows = db.execute(
+            select(
+                ScheduleCell.person_id,
+                ScheduleCell.hour,
+                ScheduleCell.activity_id,
+                ScheduleCell.minute_start,
+                ScheduleCell.minute_end,
+            ).where(
+                ScheduleCell.year == year,
+                ScheduleCell.week == week,
+                ScheduleCell.weekday == weekday,
+                ScheduleCell.person_id.in_(person_ids),
+            )
+        ).all()
+
+        explicit_hours = {(row.person_id, row.hour) for row in explicit_rows}
+        for row in explicit_rows:
+            if row.activity_id is None:
+                continue
+            minutes_by_activity[row.activity_id] = (
+                minutes_by_activity.get(row.activity_id, 0) + int(row.minute_end - row.minute_start)
+            )
+
+        for person in persons:
+            template_hours = get_template_hours(db, person.id, weekday)
+            if template_hours is None or person.home_activity_id is None:
+                continue
+            for hour in template_hours:
+                if (person.id, hour) in explicit_hours:
+                    continue
+                minutes_by_activity[person.home_activity_id] = (
+                    minutes_by_activity.get(person.home_activity_id, 0) + 60
+                )
 
     def resolve_summary_target(activity_id: int) -> Activity | None:
         current = activities.get(activity_id)
@@ -667,8 +679,8 @@ def get_summary(
         return current
 
     grouped: dict[int, dict] = {}
-    for row in rows:
-        target = resolve_summary_target(row.id) or activities.get(row.id)
+    for activity_id, minutes in minutes_by_activity.items():
+        target = resolve_summary_target(activity_id) or activities.get(activity_id)
         if target is None:
             continue
         bucket = grouped.setdefault(
@@ -682,7 +694,7 @@ def get_summary(
                 "minutes": 0,
             },
         )
-        bucket["minutes"] += int(row.minutes or 0)
+        bucket["minutes"] += minutes
 
     return [
         SummaryRow(
