@@ -222,10 +222,12 @@ function focusCell(td) {
     hour: Number(td.dataset.hour),
   };
   td.classList.add("focused");
-  // Tar bort fokus från select så Ctrl+C/V/X-events går till document, inte fångas av select
+  // Tar bort fokus från select och flyttar till td så Ctrl+C/V/X går till document
   if (document.activeElement && document.activeElement.tagName === "SELECT") {
     document.activeElement.blur();
   }
+  // td har tabIndex=-1 så vi kan ge den fokus programmatiskt
+  setTimeout(() => { try { td.focus({ preventScroll: true }); } catch (e) {} }, 0);
 }
 
 function clipboardLabel(activityId) {
@@ -284,14 +286,19 @@ async function pasteFocused() {
 
 function setupKeyboard() {
   const handler = (e) => {
-    const active = document.activeElement;
-    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
     if (!(e.ctrlKey || e.metaKey)) return;
     const key = e.key.toLowerCase();
     if (!["c", "x", "v"].includes(key)) return;
 
+    const active = document.activeElement;
+    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
+
+    // Debug – tas bort senare
+    const debugTag = state.focusedCell ? "cell vald" : "INGEN cell";
+    console.log(`[keyboard] Ctrl+${key}, active=${active?.tagName}, ${debugTag}`);
+
     if (!state.focusedCell) {
-      showToast("Klicka först på en cell", "warn");
+      showToast(`Ctrl+${key.toUpperCase()}: klicka först på en cell`, "warn");
       return;
     }
     e.preventDefault();
