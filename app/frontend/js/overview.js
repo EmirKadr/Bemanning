@@ -145,6 +145,90 @@ function focusDayCell(td) {
   setTimeout(() => { try { td.focus({ preventScroll: true }); } catch (e) {} }, 0);
 }
 
+function dayRequestKey(personId, year, week, weekday) {
+  return `${personId}:${year}:${week}:${weekday}`;
+}
+
+function normalizeOverviewCell(cell, td = null) {
+  const normalized = {
+    person_id: Number(cell?.person_id ?? td?.dataset.personId ?? 0),
+    activity_id: cell?.activity_id == null ? null : Number(cell.activity_id),
+    mixed: !!cell?.mixed,
+    hours_total: Number(cell?.hours_total) || 0,
+    template_hours: Number(cell?.template_hours ?? td?.dataset.templateHours ?? 0) || 0,
+  };
+  if (cell?.date != null || td?.dataset.date) normalized.date = cell?.date ?? td.dataset.date;
+  else normalized.weekday = Number(cell?.weekday ?? td?.dataset.weekday ?? 0);
+  if (cell?.year != null || td?.dataset.year) normalized.year = Number(cell?.year ?? td?.dataset.year ?? 0);
+  if (cell?.week != null || td?.dataset.week) normalized.week = Number(cell?.week ?? td?.dataset.week ?? 0);
+  return normalized;
+}
+
+function cellRecordIndexForTd(td) {
+  if (state.view === "week") {
+    const personId = Number(td.dataset.personId);
+    const weekday = Number(td.dataset.weekday);
+    return state.cells.findIndex((cell) => Number(cell.person_id) === personId && Number(cell.weekday) === weekday);
+  }
+  const personId = Number(td.dataset.personId);
+  const date = td.dataset.date || "";
+  return state.cells.findIndex((cell) => Number(cell.person_id) === personId && cell.date === date);
+}
+
+function cellRecordForTd(td) {
+  const idx = cellRecordIndexForTd(td);
+  if (idx >= 0) return normalizeOverviewCell(state.cells[idx], td);
+  return normalizeOverviewCell({}, td);
+}
+
+function upsertCellRecordForTd(td, cell) {
+  const normalized = normalizeOverviewCell(cell, td);
+  const idx = cellRecordIndexForTd(td);
+  if (idx >= 0) state.cells[idx] = { ...state.cells[idx], ...normalized };
+  else state.cells.push(normalized);
+  return normalized;
+}
+
+function markDayPending(td, pending) {
+  td.classList.toggle("pending-save", pending);
+  const sel = td.querySelector("select");
+  if (sel) sel.disabled = pending;
+}
+
+function renderDayCell(td, cell) {
+  const normalized = upsertCellRecordForTd(td, cell);
+  td.dataset.activityId = normalized.activity_id == null ? "" : String(normalized.activity_id);
+  td.dataset.templateHours = String(normalized.template_hours);
+  styleCell(td, normalized);
+  const sel = td.querySelector("select");
+  if (sel) sel.disabled = td.classList.contains("pending-save");
+  return normalized;
+}
+
+function buildOptimisticDayCell(td, activityId) {
+  const current = cellRecordForTd(td);
+  return normalizeOverviewCell(
+    {
+      person_id: current.person_id,
+      weekday: current.weekday,
+      date: current.date,
+      year: Number(td.dataset.year),
+      week: Number(td.dataset.week),
+      activity_id: activityId,
+      mixed: false,
+      hours_total: activityId == null ? 0 : current.template_hours,
+      template_hours: current.template_hours,
+    },
+    td,
+  );
+}
+
+function findDayTd(personId, year, week, weekday) {
+  return document.querySelector(
+    `#overviewBody td.day[data-person-id="${personId}"][data-year="${year}"][data-week="${week}"][data-weekday="${weekday}"]`
+  );
+}
+
 
 // ---- Cell rendering ----
 function styleCell(td, cell) {
@@ -189,6 +273,9 @@ function styleCell(td, cell) {
   else if (cell.activity_id) info.textContent = `${cell.hours_total}/${cell.template_hours}h`;
   else info.textContent = `Schemalagd (${cell.template_hours}h)`;
   td.appendChild(info);
+  if (td.classList.contains("pending-save")) {
+    sel.disabled = true;
+  }
 
 }
 
@@ -229,10 +316,8 @@ function buildWeekBody() {
       td.dataset.weekday = wd;
       td.dataset.year = state.year;
       td.dataset.week = state.week;
-      td.dataset.activityId = cell.activity_id || "";
-      td.dataset.templateHours = cell.template_hours;
       td.tabIndex = -1;
-      styleCell(td, cell);
+      renderDayCell(td, cell);
       tr.appendChild(td);
     }
     body.appendChild(tr);
@@ -276,10 +361,8 @@ function buildMonthBody() {
       td.dataset.year = dInfo.year;
       td.dataset.week = dInfo.week;
       td.dataset.date = dInfo.date;
-      td.dataset.activityId = cell.activity_id || "";
-      td.dataset.templateHours = cell.template_hours;
       td.tabIndex = -1;
-      styleCell(td, cell);
+      renderDayCell(td, cell);
       tr.appendChild(td);
     });
     body.appendChild(tr);
@@ -296,13 +379,20 @@ async function postDay(personId, year, week, weekday, activityId) {
   });
 }
 
+async function postBulkDays(days, atomic = false) {
+  return api.post("/api/overview/days/bulk", { days, atomic });
+}
+
 async function onDayChange(td, sel, cell) {
   const newActivityId = sel.value ? Number(sel.value) : null;
-  if (cell.mixed && !confirm("Denna dag har flera olika aktiviteter. Skriv över med samma värde?")) {
-    sel.value = cell.activity_id ? String(cell.activity_id) : "";
+  const previousCell = cellRecordForTd(td);
+  if (previousCell.mixed && !confirm("Denna dag har flera olika aktiviteter. Skriv över med samma värde?")) {
+    sel.value = previousCell.activity_id ? String(previousCell.activity_id) : "";
     return;
   }
 
+  markDayPending(td, true);
+  renderDayCell(td, buildOptimisticDayCell(td, newActivityId));
   try {
     const resp = await postDay(
       Number(td.dataset.personId),
@@ -311,12 +401,14 @@ async function onDayChange(td, sel, cell) {
       Number(td.dataset.weekday),
       newActivityId,
     );
+    markDayPending(td, false);
+    renderDayCell(td, resp.cell);
     showToast(`Bemannade ${resp.written} h, tog bort ${resp.deleted} h`);
-    await load();
   } catch (e) {
     const detail = e.body?.detail || e.message;
+    markDayPending(td, false);
+    renderDayCell(td, previousCell);
     showToast("Kunde inte spara: " + detail, "error");
-    sel.value = cell.activity_id ? String(cell.activity_id) : "";
   }
 }
 
@@ -421,24 +513,79 @@ function setupDrag() {
     if (targets.length <= 1) return;
     if (targets.length > 100) { showToast("För många celler (max 100)", "error"); return; }
 
-    let written = 0, deleted = 0, errors = 0;
-    for (const td of targets) {
-      try {
-        const r = await postDay(
+    const days = targets.map((td) => ({
+      person_id: Number(td.dataset.personId),
+      year: Number(td.dataset.year),
+      week: Number(td.dataset.week),
+      weekday: Number(td.dataset.weekday),
+      activity_id: sourceActivityId,
+    }));
+    const snapshots = new Map();
+    targets.forEach((td) => {
+      const key = dayRequestKey(
+        Number(td.dataset.personId),
+        Number(td.dataset.year),
+        Number(td.dataset.week),
+        Number(td.dataset.weekday),
+      );
+      snapshots.set(key, cellRecordForTd(td));
+      markDayPending(td, true);
+      renderDayCell(td, buildOptimisticDayCell(td, sourceActivityId));
+    });
+
+    try {
+      const resp = await postBulkDays(days, false);
+      const handled = new Set();
+
+      (resp.applied || []).forEach((result) => {
+        const key = dayRequestKey(result.person_id, result.year, result.week, result.weekday);
+        handled.add(key);
+        const targetTd = findDayTd(result.person_id, result.year, result.week, result.weekday);
+        if (!targetTd) return;
+        markDayPending(targetTd, false);
+        renderDayCell(targetTd, result);
+      });
+
+      (resp.errors || []).forEach((result) => {
+        const key = dayRequestKey(result.person_id, result.year, result.week, result.weekday);
+        handled.add(key);
+        const targetTd = findDayTd(result.person_id, result.year, result.week, result.weekday);
+        if (!targetTd) return;
+        markDayPending(targetTd, false);
+        const snapshot = snapshots.get(key);
+        if (snapshot) renderDayCell(targetTd, snapshot);
+      });
+
+      targets.forEach((td) => {
+        const key = dayRequestKey(
           Number(td.dataset.personId),
           Number(td.dataset.year),
           Number(td.dataset.week),
           Number(td.dataset.weekday),
-          sourceActivityId,
         );
-        written += r.written;
-        deleted += r.deleted;
-      } catch (e) {
-        errors++;
-      }
+        if (handled.has(key)) return;
+        markDayPending(td, false);
+        const snapshot = snapshots.get(key);
+        if (snapshot) renderDayCell(td, snapshot);
+      });
+
+      const errorCount = resp.errors?.length || 0;
+      showToast(`Drag klar: skrev ${resp.written || 0} h, tog bort ${resp.deleted || 0} h${errorCount ? `, ${errorCount} fel` : ""}`);
+    } catch (e) {
+      targets.forEach((td) => {
+        const key = dayRequestKey(
+          Number(td.dataset.personId),
+          Number(td.dataset.year),
+          Number(td.dataset.week),
+          Number(td.dataset.weekday),
+        );
+        markDayPending(td, false);
+        const snapshot = snapshots.get(key);
+        if (snapshot) renderDayCell(td, snapshot);
+      });
+      const detail = e.body?.detail || e.message;
+      showToast("Drag misslyckades: " + detail, "error");
     }
-    showToast(`Drag klar: skrev ${written} h, tog bort ${deleted} h${errors ? `, ${errors} fel` : ""}`);
-    await load();
   });
 
   document.addEventListener("click", (e) => {

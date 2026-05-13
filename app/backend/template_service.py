@@ -1,6 +1,8 @@
 """Hjälpfunktioner för person_schedule_templates."""
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -41,6 +43,46 @@ def get_template_hours(db: Session, person_id: int, weekday: int) -> set[int] | 
     if row.is_off:
         return None
     return _hours_with_lunch_removed(row.start_hour, row.end_hour)
+
+
+def get_template_hours_map(
+    db: Session,
+    person_ids: Iterable[int],
+    weekdays: Iterable[int],
+) -> dict[tuple[int, int], set[int] | None]:
+    """Batchhämta schema för flera personer/veckodagar.
+
+    Nyckeln i resultatet är ``(person_id, weekday)``.
+    Om en rad saknas används samma defaultbeteende som i ``get_template_hours``.
+    """
+    unique_person_ids = sorted({int(person_id) for person_id in person_ids})
+    unique_weekdays = sorted({int(weekday) for weekday in weekdays})
+    if not unique_person_ids or not unique_weekdays:
+        return {}
+
+    rows = db.execute(
+        select(PersonScheduleTemplate).where(
+            PersonScheduleTemplate.person_id.in_(unique_person_ids),
+            PersonScheduleTemplate.weekday.in_(unique_weekdays),
+        )
+    ).scalars().all()
+
+    template_map: dict[tuple[int, int], set[int] | None] = {}
+    for row in rows:
+        key = (int(row.person_id), int(row.weekday))
+        if row.is_off:
+            template_map[key] = None
+        else:
+            template_map[key] = _hours_with_lunch_removed(row.start_hour, row.end_hour)
+
+    for person_id in unique_person_ids:
+        for weekday in unique_weekdays:
+            template_map.setdefault(
+                (person_id, weekday),
+                _hours_with_lunch_removed(DEFAULT_START, DEFAULT_END),
+            )
+
+    return template_map
 
 
 def get_all_default_days() -> list[dict]:

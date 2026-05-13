@@ -5,6 +5,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     SmallInteger,
     String,
@@ -83,6 +84,7 @@ class ScheduleCell(Base):
     __tablename__ = "schedule_cells"
     __table_args__ = (
         UniqueConstraint("year", "week", "weekday", "hour", "person_id", "minute_start", name="uq_schedule_cell"),
+        Index("ix_schedule_cells_ywd_person_hour", "year", "week", "weekday", "person_id", "hour"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)

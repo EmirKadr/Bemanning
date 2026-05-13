@@ -1,4 +1,4 @@
-# Bara app/ pushas till GitHub
+# Lokala exempeldata
 demo/
 referens/
 
@@ -24,3 +24,8 @@ env/
 *.log
 .DS_Store
 Thumbs.db
+
+# Desktop build artifacts
+build/
+dist/
+release/

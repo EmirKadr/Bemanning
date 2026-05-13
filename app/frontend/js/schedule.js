@@ -213,6 +213,185 @@ function currentSegment(personId, hour, minuteStart, minuteEnd) {
   };
 }
 
+function cloneSegment(segment) {
+  return {
+    person_id: Number(segment.person_id),
+    hour: Number(segment.hour),
+    minute_start: Number(segment.minute_start),
+    minute_end: Number(segment.minute_end),
+    activity_id: segment.activity_id == null ? null : Number(segment.activity_id),
+    empty_override: !!segment.empty_override,
+    version: Number(segment.version) || 0,
+    updated_at: segment.updated_at || null,
+    updated_by: segment.updated_by == null ? null : Number(segment.updated_by),
+  };
+}
+
+function cloneSegments(segments) {
+  return sortSegments((segments || []).map((segment) => cloneSegment(segment)));
+}
+
+function getHourTd(personId, hour) {
+  return document.querySelector(
+    `#scheduleBody td[data-person-id="${personId}"][data-hour="${hour}"]`
+  );
+}
+
+function setHourPending(td, pending) {
+  if (!td) return;
+  td.classList.toggle("pending-save", pending);
+  td.querySelectorAll("select").forEach((select) => {
+    select.disabled = pending;
+  });
+}
+
+function snapshotHoursFromCells(cells) {
+  const snapshots = new Map();
+  cells.forEach((cell) => {
+    const key = hourKey(cell.person_id, cell.hour);
+    if (snapshots.has(key)) return;
+    snapshots.set(key, {
+      personId: Number(cell.person_id),
+      hour: Number(cell.hour),
+      segments: cloneSegments(segmentsForHour(cell.person_id, cell.hour)),
+    });
+  });
+  return snapshots;
+}
+
+function optimisticSegmentsForHour(personId, hour, items) {
+  const current = cloneSegments(segmentsForHour(personId, hour));
+  const scheduled = isScheduledHour(personId, hour);
+  const needsHalfSegments = items.some(
+    (item) => Number(item.minute_end) - Number(item.minute_start) === 30
+  );
+
+  if (!needsHalfSegments && items.length === 1 && Number(items[0].minute_start) === 0 && Number(items[0].minute_end) === 60) {
+    return [
+      {
+        person_id: personId,
+        hour,
+        minute_start: 0,
+        minute_end: 60,
+        activity_id: items[0].activity_id == null ? null : Number(items[0].activity_id),
+        empty_override: items[0].activity_id == null && scheduled,
+        version: current[0]?.version || 0,
+        updated_at: current[0]?.updated_at || null,
+        updated_by: current[0]?.updated_by ?? null,
+      },
+    ];
+  }
+
+  let segments = current;
+  if (needsHalfSegments) {
+    if (segments.length === 0) {
+      segments = HALF_SEGMENTS.map(({ minute_start, minute_end }) => ({
+        person_id: personId,
+        hour,
+        minute_start,
+        minute_end,
+        activity_id: null,
+        empty_override: scheduled,
+        version: 0,
+        updated_at: null,
+        updated_by: null,
+      }));
+    } else if (
+      segments.length === 1 &&
+      segments[0].minute_start === 0 &&
+      segments[0].minute_end === 60
+    ) {
+      const source = segments[0];
+      segments = HALF_SEGMENTS.map(({ minute_start, minute_end }) => ({
+        person_id: personId,
+        hour,
+        minute_start,
+        minute_end,
+        activity_id: source.activity_id,
+        empty_override: source.empty_override,
+        version: source.version,
+        updated_at: source.updated_at || null,
+        updated_by: source.updated_by ?? null,
+      }));
+    }
+  }
+
+  const byRange = new Map(
+    segments.map((segment) => [`${segment.minute_start}:${segment.minute_end}`, cloneSegment(segment)])
+  );
+  if (needsHalfSegments) {
+    HALF_SEGMENTS.forEach(({ minute_start, minute_end }) => {
+      const key = `${minute_start}:${minute_end}`;
+      if (byRange.has(key)) return;
+      byRange.set(key, {
+        person_id: personId,
+        hour,
+        minute_start,
+        minute_end,
+        activity_id: null,
+        empty_override: scheduled,
+        version: 0,
+        updated_at: null,
+        updated_by: null,
+      });
+    });
+  }
+
+  items.forEach((item) => {
+    const key = `${item.minute_start}:${item.minute_end}`;
+    const existing = byRange.get(key) || {
+      person_id: personId,
+      hour,
+      minute_start: Number(item.minute_start),
+      minute_end: Number(item.minute_end),
+      activity_id: null,
+      empty_override: scheduled,
+      version: 0,
+      updated_at: null,
+      updated_by: null,
+    };
+    byRange.set(key, {
+      ...existing,
+      activity_id: item.activity_id == null ? null : Number(item.activity_id),
+      empty_override: item.activity_id == null && scheduled,
+    });
+  });
+
+  return sortSegments(Array.from(byRange.values()));
+}
+
+function applySegmentsByHourResponse(applied) {
+  const updatedHours = new Map();
+  (applied || []).forEach((segment) => {
+    const key = hourKey(segment.person_id, segment.hour);
+    if (!updatedHours.has(key)) updatedHours.set(key, []);
+    updatedHours.get(key).push(segment);
+  });
+
+  updatedHours.forEach((segments, key) => {
+    const [personId, hour] = key.split(":").map(Number);
+    replaceHourSegments(personId, hour, segments);
+    const td = getHourTd(personId, hour);
+    if (!td) return;
+    setHourPending(td, false);
+    renderHourCell(td);
+  });
+}
+
+function restoreHourSnapshots(snapshots) {
+  snapshots.forEach((snapshot) => {
+    replaceHourSegments(snapshot.personId, snapshot.hour, snapshot.segments);
+    const td = getHourTd(snapshot.personId, snapshot.hour);
+    if (!td) return;
+    setHourPending(td, false);
+    renderHourCell(td);
+  });
+}
+
+function targetMatchesCurrentDay(year, week, weekday) {
+  return year === state.year && week === state.week && weekday === state.weekday;
+}
+
 function isSplitHour(segments) {
   return (
     segments.length === 2 &&
@@ -664,11 +843,13 @@ function renderHourCell(td) {
 
   if (isSplitHour(segments) || segments.some((segment) => segment.minute_end - segment.minute_start === 30)) {
     renderSplitHourCell(td, segments, isScheduled);
+    if (td.classList.contains("pending-save")) setHourPending(td, true);
     return;
   }
 
   const segment = segments.length === 1 ? segments[0] : null;
   renderFullHourCell(td, segment, isScheduled);
+  if (td.classList.contains("pending-save")) setHourPending(td, true);
 }
 
 function buildRows() {
@@ -1038,25 +1219,29 @@ async function finishDrag() {
     return;
   }
 
+  const snapshots = snapshotHoursFromCells(cells);
+  const optimisticByHour = new Map();
+  cells.forEach((cell) => {
+    const key = hourKey(cell.person_id, cell.hour);
+    if (!optimisticByHour.has(key)) optimisticByHour.set(key, []);
+    optimisticByHour.get(key).push(cell);
+  });
+  optimisticByHour.forEach((items, key) => {
+    const [personId, hour] = key.split(":").map(Number);
+    replaceHourSegments(personId, hour, optimisticSegmentsForHour(personId, hour, items));
+    const td = getHourTd(personId, hour);
+    if (!td) return;
+    setHourPending(td, true);
+    renderHourCell(td);
+  });
+
   try {
     const resp = await api.post("/api/schedule/cells", { cells, atomic: true, action: "drag_fill" });
-    const updatedHours = new Map();
-    resp.applied.forEach((segment) => {
-      const key = `${segment.person_id}:${segment.hour}`;
-      if (!updatedHours.has(key)) updatedHours.set(key, new Map());
-      updatedHours.get(key).set(`${segment.minute_start}:${segment.minute_end}`, segment);
-    });
-    updatedHours.forEach((segmentMap, key) => {
-      const [personId, hour] = key.split(":").map(Number);
-      replaceHourSegments(personId, hour, Array.from(segmentMap.values()));
-      const td = document.querySelector(
-        `#scheduleBody td[data-person-id="${personId}"][data-hour="${hour}"]`
-      );
-      if (td) renderHourCell(td);
-    });
+    applySegmentsByHourResponse(resp.applied);
     refreshSummary();
     showToast(`Fyllde ${targetCount} celler`);
   } catch (e) {
+    restoreHourSnapshots(snapshots);
     if (e.status === 409) {
       showToast(`${e.body?.conflicts?.length ?? 0} konflikter – läser om`, "warn");
       await loadSchedule();
@@ -1332,20 +1517,24 @@ function openCopyModal() {
   document.body.appendChild(backdrop);
   document.getElementById("cp-cancel").addEventListener("click", () => backdrop.remove());
   document.getElementById("cp-go").addEventListener("click", async () => {
+    const copyPayload = {
+      from_year: Number(document.getElementById("cp-fy").value),
+      from_week: Number(document.getElementById("cp-fw").value),
+      from_weekday: Number(document.getElementById("cp-fd").value),
+      to_year: Number(document.getElementById("cp-ty").value),
+      to_week: Number(document.getElementById("cp-tw").value),
+      to_weekday: Number(document.getElementById("cp-td").value),
+      area_id: state.areaId,
+      overwrite: document.getElementById("cp-ow").checked,
+    };
     try {
-      const r = await api.post("/api/schedule/copy", {
-        from_year: Number(document.getElementById("cp-fy").value),
-        from_week: Number(document.getElementById("cp-fw").value),
-        from_weekday: Number(document.getElementById("cp-fd").value),
-        to_year: Number(document.getElementById("cp-ty").value),
-        to_week: Number(document.getElementById("cp-tw").value),
-        to_weekday: Number(document.getElementById("cp-td").value),
-        area_id: state.areaId,
-        overwrite: document.getElementById("cp-ow").checked,
-      });
+      const r = await api.post("/api/schedule/copy", copyPayload);
       showToast(`Kopierade ${r.copied} celler`);
       backdrop.remove();
-      await loadSchedule();
+      if (targetMatchesCurrentDay(copyPayload.to_year, copyPayload.to_week, copyPayload.to_weekday)) {
+        applySegmentsByHourResponse(r.applied);
+        refreshSummary();
+      }
     } catch (e) {
       showToast("Fel: " + e.message, "error");
     }

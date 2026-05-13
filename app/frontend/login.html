@@ -8,7 +8,15 @@
 </head>
 <body>
   <div class="login-box">
-    <h2>Logga in</h2>
+    <div class="login-brand">
+      <div class="brand-dot">B</div>
+      <div>
+        <div class="brand-name">Bemanning</div>
+        <div class="brand-sub">Stigamo</div>
+      </div>
+    </div>
+    <h2>Välkommen tillbaka</h2>
+    <p class="subtitle">Logga in för att komma åt bemanningssystemet</p>
     <form id="login-form">
       <label for="username">Användarnamn</label>
       <input id="username" name="username" autocomplete="username" required />
@@ -41,12 +49,11 @@
       }
     });
 
-    // Om redan inloggad – skicka till startsida
     (async () => {
       try {
         await api.get("/api/auth/me");
         window.location.href = "/index.html";
-      } catch (_) { /* inte inloggad – stanna kvar */ }
+      } catch (_) { /* inte inloggad */ }
     })();
   </script>
 </body>

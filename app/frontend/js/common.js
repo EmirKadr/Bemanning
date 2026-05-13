@@ -32,25 +32,63 @@ function flushQueuedToast() {
   }
 }
 
-function renderTopbar(user, activePage) {
-  const bar = document.querySelector(".topbar");
-  if (!bar) return;
-  const tips = activePage === "schedule" ? document.querySelector(".tips-fab") : null;
+function initials(name) {
+  return String(name || "?")
+    .split(/\s+/).filter(Boolean).slice(0, 2)
+    .map((p) => p[0].toUpperCase()).join("");
+}
+
+function renderSidebar(user, activePage) {
+  let sidebar = document.querySelector(".sidebar");
+  // Säkra att .app/.sidebar/.main struktur finns
+  if (!sidebar) {
+    const body = document.body;
+    const topbar = document.querySelector(".topbar");
+    if (topbar) topbar.remove();
+    // Wrap allt nuvarande body-innehåll i .main (förutom modaler/toasts/tips)
+    const main = document.createElement("main");
+    main.className = "main";
+    // Flytta över alla direkta barn till main, förutom <script> och .tips-fab
+    Array.from(body.children).forEach((el) => {
+      if (el.tagName === "SCRIPT" || el.classList.contains("tips-fab")) return;
+      main.appendChild(el);
+    });
+    sidebar = document.createElement("aside");
+    sidebar.className = "sidebar";
+    const app = document.createElement("div");
+    app.className = "app";
+    app.appendChild(sidebar);
+    app.appendChild(main);
+    body.insertBefore(app, body.firstChild);
+  }
+
   const adminLink = user?.role === "admin"
-    ? `<a href="/anvandare.html" class="${activePage === 'users' ? 'active' : ''}">Användare</a>`
+    ? `<a href="/anvandare.html" class="${activePage === 'users' ? 'active' : ''}"><span class="icon">👤</span><span>Användare</span></a>`
     : "";
-  const nav = `
+
+  sidebar.innerHTML = `
+    <div class="brand">
+      <div class="brand-dot">B</div>
+      <div>
+        <div class="brand-name">Bemanning</div>
+        <div class="brand-sub">Stigamo</div>
+      </div>
+    </div>
     <nav>
-      <a href="/index.html"     class="${activePage === 'schedule' ? 'active' : ''}">Bemanning</a>
-      <a href="/overblick.html" class="${activePage === 'overview' ? 'active' : ''}">Översikt</a>
-      <a href="/personer.html"  class="${activePage === 'persons'  ? 'active' : ''}">Personer</a>
-      <a href="/stallen.html"   class="${activePage === 'stallen'  ? 'active' : ''}">Ställen</a>
+      <a href="/index.html"     class="${activePage === 'schedule' ? 'active' : ''}"><span class="icon">📋</span><span>Bemanning</span></a>
+      <a href="/overblick.html" class="${activePage === 'overview' ? 'active' : ''}"><span class="icon">📅</span><span>Översikt</span></a>
+      <a href="/personer.html"  class="${activePage === 'persons'  ? 'active' : ''}"><span class="icon">👥</span><span>Personer</span></a>
+      <a href="/stallen.html"   class="${activePage === 'stallen'  ? 'active' : ''}"><span class="icon">📍</span><span>Ställen</span></a>
       ${adminLink}
-    </nav>`;
-  const userInfo = user
-    ? `<span class="user-info">${user.display_name || user.username} <a href="#" id="logout-link">Logga ut</a></span>`
-    : "";
-  bar.innerHTML = `<h1 id="page-title">Bemanning</h1>${nav}${userInfo}`;
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="avatar">${initials(user?.display_name || user?.username)}</div>
+      <div>
+        <div class="who">${user?.display_name || user?.username || ""}</div>
+        <a href="#" class="logout" id="logout-link">Logga ut</a>
+      </div>
+    </div>
+  `;
 
   const logout = document.getElementById("logout-link");
   if (logout) {
@@ -60,12 +98,11 @@ function renderTopbar(user, activePage) {
       window.location.href = "/login.html";
     });
   }
+}
 
-  if (tips) {
-    const userInfoEl = bar.querySelector(".user-info");
-    if (userInfoEl) bar.insertBefore(tips, userInfoEl);
-    else bar.appendChild(tips);
-  }
+// Bakåtkompatibilitet
+function renderTopbar(user, activePage) {
+  renderSidebar(user, activePage);
 }
 
 async function initPage(activePage, options = {}) {
@@ -79,7 +116,7 @@ async function initPage(activePage, options = {}) {
     window.location.href = "/index.html";
     return null;
   }
-  renderTopbar(user, activePage);
+  renderSidebar(user, activePage);
   flushQueuedToast();
   return user;
 }

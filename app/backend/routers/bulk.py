@@ -12,6 +12,20 @@ from ..schemas import ClearRequest, CopyRequest, FillFromLeftRequest
 router = APIRouter(prefix="/api/schedule", tags=["schedule-bulk"])
 
 
+def _segment_to_dict(cell: ScheduleCell) -> dict:
+    return {
+        "person_id": cell.person_id,
+        "hour": cell.hour,
+        "minute_start": cell.minute_start,
+        "minute_end": cell.minute_end,
+        "activity_id": cell.activity_id,
+        "empty_override": cell.empty_override,
+        "version": cell.version,
+        "updated_at": cell.updated_at.isoformat() if cell.updated_at else None,
+        "updated_by": cell.updated_by,
+    }
+
+
 def _person_ids_for_area(db: Session, area_id: int | None) -> list[int] | None:
     if area_id is None:
         return None
@@ -37,9 +51,10 @@ def copy_schedule(
 
     area_person_ids = _person_ids_for_area(db, payload.area_id)
     if area_person_ids is not None and not area_person_ids:
-        return {"copied": 0}
+        return {"copied": 0, "applied": []}
 
     copied = 0
+    applied: list[dict] = []
     for from_wd, to_wd in zip(weekdays, to_weekdays):
         src_q = select(ScheduleCell).where(
             ScheduleCell.year == payload.from_year,
@@ -68,6 +83,8 @@ def copy_schedule(
         for cell in src_cells:
             src_by_hour[(cell.person_id, cell.hour)].append(cell)
 
+        cells_to_delete: list[ScheduleCell] = []
+        cells_to_create: list[ScheduleCell] = []
         for key, source_segments in src_by_hour.items():
             target_segments = existing_by_hour.get(key, [])
             if target_segments and not payload.overwrite:
@@ -89,25 +106,34 @@ def copy_schedule(
                         new_value=None,
                         user_id=user.id,
                     )
-                    db.delete(target)
-                db.flush()
+                    cells_to_delete.append(target)
 
             for src in sorted(source_segments, key=lambda cell: (cell.minute_start, cell.minute_end)):
-                new_cell = ScheduleCell(
-                    year=payload.to_year,
-                    week=payload.to_week,
-                    weekday=to_wd,
-                    hour=src.hour,
-                    minute_start=src.minute_start,
-                    minute_end=src.minute_end,
-                    person_id=src.person_id,
-                    activity_id=src.activity_id,
-                    empty_override=src.empty_override,
-                    version=1,
-                    updated_by=user.id,
+                cells_to_create.append(
+                    ScheduleCell(
+                        year=payload.to_year,
+                        week=payload.to_week,
+                        weekday=to_wd,
+                        hour=src.hour,
+                        minute_start=src.minute_start,
+                        minute_end=src.minute_end,
+                        person_id=src.person_id,
+                        activity_id=src.activity_id,
+                        empty_override=src.empty_override,
+                        version=1,
+                        updated_by=user.id,
+                    )
                 )
-                db.add(new_cell)
-                db.flush()
+
+        for target in cells_to_delete:
+            db.delete(target)
+        if cells_to_delete:
+            db.flush()
+
+        if cells_to_create:
+            db.add_all(cells_to_create)
+            db.flush()
+            for new_cell in cells_to_create:
                 audit_log(
                     db,
                     entity_type="schedule_cell",
@@ -123,9 +149,10 @@ def copy_schedule(
                     user_id=user.id,
                 )
                 copied += 1
+                applied.append(_segment_to_dict(new_cell))
 
     db.commit()
-    return {"copied": copied}
+    return {"copied": copied, "applied": applied}
 
 
 @router.post("/clear")

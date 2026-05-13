@@ -22,6 +22,20 @@ Webbaserad ersättning för Excel-bemanningsfilen. Arbetsledare planerar bemanni
 - **Auth:** Session-cookie (FastAPI SessionMiddleware) + bcrypt
 - **Hosting:** Render via `render.yaml` Blueprint
 
+## Windows-klient
+
+Repo-roten innehaller nu aven en PyQt6-baserad Windows-klient som laddar den
+centrala Render-hostade appen i ett eget skrivbordsfonster.
+
+- **Desktop shell:** PyQt6 + Qt WebEngine
+- **Uppdateringar:** GitHub Releases + `Setup.exe`
+- **Build docs:** `..\BUILD.md`
+- **Release docs:** `..\RELEASE.md`
+
+Desktop-klienten innehaller ingen lokal databas och ingen lokal FastAPI-server i
+steg 1. All affarslogik, auth och delad data ligger fortsatt i den centrala
+Render-miljon.
+
 ## Default-inlogg
 
 Seeden skapar en admin-användare:
@@ -44,7 +58,7 @@ Seeden skapar en admin-användare:
 2. På [render.com](https://render.com): **New → Blueprint** → välj GitHub-repot. Render läser `app/render.yaml` automatiskt.
 3. Render skapar databasen `bemanning-db` och web-servicen `bemanning-web`, sätter `DATABASE_URL` och auto-genererar `SECRET_KEY`.
 4. Build-steget kör `pip install`, `alembic upgrade head` och `python -m backend.seed`. Vid varje deploy uppdateras seed-data (idempotent).
-5. När deploy är klar: öppna `https://bemanning-web.onrender.com` och logga in.
+5. När deploy är klar: öppna `https://stigamo.nu` och logga in.
 
 **Kostnad:** Starter web (~7 USD/mån) + PostgreSQL free 90 dagar → basic-256mb (~7 USD/mån).
 
