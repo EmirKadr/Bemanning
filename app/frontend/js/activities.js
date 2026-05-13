@@ -57,7 +57,7 @@ function openModal(act) {
       <label>Etikett (visas i celler)</label>
       <input id="m-label" value="${escapeHtml(act?.label || "")}" />
       <label>Kod (unik nyckel, ej synlig)</label>
-      <input id="m-code" value="${escapeHtml(act?.code || "")}" ${isEdit ? "readonly" : ""} />
+      <input id="m-code" value="${escapeHtml(act?.code || "")}" />
       <label>Område</label>
       <select id="m-area">
         <option value="">(inget)</option>
@@ -83,6 +83,7 @@ function openModal(act) {
   document.getElementById("m-cancel").addEventListener("click", () => backdrop.remove());
   document.getElementById("m-save").addEventListener("click", async () => {
     const payload = {
+      code: document.getElementById("m-code").value.trim(),
       label: document.getElementById("m-label").value.trim(),
       area_id: document.getElementById("m-area").value ? Number(document.getElementById("m-area").value) : null,
       color: document.getElementById("m-color").value,
@@ -90,9 +91,8 @@ function openModal(act) {
       sort_order: Number(document.getElementById("m-sort").value) || 0,
       is_active: document.getElementById("m-active").checked,
     };
-    if (!isEdit) payload.code = document.getElementById("m-code").value.trim();
 
-    if (!payload.label || (!isEdit && !payload.code)) {
+    if (!payload.label || !payload.code) {
       showToast("Etikett och kod krävs", "error");
       return;
     }

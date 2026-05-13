@@ -427,9 +427,122 @@ def bulk_update_cells(
                 ),
                 None,
             )
+            version_checked = False
+
+            if matching is None and (item.minute_start, item.minute_end) in HALF_SEGMENTS:
+                full_segment = hour_segments[0] if len(hour_segments) == 1 and (hour_segments[0].minute_start, hour_segments[0].minute_end) == FULL_SEGMENT else None
+
+                if full_segment is not None:
+                    if full_segment.version != item.expected_version:
+                        conflicts.append(
+                            {
+                                "person_id": item.person_id,
+                                "hour": item.hour,
+                                "minute_start": item.minute_start,
+                                "minute_end": item.minute_end,
+                                "current": _serialize_segments(hour_segments),
+                            }
+                        )
+                        if payload.atomic:
+                            db.rollback()
+                            return JSONResponse(
+                                status_code=status.HTTP_409_CONFLICT,
+                                content={"error": "version_conflict", "conflicts": conflicts},
+                            )
+                        continue
+
+                    version_checked = True
+                    original_activity_id = full_segment.activity_id
+                    old_full = _cell_to_dict(full_segment)
+                    full_segment.minute_start = 0
+                    full_segment.minute_end = 30
+                    full_segment.version += 1
+                    full_segment.updated_by = user.id
+                    db.flush()
+                    audit_log(
+                        db,
+                        entity_type="schedule_cell",
+                        entity_id=full_segment.id,
+                        action=f"{payload.action}_split_update",
+                        old_value=old_full,
+                        new_value=_cell_to_dict(full_segment),
+                        user_id=user.id,
+                    )
+
+                    other_half = ScheduleCell(
+                        year=item.year,
+                        week=item.week,
+                        weekday=item.weekday,
+                        hour=item.hour,
+                        minute_start=30,
+                        minute_end=60,
+                        person_id=item.person_id,
+                        activity_id=original_activity_id,
+                        version=1,
+                        updated_by=user.id,
+                    )
+                    db.add(other_half)
+                    db.flush()
+                    audit_log(
+                        db,
+                        entity_type="schedule_cell",
+                        entity_id=other_half.id,
+                        action=f"{payload.action}_split_create",
+                        old_value=None,
+                        new_value=_cell_to_dict(other_half),
+                        user_id=user.id,
+                    )
+
+                    hour_segments = _load_hour_segments(
+                        db,
+                        year=item.year,
+                        week=item.week,
+                        weekday=item.weekday,
+                        hour=item.hour,
+                        person_id=item.person_id,
+                        lock=True,
+                    )
+                    matching = next(
+                        (
+                            cell
+                            for cell in hour_segments
+                            if cell.minute_start == item.minute_start and cell.minute_end == item.minute_end
+                        ),
+                        None,
+                    )
+                elif not hour_segments:
+                    created: list[ScheduleCell] = []
+                    for minute_start, minute_end in HALF_SEGMENTS:
+                        cell = ScheduleCell(
+                            year=item.year,
+                            week=item.week,
+                            weekday=item.weekday,
+                            hour=item.hour,
+                            minute_start=minute_start,
+                            minute_end=minute_end,
+                            person_id=item.person_id,
+                            activity_id=item.activity_id if minute_start == item.minute_start else None,
+                            version=1,
+                            updated_by=user.id,
+                        )
+                        db.add(cell)
+                        db.flush()
+                        audit_log(
+                            db,
+                            entity_type="schedule_cell",
+                            entity_id=cell.id,
+                            action=payload.action,
+                            old_value=None,
+                            new_value=_cell_to_dict(cell),
+                            user_id=user.id,
+                        )
+                        created.append(cell)
+
+                    applied.extend(_serialize_segments(created))
+                    continue
 
             current_version = matching.version if matching else 0
-            if current_version != item.expected_version or (matching is None and hour_segments):
+            if ((not version_checked) and current_version != item.expected_version) or (matching is None and hour_segments):
                 conflicts.append(
                     {
                         "person_id": item.person_id,
@@ -487,7 +600,14 @@ def bulk_update_cells(
                     new_value=_cell_to_dict(cell),
                     user_id=user.id,
                 )
-            applied.append(_cell_to_dict(cell))
+            applied.extend(_serialize_segments(_load_hour_segments(
+                db,
+                year=item.year,
+                week=item.week,
+                weekday=item.weekday,
+                hour=item.hour,
+                person_id=item.person_id,
+            )))
 
         db.commit()
         return {"applied": applied, "conflicts": conflicts}

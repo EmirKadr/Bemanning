@@ -34,6 +34,8 @@ const drag = {
   suppressClick: false,
   sourceTd: null,
   sourceActivityId: null,
+  sourceMinuteStart: 0,
+  sourceMinuteEnd: 60,
   sourceRow: -1,
   sourceCol: -1,
   currentRow: -1,
@@ -301,10 +303,27 @@ function handleSplitSegmentContextMenu(e, td, part, minuteStart, minuteEnd) {
   void toggleHourSplit(td, minuteStart);
 }
 
+function activityIdForDragSource(td, minuteStart, minuteEnd) {
+  const personId = Number(td.dataset.personId);
+  const hour = Number(td.dataset.hour);
+  const segment = currentSegment(personId, hour, minuteStart, minuteEnd);
+  if (segment.activity_id != null) return segment.activity_id;
+  if (minuteStart === 0 && minuteEnd === 60 && td?.dataset.isBase === "1") {
+    const person = personById(personId);
+    return person?.home_activity_id || null;
+  }
+  return null;
+}
+
 function armFullHourDrag(td, event) {
   if (event.button !== 0) return;
   if (td.dataset.split === "1") return;
-  startPendingDrag(td, event);
+  startPendingDrag(td, event, 0, 60);
+}
+
+function armHalfHourDrag(td, minuteStart, minuteEnd, event) {
+  if (event.button !== 0) return;
+  startPendingDrag(td, event, minuteStart, minuteEnd);
 }
 
 function renderFullHourCell(td, segment, isScheduled) {
@@ -405,6 +424,7 @@ function renderSplitHourCell(td, segments, isScheduled) {
     select.addEventListener("change", () => onSegmentChange(td, minute_start, minute_end));
     select.addEventListener("focus", () => focusSegment(td, part, minute_start, minute_end));
     select.addEventListener("mousedown", (e) => {
+      armHalfHourDrag(td, minute_start, minute_end, e);
       e.stopPropagation();
       const isFocused = state.focusedCell
         && state.focusedCell.td === td
@@ -712,7 +732,7 @@ function updateDragTargets() {
   document.querySelectorAll("#scheduleBody td[data-row-index]").forEach((td) => {
     const r = Number(td.dataset.rowIndex);
     const c = Number(td.dataset.colIndex);
-    if (td.dataset.split === "1") return;
+    if (drag.sourceMinuteStart === 0 && drag.sourceMinuteEnd === 60 && td.dataset.split === "1") return;
     if (r >= r0 && r <= r1 && c >= c0 && c <= c1) td.classList.add("drag-target");
   });
 }
@@ -725,6 +745,8 @@ function resetDragState() {
   drag.pending = false;
   drag.sourceTd = null;
   drag.sourceActivityId = null;
+  drag.sourceMinuteStart = 0;
+  drag.sourceMinuteEnd = 60;
   drag.sourceRow = -1;
   drag.sourceCol = -1;
   drag.currentRow = -1;
@@ -733,10 +755,12 @@ function resetDragState() {
   drag.startY = 0;
 }
 
-function startPendingDrag(td, event) {
+function startPendingDrag(td, event, minuteStart = 0, minuteEnd = 60) {
   drag.pending = true;
   drag.sourceTd = td;
-  drag.sourceActivityId = effectiveActivityIdForTd(td);
+  drag.sourceActivityId = activityIdForDragSource(td, minuteStart, minuteEnd);
+  drag.sourceMinuteStart = minuteStart;
+  drag.sourceMinuteEnd = minuteEnd;
   drag.sourceRow = Number(td.dataset.rowIndex);
   drag.sourceCol = Number(td.dataset.colIndex);
   drag.currentRow = drag.sourceRow;
@@ -766,6 +790,8 @@ async function finishDrag() {
   if (!drag.active) return;
   const sourceTd = drag.sourceTd;
   const sourceActivityId = drag.sourceActivityId;
+  const sourceMinuteStart = drag.sourceMinuteStart;
+  const sourceMinuteEnd = drag.sourceMinuteEnd;
   const targets = Array.from(document.querySelectorAll("#scheduleBody td.drag-target"));
   resetDragState();
 
@@ -780,17 +806,28 @@ async function finishDrag() {
     .map((td) => {
       const personId = Number(td.dataset.personId);
       const hour = Number(td.dataset.hour);
-      const segment = currentSegment(personId, hour, 0, 60);
+      const segments = sortSegments(segmentsForHour(personId, hour));
+      const matching = segments.find(
+        (segment) => segment.minute_start === sourceMinuteStart && segment.minute_end === sourceMinuteEnd
+      );
+      const fullSegment = segments.length === 1
+        && segments[0].minute_start === 0
+        && segments[0].minute_end === 60
+        ? segments[0]
+        : null;
+      const expectedVersion = matching
+        ? Number(matching.version) || 0
+        : (fullSegment ? Number(fullSegment.version) || 0 : 0);
       return {
         year: state.year,
         week: state.week,
         weekday: state.weekday,
         hour,
-        minute_start: 0,
-        minute_end: 60,
+        minute_start: sourceMinuteStart,
+        minute_end: sourceMinuteEnd,
         person_id: personId,
         activity_id: sourceActivityId,
-        expected_version: Number(segment.version) || 0,
+        expected_version: expectedVersion,
       };
     });
 
@@ -798,15 +835,22 @@ async function finishDrag() {
 
   try {
     const resp = await api.post("/api/schedule/cells", { cells, atomic: true, action: "drag_fill" });
+    const updatedHours = new Map();
     resp.applied.forEach((segment) => {
-      replaceHourSegments(segment.person_id, segment.hour, [segment]);
+      const key = `${segment.person_id}:${segment.hour}`;
+      if (!updatedHours.has(key)) updatedHours.set(key, []);
+      updatedHours.get(key).push(segment);
+    });
+    updatedHours.forEach((segments, key) => {
+      const [personId, hour] = key.split(":").map(Number);
+      replaceHourSegments(personId, hour, segments);
       const td = document.querySelector(
-        `#scheduleBody td[data-person-id="${segment.person_id}"][data-hour="${segment.hour}"]`
+        `#scheduleBody td[data-person-id="${personId}"][data-hour="${hour}"]`
       );
       if (td) renderHourCell(td);
     });
     refreshSummary();
-    showToast(`Fyllde ${resp.applied.length} celler`);
+    showToast(`Fyllde ${cells.length} celler`);
   } catch (e) {
     if (e.status === 409) {
       showToast(`${e.body?.conflicts?.length ?? 0} konflikter – läser om`, "warn");
@@ -824,8 +868,14 @@ function setupDrag() {
     if (e.button !== 0) return;
     if (e.target.closest("select")) return;
     const td = e.target.closest("td[data-hour]");
-    if (!td || td.dataset.split === "1") return;
-    startPendingDrag(td, e);
+    if (!td) return;
+    const part = e.target.closest(".hour-segment");
+    if (part) {
+      startPendingDrag(td, e, Number(part.dataset.minuteStart), Number(part.dataset.minuteEnd));
+      return;
+    }
+    if (td.dataset.split === "1") return;
+    startPendingDrag(td, e, 0, 60);
   });
 
   body.addEventListener("contextmenu", (e) => {
@@ -855,7 +905,8 @@ function setupDrag() {
       activateDrag();
     }
     const td = scheduleCellFromPoint(e.clientX, e.clientY);
-    if (!td || td.dataset.split === "1") return;
+    if (!td) return;
+    if (drag.sourceMinuteStart === 0 && drag.sourceMinuteEnd === 60 && td.dataset.split === "1") return;
     drag.currentRow = Number(td.dataset.rowIndex);
     drag.currentCol = Number(td.dataset.colIndex);
     updateDragTargets();
@@ -1003,22 +1054,6 @@ async function loadSchedule() {
   document.getElementById("daySelect").addEventListener("change", onControlChange);
   document.getElementById("areaSelect").addEventListener("change", onControlChange);
   document.getElementById("reloadBtn").addEventListener("click", onControlChange);
-
-  document.getElementById("fillLeftBtn").addEventListener("click", async () => {
-    if (!confirm("Fyll tomma celler från vänster för alla personer i området?")) return;
-    try {
-      const r = await api.post("/api/schedule/fill-from-left", {
-        year: state.year,
-        week: state.week,
-        weekday: state.weekday,
-        area_id: state.areaId,
-      });
-      showToast(`Fyllde ${r.updated} celler`);
-      await loadSchedule();
-    } catch (e) {
-      showToast("Fel: " + e.message, "error");
-    }
-  });
 
   document.getElementById("clearBtn").addEventListener("click", async () => {
     if (!confirm("Rensa hela dagen för det valda området?")) return;

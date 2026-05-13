@@ -45,6 +45,10 @@ def update_activity(
     activity = db.get(Activity, activity_id)
     if not activity:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Aktivitet hittades inte")
+    if payload.code is not None:
+        existing = db.query(Activity).filter(Activity.code == payload.code, Activity.id != activity_id).first()
+        if existing:
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="Aktivitet med samma kod finns redan")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(activity, key, value)
     db.commit()

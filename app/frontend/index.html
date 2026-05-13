@@ -31,7 +31,6 @@
       <select id="areaSelect"></select>
     </label>
     <button id="reloadBtn">Uppdatera</button>
-    <button id="fillLeftBtn">Fyll tomma från vänster</button>
     <button id="copyBtn">Kopiera dag…</button>
     <button id="clearBtn" class="danger">Rensa dag</button>
   </section>
@@ -65,18 +64,22 @@
           <tbody id="summaryBody"></tbody>
         </table>
       </div>
-      <div class="card">
-        <h3>Tips</h3>
-        <p class="note">
-          Hogerklicka pa en timcell for att dela den i tva halvtimmar. Hogerklicka igen for att sla ihop den till en hel timme.
-        </p>
-        <p class="note">
-          Ändringar sparas automatiskt. Om en kollega ändrar samma cell samtidigt
-          läses dagen om och du får ett meddelande.
-        </p>
-      </div>
     </div>
   </main>
+
+  <details class="tips-fab">
+    <summary aria-label="Visa tips" title="Visa tips">?</summary>
+    <div class="tips-popover">
+      <h3>Tips</h3>
+      <p class="note">
+        Hogerklicka pa en timcell for att dela den i tva halvtimmar. Hogerklicka igen for att sla ihop den till en hel timme.
+      </p>
+      <p class="note">
+        Ändringar sparas automatiskt. Om en kollega ändrar samma cell samtidigt
+        läses dagen om och du får ett meddelande.
+      </p>
+    </div>
+  </details>
 
   <script src="/js/api.js"></script>
   <script src="/js/common.js"></script>
