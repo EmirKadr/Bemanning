@@ -26,12 +26,13 @@ body {
   padding: 14px 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 16px;
   border-bottom: 4px solid var(--green);
 }
 
 .topbar h1 { margin: 0; font-size: 22px; }
+.topbar nav { margin-left: auto; }
 .topbar nav a {
   color: var(--green);
   text-decoration: none;
@@ -39,7 +40,7 @@ body {
   font-weight: bold;
 }
 .topbar nav a.active { text-decoration: underline; }
-.topbar .user-info { font-size: 13px; }
+.topbar .user-info { font-size: 13px; white-space: nowrap; }
 .topbar .user-info a { color: #fff; margin-left: 10px; }
 
 .controls {
@@ -257,15 +258,14 @@ table.matrix td.split-hour {
 .note { color: #555; font-size: 13px; margin: 8px 0 0; }
 
 .tips-fab {
-  position: fixed;
-  left: 18px;
-  bottom: 18px;
-  z-index: 40;
+  position: relative;
+  flex: 0 0 auto;
+  z-index: 20;
 }
 
 .tips-fab summary {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -291,9 +291,9 @@ table.matrix td.split-hour {
 
 .tips-popover {
   position: absolute;
-  left: 0;
-  bottom: 52px;
-  width: min(320px, calc(100vw - 24px));
+  right: 0;
+  top: calc(100% + 10px);
+  width: min(320px, calc(100vw - 40px));
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 10px;
@@ -307,11 +307,6 @@ table.matrix td.split-hour {
 }
 
 @media (max-width: 640px) {
-  .tips-fab {
-    left: 12px;
-    bottom: 12px;
-  }
-
   .tips-popover {
     width: min(300px, calc(100vw - 24px));
   }

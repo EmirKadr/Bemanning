@@ -19,6 +19,7 @@ function showToast(message, kind = "info", durationMs = 4000) {
 function renderTopbar(user, activePage) {
   const bar = document.querySelector(".topbar");
   if (!bar) return;
+  const tips = activePage === "schedule" ? document.querySelector(".tips-fab") : null;
   const nav = `
     <nav>
       <a href="/index.html"     class="${activePage === 'schedule' ? 'active' : ''}">Bemanning</a>
@@ -38,6 +39,12 @@ function renderTopbar(user, activePage) {
       await api.post("/api/auth/logout");
       window.location.href = "/login.html";
     });
+  }
+
+  if (tips) {
+    const userInfoEl = bar.querySelector(".user-info");
+    if (userInfoEl) bar.insertBefore(tips, userInfoEl);
+    else bar.appendChild(tips);
   }
 }
 
