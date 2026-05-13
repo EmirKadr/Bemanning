@@ -64,6 +64,15 @@ function colorFor(activityId) {
   return a ? a.color : "#ffffff";
 }
 
+function effectiveActivityId(td) {
+  if (td.dataset.activityId) return Number(td.dataset.activityId);
+  if (td.dataset.isBase === "1") {
+    const p = state.persons.find((x) => x.id === Number(td.dataset.personId));
+    return p?.home_activity_id || null;
+  }
+  return null;
+}
+
 function setCellVisual(td, activityId, version) {
   const personId = Number(td.dataset.personId);
   const hour = Number(td.dataset.hour);
@@ -271,7 +280,7 @@ function clipboardLabel(activityId) {
 async function copyFocused(cut = false) {
   if (!state.focusedCell) return;
   const { td, personId, hour } = state.focusedCell;
-  const activityId = td.dataset.activityId ? Number(td.dataset.activityId) : null;
+  const activityId = effectiveActivityId(td);
   state.clipboard = { activity_id: activityId };
   td.classList.add("clipboard-flash");
   setTimeout(() => td.classList.remove("clipboard-flash"), 500);
@@ -422,7 +431,7 @@ function setupDrag() {
     e.stopPropagation();
     drag.active = true;
     drag.sourceTd = td;
-    drag.sourceActivityId = td.dataset.activityId ? Number(td.dataset.activityId) : null;
+    drag.sourceActivityId = effectiveActivityId(td);
     drag.sourceRow = Number(td.dataset.rowIndex);
     drag.sourceCol = Number(td.dataset.colIndex);
     drag.currentRow = drag.sourceRow;
