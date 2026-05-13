@@ -301,6 +301,12 @@ function handleSplitSegmentContextMenu(e, td, part, minuteStart, minuteEnd) {
   void toggleHourSplit(td, minuteStart);
 }
 
+function armFullHourDrag(td, event) {
+  if (event.button !== 0) return;
+  if (td.dataset.split === "1") return;
+  startPendingDrag(td, event);
+}
+
 function renderFullHourCell(td, segment, isScheduled) {
   td.dataset.split = "0";
   td.classList.remove("split-hour", "scheduled-empty", "base-value");
@@ -335,6 +341,7 @@ function renderFullHourCell(td, segment, isScheduled) {
   select.addEventListener("change", () => onSegmentChange(td, 0, 60));
   select.addEventListener("focus", () => focusSegment(td, td, 0, 60));
   select.addEventListener("mousedown", (e) => {
+    armFullHourDrag(td, e);
     e.stopPropagation();
     const isFocused = state.focusedCell
       && state.focusedCell.td === td
