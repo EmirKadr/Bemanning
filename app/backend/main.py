@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from .config import settings
-from .routers import activities, areas, auth, bulk, persons, schedule
+from .routers import activities, areas, auth, bulk, overview, person_schedules, persons, schedule
 
 app = FastAPI(title="Bemanningssystem", version="0.1.0")
 
@@ -27,8 +27,10 @@ app.include_router(auth.router)
 app.include_router(areas.router)
 app.include_router(activities.router)
 app.include_router(persons.router)
+app.include_router(person_schedules.router)
 app.include_router(schedule.router)
 app.include_router(bulk.router)
+app.include_router(overview.router)
 
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"

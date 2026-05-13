@@ -21,9 +21,10 @@ function renderTopbar(user, activePage) {
   if (!bar) return;
   const nav = `
     <nav>
-      <a href="/index.html"    class="${activePage === 'schedule' ? 'active' : ''}">Bemanning</a>
-      <a href="/personer.html" class="${activePage === 'persons'  ? 'active' : ''}">Personer</a>
-      <a href="/stallen.html"  class="${activePage === 'stallen'  ? 'active' : ''}">Ställen</a>
+      <a href="/index.html"     class="${activePage === 'schedule' ? 'active' : ''}">Bemanning</a>
+      <a href="/overblick.html" class="${activePage === 'overview' ? 'active' : ''}">Översikt</a>
+      <a href="/personer.html"  class="${activePage === 'persons'  ? 'active' : ''}">Personer</a>
+      <a href="/stallen.html"   class="${activePage === 'stallen'  ? 'active' : ''}">Ställen</a>
     </nav>`;
   const userInfo = user
     ? `<span class="user-info">${user.display_name || user.username} <a href="#" id="logout-link">Logga ut</a></span>`

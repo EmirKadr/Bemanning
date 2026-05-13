@@ -97,6 +97,24 @@ class ScheduleCell(Base):
     updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
+class PersonScheduleTemplate(Base):
+    __tablename__ = "person_schedule_templates"
+    __table_args__ = (
+        UniqueConstraint("person_id", "weekday", name="uq_person_schedule_weekday"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    person_id: Mapped[int] = mapped_column(ForeignKey("persons.id", ondelete="CASCADE"), nullable=False)
+    weekday: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    start_hour: Mapped[int | None] = mapped_column(SmallInteger)
+    end_hour: Mapped[int | None] = mapped_column(SmallInteger)
+    is_off: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+
 class AuditLog(Base):
     __tablename__ = "audit_log"
 

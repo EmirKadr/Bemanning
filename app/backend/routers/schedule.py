@@ -7,6 +7,7 @@ from ..audit import log as audit_log
 from ..deps import get_current_user, get_db
 from ..models import Activity, Person, ScheduleCell, User
 from ..schemas import (
+    BulkCellRequest,
     CellOut,
     CellUpdate,
     PersonOut,
@@ -161,6 +162,106 @@ def update_cell(
     db.commit()
     db.refresh(cell)
     return {"cell": _cell_to_dict(cell)}
+
+
+@router.post("/cells")
+def bulk_update_cells(
+    payload: BulkCellRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not payload.cells:
+        return {"applied": [], "conflicts": []}
+    if len(payload.cells) > 200:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="För många celler (max 200)")
+
+    applied: list[dict] = []
+    conflicts: list[dict] = []
+
+    try:
+        for item in payload.cells:
+            if item.hour not in HOURS:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Ogiltig timme {item.hour}")
+            if not db.get(Person, item.person_id):
+                raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Person {item.person_id} hittades inte")
+            if item.activity_id is not None and not db.get(Activity, item.activity_id):
+                raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Aktivitet {item.activity_id} hittades inte")
+
+            cell = (
+                db.execute(
+                    select(ScheduleCell)
+                    .where(
+                        ScheduleCell.year == item.year,
+                        ScheduleCell.week == item.week,
+                        ScheduleCell.weekday == item.weekday,
+                        ScheduleCell.hour == item.hour,
+                        ScheduleCell.person_id == item.person_id,
+                    )
+                    .with_for_update()
+                )
+                .scalar_one_or_none()
+            )
+
+            current_version = cell.version if cell else 0
+            if current_version != item.expected_version:
+                conflicts.append(
+                    {
+                        "person_id": item.person_id,
+                        "hour": item.hour,
+                        "current": _cell_to_dict(cell) if cell else {
+                            "person_id": item.person_id,
+                            "hour": item.hour,
+                            "activity_id": None,
+                            "version": 0,
+                            "updated_at": None,
+                            "updated_by": None,
+                        },
+                    }
+                )
+                if payload.atomic:
+                    db.rollback()
+                    return JSONResponse(
+                        status_code=status.HTTP_409_CONFLICT,
+                        content={"error": "version_conflict", "conflicts": conflicts},
+                    )
+                continue
+
+            if cell is None:
+                cell = ScheduleCell(
+                    year=item.year,
+                    week=item.week,
+                    weekday=item.weekday,
+                    hour=item.hour,
+                    person_id=item.person_id,
+                    activity_id=item.activity_id,
+                    version=1,
+                    updated_by=user.id,
+                )
+                db.add(cell)
+                db.flush()
+                audit_log(
+                    db, entity_type="schedule_cell", entity_id=cell.id,
+                    action=payload.action, old_value=None,
+                    new_value=_cell_to_dict(cell), user_id=user.id,
+                )
+            else:
+                old = _cell_to_dict(cell)
+                cell.activity_id = item.activity_id
+                cell.version += 1
+                cell.updated_by = user.id
+                db.flush()
+                audit_log(
+                    db, entity_type="schedule_cell", entity_id=cell.id,
+                    action=payload.action, old_value=old,
+                    new_value=_cell_to_dict(cell), user_id=user.id,
+                )
+            applied.append(_cell_to_dict(cell))
+
+        db.commit()
+        return {"applied": applied, "conflicts": conflicts}
+    except HTTPException:
+        db.rollback()
+        raise
 
 
 @router.get("/summary", response_model=list[SummaryRow])

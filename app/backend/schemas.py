@@ -119,6 +119,22 @@ class CellUpdate(BaseModel):
     expected_version: int
 
 
+class BulkCellItem(BaseModel):
+    year: int
+    week: int
+    weekday: int
+    hour: int
+    person_id: int
+    activity_id: int | None
+    expected_version: int
+
+
+class BulkCellRequest(BaseModel):
+    cells: list[BulkCellItem]
+    atomic: bool = True
+    action: str = "drag_fill"
+
+
 class CellUpdateResponse(BaseModel):
     cell: CellOut
 
@@ -166,6 +182,22 @@ class FillFromLeftRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+
+class TemplateDay(BaseModel):
+    weekday: int = Field(ge=1, le=7)
+    is_off: bool = False
+    start_hour: int | None = None
+    end_hour: int | None = None
+
+
+class TemplateOut(BaseModel):
+    person_id: int
+    days: list[TemplateDay]
+
+
+class TemplateUpdate(BaseModel):
+    days: list[TemplateDay]
 
 
 class UserOut(BaseModel):

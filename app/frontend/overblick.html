@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Översikt – Bemanning</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    table.overview { min-width: 900px; }
+    table.overview th, table.overview td {
+      padding: 4px;
+      font-size: 12px;
+      text-align: center;
+      min-width: 110px;
+    }
+    table.overview th { background: var(--header); color: var(--green); position: sticky; top: 0; z-index: 2; }
+    table.overview td.name {
+      text-align: left; padding-left: 8px; font-weight: bold;
+      background: #e6e6e6; min-width: 160px;
+      position: sticky; left: 0; z-index: 3;
+    }
+    table.overview td.day select { width: 100%; border: 0; background-color: inherit; font-weight: bold; padding: 4px; }
+    table.overview td.day.mixed {
+      background: repeating-linear-gradient(135deg, #fff, #fff 6px, #ddd 6px, #ddd 12px) !important;
+    }
+    table.overview td.day.is-off {
+      background: #f0f0f0 !important;
+      color: #888;
+      font-style: italic;
+    }
+    .hour-info { font-size: 10px; opacity: 0.7; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <header class="topbar"></header>
+
+  <section class="controls">
+    <button id="prevWeek">◀</button>
+    <label>År <input id="yearInput" type="number" min="2000" max="2100" style="width: 80px;" /></label>
+    <label>Vecka <input id="weekInput" type="number" min="1" max="53" style="width: 60px;" /></label>
+    <button id="nextWeek">▶</button>
+    <label>Område <select id="areaSelect"></select></label>
+    <button id="reloadBtn">Uppdatera</button>
+  </section>
+
+  <main>
+    <div class="section-title" id="sectionTitle">Översikt</div>
+    <div class="table-wrap">
+      <table class="overview" id="overviewTable">
+        <thead><tr id="headerRow"><th class="name">Person</th></tr></thead>
+        <tbody id="overviewBody"></tbody>
+      </table>
+    </div>
+    <p class="note">Klicka i en cell för att bemanna hela dagen enligt personens veckomall. Saknar personen mall används 07-16 (9 timmar). Ändra mall under <a href="/personer.html">Personer → Schema</a>.</p>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/overview.js"></script>
+</body>
+</html>

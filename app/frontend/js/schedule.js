@@ -9,10 +9,20 @@ const state = {
   weekday: 1,
   areaId: null,
   areas: [],
-  activities: [],   // alla, inkl. inaktiva för befintliga celler
+  activities: [],
   activitiesActive: [],
   persons: [],
-  cells: new Map(), // key = `${person_id}:${hour}` → {activity_id, version}
+  cells: new Map(),            // key = `${person_id}:${hour}` → {activity_id, version}
+  focusedCell: null,           // {td, personId, hour}
+  clipboard: null,             // {activity_id} | null
+};
+
+const drag = {
+  active: false,
+  sourceTd: null,
+  sourceActivityId: null,
+  sourceRow: -1,
+  sourceCol: -1,
 };
 
 
@@ -53,13 +63,39 @@ function colorFor(activityId) {
   return a ? a.color : "#ffffff";
 }
 
+function setCellVisual(td, activityId, version) {
+  const sel = td.querySelector("select");
+  if (sel) {
+    sel.value = activityId ? String(activityId) : "";
+    sel.dataset.version = version || 0;
+    sel.dataset.activityId = activityId || "";
+    sel.style.background = colorFor(activityId);
+  }
+  td.dataset.version = version || 0;
+  td.dataset.activityId = activityId || "";
+
+  // Drag-handle – bara på celler med värde
+  const existing = td.querySelector(".drag-handle");
+  if (activityId) {
+    if (!existing) {
+      const h = document.createElement("span");
+      h.className = "drag-handle";
+      h.title = "Dra för att fylla flera celler";
+      td.appendChild(h);
+    }
+  } else if (existing) {
+    existing.remove();
+  }
+}
+
 function buildRows() {
   const body = document.getElementById("scheduleBody");
   body.innerHTML = "";
 
-  state.persons.forEach((person) => {
+  state.persons.forEach((person, rowIndex) => {
     const tr = document.createElement("tr");
     tr.dataset.personId = person.id;
+    tr.dataset.rowIndex = rowIndex;
 
     const name = document.createElement("td");
     name.className = "name";
@@ -72,15 +108,19 @@ function buildRows() {
     base.textContent = homeArea ? homeArea.name : "";
     tr.appendChild(base);
 
-    HOURS.forEach((hour) => {
+    HOURS.forEach((hour, colIndex) => {
       const td = document.createElement("td");
+      td.dataset.personId = person.id;
+      td.dataset.hour = hour;
+      td.dataset.rowIndex = rowIndex;
+      td.dataset.colIndex = colIndex;
+
       const select = document.createElement("select");
       select.dataset.personId = person.id;
       select.dataset.hour = hour;
       select.dataset.version = 0;
       select.dataset.activityId = "";
 
-      // Tom-option
       const empty = document.createElement("option");
       empty.value = "";
       empty.textContent = "–";
@@ -94,7 +134,8 @@ function buildRows() {
         select.appendChild(opt);
       });
 
-      select.addEventListener("change", () => onCellChange(select));
+      select.addEventListener("change", () => onCellChange(td));
+      select.addEventListener("focus", () => focusCell(td));
 
       td.appendChild(select);
       tr.appendChild(td);
@@ -107,54 +148,38 @@ function buildRows() {
 }
 
 function applyCells() {
-  // Töm alla först
-  document.querySelectorAll("#scheduleBody select").forEach((sel) => {
-    sel.value = "";
-    sel.dataset.version = 0;
-    sel.dataset.activityId = "";
-    sel.style.background = "#ffffff";
+  document.querySelectorAll("#scheduleBody td[data-hour]").forEach((td) => {
+    setCellVisual(td, null, 0);
   });
 
   state.cells.forEach((info, key) => {
     const [pid, hour] = key.split(":");
-    const sel = document.querySelector(
-      `#scheduleBody select[data-person-id="${pid}"][data-hour="${hour}"]`
+    const td = document.querySelector(
+      `#scheduleBody td[data-person-id="${pid}"][data-hour="${hour}"]`
     );
-    if (!sel) return;
-    sel.value = info.activity_id ? String(info.activity_id) : "";
-    sel.dataset.version = info.version;
-    sel.dataset.activityId = info.activity_id || "";
-    sel.style.background = colorFor(info.activity_id);
+    if (!td) return;
+    setCellVisual(td, info.activity_id, info.version);
   });
 }
 
 
 // ---- Cell-update flow ----
-async function onCellChange(sel) {
-  const personId = Number(sel.dataset.personId);
-  const hour = Number(sel.dataset.hour);
-  const expectedVersion = Number(sel.dataset.version) || 0;
+async function onCellChange(td) {
+  const sel = td.querySelector("select");
+  const personId = Number(td.dataset.personId);
+  const hour = Number(td.dataset.hour);
+  const expectedVersion = Number(td.dataset.version) || 0;
   const newActivityId = sel.value ? Number(sel.value) : null;
 
   try {
     const resp = await api.put("/api/schedule/cell", {
-      year: state.year,
-      week: state.week,
-      weekday: state.weekday,
-      hour,
-      person_id: personId,
-      activity_id: newActivityId,
+      year: state.year, week: state.week, weekday: state.weekday,
+      hour, person_id: personId, activity_id: newActivityId,
       expected_version: expectedVersion,
     });
-
     const c = resp.cell;
-    sel.dataset.version = c.version;
-    sel.dataset.activityId = c.activity_id || "";
-    sel.style.background = colorFor(c.activity_id);
-    state.cells.set(`${personId}:${hour}`, {
-      activity_id: c.activity_id,
-      version: c.version,
-    });
+    setCellVisual(td, c.activity_id, c.version);
+    state.cells.set(`${personId}:${hour}`, { activity_id: c.activity_id, version: c.version });
     refreshSummary();
   } catch (err) {
     if (err.status === 409) {
@@ -162,11 +187,193 @@ async function onCellChange(sel) {
       await loadSchedule();
     } else {
       showToast("Kunde inte spara: " + err.message, "error");
-      // Ångra dropdown-värdet
       const stored = state.cells.get(`${personId}:${hour}`);
-      sel.value = stored?.activity_id ? String(stored.activity_id) : "";
+      setCellVisual(td, stored?.activity_id || null, stored?.version || 0);
     }
   }
+}
+
+
+// ---- Focus + Clipboard ----
+function focusCell(td) {
+  if (state.focusedCell?.td) state.focusedCell.td.classList.remove("focused");
+  state.focusedCell = {
+    td,
+    personId: Number(td.dataset.personId),
+    hour: Number(td.dataset.hour),
+  };
+  td.classList.add("focused");
+}
+
+function clipboardLabel(activityId) {
+  const a = activityById(activityId);
+  return a ? a.label : "(tom)";
+}
+
+async function copyFocused(cut = false) {
+  if (!state.focusedCell) return;
+  const { td, personId, hour } = state.focusedCell;
+  const activityId = td.dataset.activityId ? Number(td.dataset.activityId) : null;
+  state.clipboard = { activity_id: activityId };
+  td.classList.add("clipboard-flash");
+  setTimeout(() => td.classList.remove("clipboard-flash"), 500);
+
+  if (cut && activityId != null) {
+    const expectedVersion = Number(td.dataset.version) || 0;
+    try {
+      const resp = await api.put("/api/schedule/cell", {
+        year: state.year, week: state.week, weekday: state.weekday,
+        hour, person_id: personId, activity_id: null,
+        expected_version: expectedVersion,
+      });
+      setCellVisual(td, resp.cell.activity_id, resp.cell.version);
+      state.cells.set(`${personId}:${hour}`, { activity_id: resp.cell.activity_id, version: resp.cell.version });
+      refreshSummary();
+      showToast(`Klippt: ${clipboardLabel(activityId)}`);
+    } catch (e) {
+      if (e.status === 409) { showToast("Konflikt – läser om", "warn"); await loadSchedule(); }
+      else showToast("Kunde inte klippa: " + e.message, "error");
+    }
+  } else {
+    showToast(`Kopierat: ${clipboardLabel(activityId)}`);
+  }
+}
+
+async function pasteFocused() {
+  if (!state.focusedCell || state.clipboard == null) return;
+  const { td, personId, hour } = state.focusedCell;
+  const expectedVersion = Number(td.dataset.version) || 0;
+  try {
+    const resp = await api.put("/api/schedule/cell", {
+      year: state.year, week: state.week, weekday: state.weekday,
+      hour, person_id: personId, activity_id: state.clipboard.activity_id,
+      expected_version: expectedVersion,
+    });
+    setCellVisual(td, resp.cell.activity_id, resp.cell.version);
+    state.cells.set(`${personId}:${hour}`, { activity_id: resp.cell.activity_id, version: resp.cell.version });
+    refreshSummary();
+    showToast(`Klistrade in: ${clipboardLabel(state.clipboard.activity_id)}`);
+  } catch (e) {
+    if (e.status === 409) { showToast("Konflikt – läser om", "warn"); await loadSchedule(); }
+    else showToast("Kunde inte klistra in: " + e.message, "error");
+  }
+}
+
+function setupKeyboard() {
+  document.addEventListener("keydown", (e) => {
+    const active = document.activeElement;
+    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const key = e.key.toLowerCase();
+    if (key === "c") { e.preventDefault(); copyFocused(false); }
+    else if (key === "x") { e.preventDefault(); copyFocused(true); }
+    else if (key === "v") { e.preventDefault(); pasteFocused(); }
+  });
+}
+
+
+// ---- Drag-to-fill ----
+function getDragRect() {
+  const r0 = Math.min(drag.sourceRow, drag.currentRow);
+  const r1 = Math.max(drag.sourceRow, drag.currentRow);
+  const c0 = Math.min(drag.sourceCol, drag.currentCol);
+  const c1 = Math.max(drag.sourceCol, drag.currentCol);
+  return { r0, r1, c0, c1 };
+}
+
+function updateDragTargets() {
+  document.querySelectorAll("#scheduleBody td.drag-target").forEach((t) => t.classList.remove("drag-target"));
+  if (!drag.active) return;
+  const { r0, r1, c0, c1 } = getDragRect();
+  document.querySelectorAll("#scheduleBody td[data-row-index]").forEach((td) => {
+    const r = Number(td.dataset.rowIndex);
+    const c = Number(td.dataset.colIndex);
+    if (r >= r0 && r <= r1 && c >= c0 && c <= c1) td.classList.add("drag-target");
+  });
+}
+
+async function finishDrag() {
+  if (!drag.active) return;
+  drag.active = false;
+  document.body.classList.remove("dragging");
+  drag.sourceTd?.classList.remove("drag-source-cell");
+
+  const targets = Array.from(document.querySelectorAll("#scheduleBody td.drag-target"));
+  document.querySelectorAll("#scheduleBody td.drag-target").forEach((t) => t.classList.remove("drag-target"));
+
+  if (targets.length === 0 || (targets.length === 1 && targets[0] === drag.sourceTd)) return;
+  if (targets.length > 200) { showToast("För många celler (max 200)", "error"); return; }
+
+  const cells = targets
+    .filter((td) => td !== drag.sourceTd)
+    .map((td) => ({
+      year: state.year, week: state.week, weekday: state.weekday,
+      hour: Number(td.dataset.hour),
+      person_id: Number(td.dataset.personId),
+      activity_id: drag.sourceActivityId,
+      expected_version: Number(td.dataset.version) || 0,
+    }));
+
+  if (cells.length === 0) return;
+
+  try {
+    const resp = await api.post("/api/schedule/cells", { cells, atomic: true, action: "drag_fill" });
+    resp.applied.forEach((c) => {
+      const td = document.querySelector(
+        `#scheduleBody td[data-person-id="${c.person_id}"][data-hour="${c.hour}"]`
+      );
+      if (td) setCellVisual(td, c.activity_id, c.version);
+      state.cells.set(`${c.person_id}:${c.hour}`, { activity_id: c.activity_id, version: c.version });
+    });
+    refreshSummary();
+    showToast(`Fyllde ${resp.applied.length} celler`);
+  } catch (e) {
+    if (e.status === 409) {
+      showToast(`${e.body?.conflicts?.length ?? 0} konflikter – läser om`, "warn");
+      await loadSchedule();
+    } else {
+      showToast("Drag misslyckades: " + e.message, "error");
+    }
+  }
+}
+
+function setupDrag() {
+  const body = document.getElementById("scheduleBody");
+
+  body.addEventListener("mousedown", (e) => {
+    const handle = e.target.closest(".drag-handle");
+    if (!handle) return;
+    const td = handle.parentElement;
+    if (!td.dataset.activityId) return;
+    e.preventDefault();
+    drag.active = true;
+    drag.sourceTd = td;
+    drag.sourceActivityId = Number(td.dataset.activityId);
+    drag.sourceRow = Number(td.dataset.rowIndex);
+    drag.sourceCol = Number(td.dataset.colIndex);
+    drag.currentRow = drag.sourceRow;
+    drag.currentCol = drag.sourceCol;
+    document.body.classList.add("dragging");
+    td.classList.add("drag-source-cell");
+    updateDragTargets();
+  });
+
+  body.addEventListener("mouseover", (e) => {
+    if (!drag.active) return;
+    const td = e.target.closest("td[data-hour]");
+    if (!td) return;
+    drag.currentRow = Number(td.dataset.rowIndex);
+    drag.currentCol = Number(td.dataset.colIndex);
+    updateDragTargets();
+  });
+
+  document.addEventListener("mouseup", () => { if (drag.active) finishDrag(); });
+
+  // Klick på cell → focus (även när man klickar på själva td:n)
+  body.addEventListener("click", (e) => {
+    const td = e.target.closest("td[data-hour]");
+    if (td) focusCell(td);
+  });
 }
 
 
@@ -202,6 +409,10 @@ async function loadAreasAndActivities() {
 
   const sel = document.getElementById("areaSelect");
   sel.innerHTML = "";
+  const allOpt = document.createElement("option");
+  allOpt.value = "";
+  allOpt.textContent = "Alla";
+  sel.appendChild(allOpt);
   areas.forEach((a) => {
     const opt = document.createElement("option");
     opt.value = a.id;
@@ -209,7 +420,7 @@ async function loadAreasAndActivities() {
     sel.appendChild(opt);
   });
   if (areas.length > 0) state.areaId = areas[0].id;
-  sel.value = state.areaId || "";
+  sel.value = state.areaId == null ? "" : String(state.areaId);
 }
 
 async function loadSchedule() {
@@ -219,15 +430,14 @@ async function loadSchedule() {
   );
   state.persons = data.persons;
   state.cells = new Map();
+  state.focusedCell = null;
   data.cells.forEach((c) => {
-    state.cells.set(`${c.person_id}:${c.hour}`, {
-      activity_id: c.activity_id,
-      version: c.version,
-    });
+    state.cells.set(`${c.person_id}:${c.hour}`, { activity_id: c.activity_id, version: c.version });
   });
 
+  const areaName = state.areaId == null ? "Alla" : (state.areas.find((a) => a.id === state.areaId)?.name || "");
   document.getElementById("sectionTitle").textContent =
-    `${DAYS[state.weekday]} – ${state.areas.find((a) => a.id === state.areaId)?.name || ""} – V${state.week}/${state.year}`;
+    `${DAYS[state.weekday]} – ${areaName} – V${state.week}/${state.year}`;
 
   buildRows();
   refreshSummary();
@@ -250,12 +460,15 @@ async function loadSchedule() {
 
   buildHeader();
   await loadSchedule();
+  setupDrag();
+  setupKeyboard();
 
   const onControlChange = async () => {
     state.year = Number(document.getElementById("yearInput").value) || state.year;
     state.week = Number(document.getElementById("weekInput").value) || state.week;
     state.weekday = Number(document.getElementById("daySelect").value);
-    state.areaId = Number(document.getElementById("areaSelect").value) || null;
+    const areaVal = document.getElementById("areaSelect").value;
+    state.areaId = areaVal === "" ? null : Number(areaVal);
     await loadSchedule();
   };
 
@@ -297,7 +510,7 @@ function openCopyModal() {
   backdrop.innerHTML = `
     <div class="modal">
       <h2>Kopiera dag</h2>
-      <p class="note">Kopierar från en dag till en annan inom området <b>${escapeHtml(state.areas.find(a => a.id === state.areaId)?.name || '')}</b>.</p>
+      <p class="note">Kopierar från en dag till en annan inom området <b>${escapeHtml(state.areas.find(a => a.id === state.areaId)?.name || 'Alla')}</b>.</p>
       <label>Från år</label><input id="cp-fy" type="number" value="${state.year}" />
       <label>Från vecka</label><input id="cp-fw" type="number" value="${state.week}" />
       <label>Från dag</label>
