@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class AreaOut(BaseModel):
@@ -240,3 +242,63 @@ class UserOut(BaseModel):
     username: str
     display_name: str | None
     role: str
+
+
+class UserAdminOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    username: str
+    display_name: str | None
+    role: str
+    is_active: bool
+    created_at: datetime
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str = Field(min_length=8, max_length=72)
+    display_name: str | None = None
+    role: Literal["admin", "leader"] = "leader"
+    is_active: bool = True
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Användarnamn krävs")
+        return cleaned
+
+    @field_validator("display_name")
+    @classmethod
+    def normalize_display_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class UserUpdate(BaseModel):
+    username: str | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=72)
+    display_name: str | None = None
+    role: Literal["admin", "leader"] | None = None
+    is_active: bool | None = None
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Användarnamn krävs")
+        return cleaned
+
+    @field_validator("display_name")
+    @classmethod
+    def normalize_display_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None

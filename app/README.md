@@ -28,7 +28,7 @@ Seeden skapar en admin-användare:
 - **Användarnamn:** `admin`
 - **Lösenord:** `admin123`
 
-**Byt lösenordet direkt efter första inloggning** (admin-UI för users kommer i v1.1; tills dess ändra `seed.py` lokalt eller uppdatera via SQL i Render-konsolen).
+**Byt lösenordet direkt efter första inloggning** och lägg gärna upp minst en extra administratör i adminvyn.
 
 ## Deploya till Render
 
@@ -122,7 +122,6 @@ Schemat är förberett för dessa funktioner – de kräver bara nytt UI, inte r
 
 - Historikvy ("vem ändrade vad och när?") – läs `audit_log`
 - Kompetensvalidering – `persons.competencies` och `activities.required_competency` finns redan
-- Admin-UI för användarhantering – `users`-tabellen finns
 - Realtidsuppdateringar via WebSockets
 - Rapporter (timmar per person/månad, närvarostatistik)
 - Excel-import från `Bemanning Huset - 2026.xlsx`
