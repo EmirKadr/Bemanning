@@ -2,6 +2,11 @@
 
 const HOURS = Array.from({ length: 18 }, (_, i) => 6 + i);   // 6..23
 const DAYS = { 1: "Måndag", 2: "Tisdag", 3: "Onsdag", 4: "Torsdag", 5: "Fredag", 6: "Lördag", 7: "Söndag" };
+const FULL_SEGMENT = { minute_start: 0, minute_end: 60 };
+const HALF_SEGMENTS = [
+  { minute_start: 0, minute_end: 30 },
+  { minute_start: 30, minute_end: 60 },
+];
 
 const state = {
   year: 0,
@@ -11,9 +16,10 @@ const state = {
   areas: [],
   activities: [],
   activitiesActive: [],
-  allPersons: [],              // rå lista från server
-  persons: [],                 // filtrerad + sorterad
-  cells: new Map(),            // key = `${person_id}:${hour}` → {activity_id, version}
+  allPersons: [],
+  persons: [],
+  cells: new Map(),            // key = `${person_id}:${hour}:${minute_start}` -> segment
+  hourCells: new Map(),        // key = `${person_id}:${hour}` -> [segments]
   scheduledHours: {},          // {person_id: Set<hour>}
   focusedCell: null,
   clipboard: null,
@@ -37,7 +43,6 @@ const drag = {
 };
 
 
-// ---- ISO-vecka för "nu" ----
 function isoWeek(d = new Date()) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dayNum = date.getUTCDay() || 7;
@@ -47,8 +52,6 @@ function isoWeek(d = new Date()) {
   return { year: date.getUTCFullYear(), week, weekday: dayNum };
 }
 
-
-// ---- Rendering ----
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
@@ -67,6 +70,15 @@ function buildHeader() {
 
 function activityById(id) {
   return state.activities.find((a) => a.id === id);
+}
+
+function personById(id) {
+  return state.persons.find((p) => p.id === id) || state.allPersons.find((p) => p.id === id) || null;
+}
+
+function colorFor(activityId) {
+  const a = activityById(activityId);
+  return a ? a.color : "#ffffff";
 }
 
 function focusNameFilter() {
@@ -100,77 +112,306 @@ function refreshPersons() {
   });
   state.persons = list;
 
-  // Uppdatera sort-indikator
   document.querySelectorAll("table.matrix th[data-sort]").forEach((th) => {
     const ind = th.querySelector(".sort-ind");
     if (ind) ind.textContent = th.dataset.sort === state.sortKey ? (state.sortAsc ? "▲" : "▼") : "";
   });
 }
 
-function colorFor(activityId) {
-  const a = activityById(activityId);
-  return a ? a.color : "#ffffff";
+function segmentKey(personId, hour, minuteStart) {
+  return `${personId}:${hour}:${minuteStart}`;
 }
 
-function effectiveActivityId(td) {
-  if (td.dataset.activityId) return Number(td.dataset.activityId);
+function hourKey(personId, hour) {
+  return `${personId}:${hour}`;
+}
+
+function sortSegments(segments) {
+  return [...segments].sort((a, b) => a.minute_start - b.minute_start || a.minute_end - b.minute_end);
+}
+
+function setAllSegments(cells) {
+  state.cells = new Map();
+  state.hourCells = new Map();
+  cells.forEach((cell) => {
+    const normalized = {
+      person_id: Number(cell.person_id),
+      hour: Number(cell.hour),
+      minute_start: Number(cell.minute_start),
+      minute_end: Number(cell.minute_end),
+      activity_id: cell.activity_id == null ? null : Number(cell.activity_id),
+      version: Number(cell.version) || 0,
+      updated_at: cell.updated_at || null,
+      updated_by: cell.updated_by == null ? null : Number(cell.updated_by),
+    };
+    state.cells.set(segmentKey(normalized.person_id, normalized.hour, normalized.minute_start), normalized);
+    const hk = hourKey(normalized.person_id, normalized.hour);
+    if (!state.hourCells.has(hk)) state.hourCells.set(hk, []);
+    state.hourCells.get(hk).push(normalized);
+  });
+  state.hourCells.forEach((segments, hk) => {
+    state.hourCells.set(hk, sortSegments(segments));
+  });
+}
+
+function segmentsForHour(personId, hour) {
+  return state.hourCells.get(hourKey(personId, hour)) || [];
+}
+
+function replaceHourSegments(personId, hour, segments) {
+  const hk = hourKey(personId, hour);
+  const existing = state.hourCells.get(hk) || [];
+  existing.forEach((segment) => state.cells.delete(segmentKey(segment.person_id, segment.hour, segment.minute_start)));
+
+  const normalized = sortSegments((segments || []).map((segment) => ({
+    person_id: Number(segment.person_id),
+    hour: Number(segment.hour),
+    minute_start: Number(segment.minute_start),
+    minute_end: Number(segment.minute_end),
+    activity_id: segment.activity_id == null ? null : Number(segment.activity_id),
+    version: Number(segment.version) || 0,
+    updated_at: segment.updated_at || null,
+    updated_by: segment.updated_by == null ? null : Number(segment.updated_by),
+  })));
+
+  if (normalized.length === 0) {
+    state.hourCells.delete(hk);
+    return;
+  }
+
+  normalized.forEach((segment) => {
+    state.cells.set(segmentKey(segment.person_id, segment.hour, segment.minute_start), segment);
+  });
+  state.hourCells.set(hk, normalized);
+}
+
+function currentSegment(personId, hour, minuteStart, minuteEnd) {
+  const match = segmentsForHour(personId, hour).find(
+    (segment) => segment.minute_start === minuteStart && segment.minute_end === minuteEnd
+  );
+  return match || {
+    person_id: personId,
+    hour,
+    minute_start: minuteStart,
+    minute_end: minuteEnd,
+    activity_id: null,
+    version: 0,
+  };
+}
+
+function isSplitHour(segments) {
+  return (
+    segments.length === 2 &&
+    segments[0].minute_start === 0 &&
+    segments[0].minute_end === 30 &&
+    segments[1].minute_start === 30 &&
+    segments[1].minute_end === 60
+  );
+}
+
+function isScheduledHour(personId, hour) {
+  const scheduledSet = state.scheduledHours[personId];
+  return !!(scheduledSet && scheduledSet.has(hour));
+}
+
+function formatHours(value) {
+  const num = Number(value) || 0;
+  return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
+}
+
+function buildActivitySelect() {
+  const select = document.createElement("select");
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "–";
+  select.appendChild(empty);
+
+  state.activitiesActive.forEach((act) => {
+    const opt = document.createElement("option");
+    opt.value = String(act.id);
+    opt.textContent = act.label;
+    opt.style.background = act.color;
+    select.appendChild(opt);
+  });
+  return select;
+}
+
+function clearFocusedCell() {
+  if (!state.focusedCell?.focusEl) return;
+  state.focusedCell.focusEl.classList.remove("focused");
+}
+
+function focusSegment(td, focusEl, minuteStart, minuteEnd) {
+  clearFocusedCell();
+  state.focusedCell = {
+    td,
+    focusEl,
+    personId: Number(td.dataset.personId),
+    hour: Number(td.dataset.hour),
+    minuteStart,
+    minuteEnd,
+  };
+  focusEl.classList.add("focused");
+  if (document.activeElement && document.activeElement.tagName === "SELECT") {
+    document.activeElement.blur();
+  }
+  setTimeout(() => {
+    try {
+      focusEl.focus({ preventScroll: true });
+    } catch (e) {}
+  }, 0);
+}
+
+function effectiveActivityIdForTd(td) {
+  const personId = Number(td.dataset.personId);
+  const hour = Number(td.dataset.hour);
+  const segments = segmentsForHour(personId, hour);
+  if (isSplitHour(segments)) return null;
+  if (segments.length === 1 && segments[0].activity_id != null) return segments[0].activity_id;
   if (td.dataset.isBase === "1") {
-    const p = state.persons.find((x) => x.id === Number(td.dataset.personId));
-    return p?.home_activity_id || null;
+    const person = personById(personId);
+    return person?.home_activity_id || null;
   }
   return null;
 }
 
-function setCellVisual(td, activityId, version) {
+function effectiveActivityIdForFocus() {
+  if (!state.focusedCell) return null;
+  const { personId, hour, minuteStart, minuteEnd, td } = state.focusedCell;
+  const segment = currentSegment(personId, hour, minuteStart, minuteEnd);
+  if (segment.activity_id != null) return segment.activity_id;
+  if (minuteStart === 0 && minuteEnd === 60 && td?.dataset.isBase === "1") {
+    const person = personById(personId);
+    return person?.home_activity_id || null;
+  }
+  return null;
+}
+
+function renderFullHourCell(td, segment, isScheduled) {
+  td.dataset.split = "0";
+  td.classList.remove("split-hour", "scheduled-empty", "base-value");
+  td.style.background = "#fff";
+  td.dataset.isBase = "";
+
+  const person = personById(Number(td.dataset.personId));
+  const explicitActivityId = segment?.activity_id ?? null;
+  const effectiveActivityId = explicitActivityId != null
+    ? explicitActivityId
+    : (isScheduled ? (person?.home_activity_id || null) : null);
+  const isBase = explicitActivityId == null && effectiveActivityId != null;
+
+  if (explicitActivityId != null) {
+    td.style.background = colorFor(explicitActivityId);
+  } else if (isBase) {
+    td.style.background = colorFor(effectiveActivityId);
+    td.classList.add("base-value");
+    td.dataset.isBase = "1";
+  } else if (isScheduled) {
+    td.classList.add("scheduled-empty");
+  }
+
+  const select = buildActivitySelect();
+  select.className = "cell-select";
+  select.value = explicitActivityId != null ? String(explicitActivityId) : "";
+  select.dataset.minuteStart = "0";
+  select.dataset.minuteEnd = "60";
+  select.dataset.version = String(segment?.version || 0);
+
+  select.addEventListener("change", () => onSegmentChange(td, 0, 60));
+  select.addEventListener("focus", () => focusSegment(td, td, 0, 60));
+  select.addEventListener("mousedown", (e) => {
+    e.stopPropagation();
+    const isFocused = state.focusedCell
+      && state.focusedCell.td === td
+      && state.focusedCell.minuteStart === 0
+      && state.focusedCell.minuteEnd === 60;
+    if (!isFocused) {
+      e.preventDefault();
+      focusSegment(td, td, 0, 60);
+    }
+  });
+  select.addEventListener("keydown", (e) => handleSelectClipboardKeys(e), true);
+
+  td.appendChild(select);
+}
+
+function renderSplitHourCell(td, segments, isScheduled) {
+  td.dataset.split = "1";
+  td.dataset.isBase = "";
+  td.classList.add("split-hour");
+  td.classList.remove("scheduled-empty", "base-value");
+  td.style.background = "#fff";
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "hour-split";
+
+  HALF_SEGMENTS.forEach(({ minute_start, minute_end }) => {
+    const segment = currentSegment(Number(td.dataset.personId), Number(td.dataset.hour), minute_start, minute_end);
+    const part = document.createElement("div");
+    part.className = "hour-segment";
+    part.dataset.minuteStart = String(minute_start);
+    part.dataset.minuteEnd = String(minute_end);
+    part.tabIndex = -1;
+
+    if (segment.activity_id != null) {
+      part.style.background = colorFor(segment.activity_id);
+    } else if (isScheduled) {
+      part.classList.add("scheduled-empty-half");
+    } else {
+      part.style.background = "#fff";
+    }
+
+    const select = buildActivitySelect();
+    select.className = "half-select";
+    select.value = segment.activity_id != null ? String(segment.activity_id) : "";
+    select.dataset.minuteStart = String(minute_start);
+    select.dataset.minuteEnd = String(minute_end);
+    select.dataset.version = String(segment.version || 0);
+
+    select.addEventListener("change", () => onSegmentChange(td, minute_start, minute_end));
+    select.addEventListener("focus", () => focusSegment(td, part, minute_start, minute_end));
+    select.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+      const isFocused = state.focusedCell
+        && state.focusedCell.td === td
+        && state.focusedCell.minuteStart === minute_start
+        && state.focusedCell.minuteEnd === minute_end;
+      if (!isFocused) {
+        e.preventDefault();
+        focusSegment(td, part, minute_start, minute_end);
+      }
+    });
+    select.addEventListener("keydown", (e) => handleSelectClipboardKeys(e), true);
+
+    part.appendChild(select);
+    wrapper.appendChild(part);
+  });
+
+  td.appendChild(wrapper);
+}
+
+function renderHourCell(td) {
+  td.innerHTML = "";
+  clearFocusedCell();
+
   const personId = Number(td.dataset.personId);
   const hour = Number(td.dataset.hour);
-  const scheduledSet = state.scheduledHours[personId];
-  const isScheduled = scheduledSet && scheduledSet.has(hour);
+  const segments = sortSegments(segmentsForHour(personId, hour));
+  const isScheduled = isScheduledHour(personId, hour);
 
-  // Effektiv aktivitet: faktisk värde > huvudställe-som-bas vid schemalagd tom > inget
-  let effectiveActivityId = activityId;
-  let isBase = false;
-  if (!activityId && isScheduled) {
-    const person = state.persons.find((p) => p.id === personId);
-    if (person && person.home_activity_id) {
-      effectiveActivityId = person.home_activity_id;
-      isBase = true;
-    }
+  if (isSplitHour(segments) || segments.some((segment) => segment.minute_end - segment.minute_start === 30)) {
+    renderSplitHourCell(td, segments, isScheduled);
+    return;
   }
 
-  const sel = td.querySelector("select");
-  if (sel) {
-    sel.value = activityId ? String(activityId) : "";
-    sel.dataset.version = version || 0;
-    sel.dataset.activityId = activityId || "";
-    sel.style.background = "transparent";
-  }
-  td.dataset.version = version || 0;
-  td.dataset.activityId = activityId || "";
-  td.dataset.isBase = isBase ? "1" : "";
-
-  if (activityId) {
-    td.style.background = colorFor(activityId);
-    td.classList.remove("scheduled-empty", "base-value");
-  } else if (effectiveActivityId) {
-    // Huvudställe som bas – samma färg som riktig men markeras med klass
-    td.style.background = colorFor(effectiveActivityId);
-    td.classList.remove("scheduled-empty");
-    td.classList.add("base-value");
-  } else if (isScheduled) {
-    td.style.background = "";
-    td.classList.add("scheduled-empty");
-    td.classList.remove("base-value");
-  } else {
-    td.style.background = "#fff";
-    td.classList.remove("scheduled-empty", "base-value");
-  }
-
+  const segment = segments.length === 1 ? segments[0] : null;
+  renderFullHourCell(td, segment, isScheduled);
 }
 
 function buildRows() {
   const body = document.getElementById("scheduleBody");
   body.innerHTML = "";
+  state.focusedCell = null;
 
   state.persons.forEach((person, rowIndex) => {
     const tr = document.createElement("tr");
@@ -194,94 +435,43 @@ function buildRows() {
       td.dataset.hour = hour;
       td.dataset.rowIndex = rowIndex;
       td.dataset.colIndex = colIndex;
-      td.tabIndex = -1;  // gör fokuserbart men inte tab-navigerat
-
-      const select = document.createElement("select");
-      select.dataset.personId = person.id;
-      select.dataset.hour = hour;
-      select.dataset.version = 0;
-      select.dataset.activityId = "";
-
-      const empty = document.createElement("option");
-      empty.value = "";
-      empty.textContent = "–";
-      select.appendChild(empty);
-
-      state.activitiesActive.forEach((act) => {
-        const opt = document.createElement("option");
-        opt.value = String(act.id);
-        opt.textContent = act.label;
-        opt.style.background = act.color;
-        select.appendChild(opt);
-      });
-
-      select.addEventListener("change", () => onCellChange(td));
-      select.addEventListener("focus", () => focusCell(td));
-      // Två-klick-flöde: första klick = bara fokus (förhindra dropdown), andra klick på samma cell = öppna dropdown
-      select.addEventListener("mousedown", (e) => {
-        const isFocused = state.focusedCell && state.focusedCell.td === td;
-        if (!isFocused) {
-          e.preventDefault();
-          focusCell(td);
-        }
-      });
-      // Försök fånga Ctrl+C/V/X även när dropdown är öppen
-      select.addEventListener("keydown", (e) => {
-        if (!(e.ctrlKey || e.metaKey)) return;
-        const key = e.key.toLowerCase();
-        if (!["c", "x", "v"].includes(key)) return;
-        e.preventDefault();
-        e.stopPropagation();
-        select.blur();
-        if (!state.focusedCell) return;
-        if (key === "c") copyFocused(false);
-        else if (key === "x") copyFocused(true);
-        else if (key === "v") pasteFocused();
-      }, true);
-
-      td.appendChild(select);
+      td.tabIndex = -1;
+      renderHourCell(td);
       tr.appendChild(td);
     });
 
     body.appendChild(tr);
   });
-
-  applyCells();
 }
 
-function applyCells() {
-  document.querySelectorAll("#scheduleBody td[data-hour]").forEach((td) => {
-    setCellVisual(td, null, 0);
-  });
-
-  state.cells.forEach((info, key) => {
-    const [pid, hour] = key.split(":");
-    const td = document.querySelector(
-      `#scheduleBody td[data-person-id="${pid}"][data-hour="${hour}"]`
-    );
-    if (!td) return;
-    setCellVisual(td, info.activity_id, info.version);
-  });
-}
-
-
-// ---- Cell-update flow ----
-async function onCellChange(td) {
-  const sel = td.querySelector("select");
+async function onSegmentChange(td, minuteStart, minuteEnd) {
   const personId = Number(td.dataset.personId);
   const hour = Number(td.dataset.hour);
-  const expectedVersion = Number(td.dataset.version) || 0;
-  const newActivityId = sel.value ? Number(sel.value) : null;
+  const segment = currentSegment(personId, hour, minuteStart, minuteEnd);
+  const selector = td.querySelector(
+    `select[data-minute-start="${minuteStart}"][data-minute-end="${minuteEnd}"]`
+  );
+  const newActivityId = selector?.value ? Number(selector.value) : null;
 
   try {
     const resp = await api.put("/api/schedule/cell", {
-      year: state.year, week: state.week, weekday: state.weekday,
-      hour, person_id: personId, activity_id: newActivityId,
-      expected_version: expectedVersion,
+      year: state.year,
+      week: state.week,
+      weekday: state.weekday,
+      hour,
+      minute_start: minuteStart,
+      minute_end: minuteEnd,
+      person_id: personId,
+      activity_id: newActivityId,
+      expected_version: Number(segment.version) || 0,
     });
-    const c = resp.cell;
-    setCellVisual(td, c.activity_id, c.version);
-    state.cells.set(`${personId}:${hour}`, { activity_id: c.activity_id, version: c.version });
+    const updated = resp.cell;
+    const others = segmentsForHour(personId, hour).filter(
+      (item) => !(item.minute_start === minuteStart && item.minute_end === minuteEnd)
+    );
+    replaceHourSegments(personId, hour, [...others, updated]);
+    renderHourCell(td);
+    focusMatchingSegment(td, minuteStart, minuteEnd);
     refreshSummary();
   } catch (err) {
     if (err.status === 409) {
@@ -289,28 +479,59 @@ async function onCellChange(td) {
       await loadSchedule();
     } else {
       showToast("Kunde inte spara: " + err.message, "error");
-      const stored = state.cells.get(`${personId}:${hour}`);
-      setCellVisual(td, stored?.activity_id || null, stored?.version || 0);
+      renderHourCell(td);
+      focusMatchingSegment(td, minuteStart, minuteEnd);
     }
   }
 }
 
-
-// ---- Focus + Clipboard ----
-function focusCell(td) {
-  if (state.focusedCell?.td) state.focusedCell.td.classList.remove("focused");
-  state.focusedCell = {
-    td,
-    personId: Number(td.dataset.personId),
-    hour: Number(td.dataset.hour),
-  };
-  td.classList.add("focused");
-  // Tar bort fokus från select och flyttar till td så Ctrl+C/V/X går till document
-  if (document.activeElement && document.activeElement.tagName === "SELECT") {
-    document.activeElement.blur();
+function focusMatchingSegment(td, minuteStart, minuteEnd) {
+  if (!td) return;
+  if (minuteStart === 0 && minuteEnd === 60 && td.dataset.split !== "1") {
+    focusSegment(td, td, 0, 60);
+    return;
   }
-  // td har tabIndex=-1 så vi kan ge den fokus programmatiskt
-  setTimeout(() => { try { td.focus({ preventScroll: true }); } catch (e) {} }, 0);
+  const part = td.querySelector(
+    `.hour-segment[data-minute-start="${minuteStart}"][data-minute-end="${minuteEnd}"]`
+  );
+  if (part) focusSegment(td, part, minuteStart, minuteEnd);
+}
+
+async function splitHourCell(td) {
+  const personId = Number(td.dataset.personId);
+  const hour = Number(td.dataset.hour);
+  const currentSegments = sortSegments(segmentsForHour(personId, hour));
+  if (isSplitHour(currentSegments)) {
+    showToast("Cellen är redan delad i två halvtimmar.", "warn");
+    return;
+  }
+
+  try {
+    const resp = await api.put("/api/schedule/cell/split", {
+      year: state.year,
+      week: state.week,
+      weekday: state.weekday,
+      hour,
+      person_id: personId,
+      segments: currentSegments.map((segment) => ({
+        minute_start: segment.minute_start,
+        minute_end: segment.minute_end,
+        expected_version: segment.version,
+      })),
+    });
+    replaceHourSegments(personId, hour, resp.segments || []);
+    renderHourCell(td);
+    focusMatchingSegment(td, 0, 30);
+    refreshSummary();
+    showToast("Cellen delades i två halvtimmar.");
+  } catch (err) {
+    if (err.status === 409) {
+      showToast("Cellen ändrades av någon annan – läste in på nytt", "warn");
+      await loadSchedule();
+    } else {
+      showToast("Kunde inte dela cellen: " + err.message, "error");
+    }
+  }
 }
 
 function clipboardLabel(activityId) {
@@ -320,27 +541,41 @@ function clipboardLabel(activityId) {
 
 async function copyFocused(cut = false) {
   if (!state.focusedCell) return;
-  const { td, personId, hour } = state.focusedCell;
-  const activityId = effectiveActivityId(td);
+  const activityId = effectiveActivityIdForFocus();
   state.clipboard = { activity_id: activityId };
-  td.classList.add("clipboard-flash");
-  setTimeout(() => td.classList.remove("clipboard-flash"), 500);
+  state.focusedCell.focusEl.classList.add("clipboard-flash");
+  setTimeout(() => state.focusedCell?.focusEl?.classList.remove("clipboard-flash"), 500);
 
   if (cut && activityId != null) {
-    const expectedVersion = Number(td.dataset.version) || 0;
+    const { td, personId, hour, minuteStart, minuteEnd } = state.focusedCell;
+    const segment = currentSegment(personId, hour, minuteStart, minuteEnd);
     try {
       const resp = await api.put("/api/schedule/cell", {
-        year: state.year, week: state.week, weekday: state.weekday,
-        hour, person_id: personId, activity_id: null,
-        expected_version: expectedVersion,
+        year: state.year,
+        week: state.week,
+        weekday: state.weekday,
+        hour,
+        minute_start: minuteStart,
+        minute_end: minuteEnd,
+        person_id: personId,
+        activity_id: null,
+        expected_version: Number(segment.version) || 0,
       });
-      setCellVisual(td, resp.cell.activity_id, resp.cell.version);
-      state.cells.set(`${personId}:${hour}`, { activity_id: resp.cell.activity_id, version: resp.cell.version });
+      const others = segmentsForHour(personId, hour).filter(
+        (item) => !(item.minute_start === minuteStart && item.minute_end === minuteEnd)
+      );
+      replaceHourSegments(personId, hour, [...others, resp.cell]);
+      renderHourCell(td);
+      focusMatchingSegment(td, minuteStart, minuteEnd);
       refreshSummary();
       showToast(`Klippt: ${clipboardLabel(activityId)}`);
     } catch (e) {
-      if (e.status === 409) { showToast("Konflikt – läser om", "warn"); await loadSchedule(); }
-      else showToast("Kunde inte klippa: " + e.message, "error");
+      if (e.status === 409) {
+        showToast("Konflikt – läser om", "warn");
+        await loadSchedule();
+      } else {
+        showToast("Kunde inte klippa: " + e.message, "error");
+      }
     }
   } else {
     showToast(`Kopierat: ${clipboardLabel(activityId)}`);
@@ -349,22 +584,48 @@ async function copyFocused(cut = false) {
 
 async function pasteFocused() {
   if (!state.focusedCell || state.clipboard == null) return;
-  const { td, personId, hour } = state.focusedCell;
-  const expectedVersion = Number(td.dataset.version) || 0;
+  const { td, personId, hour, minuteStart, minuteEnd } = state.focusedCell;
+  const segment = currentSegment(personId, hour, minuteStart, minuteEnd);
   try {
     const resp = await api.put("/api/schedule/cell", {
-      year: state.year, week: state.week, weekday: state.weekday,
-      hour, person_id: personId, activity_id: state.clipboard.activity_id,
-      expected_version: expectedVersion,
+      year: state.year,
+      week: state.week,
+      weekday: state.weekday,
+      hour,
+      minute_start: minuteStart,
+      minute_end: minuteEnd,
+      person_id: personId,
+      activity_id: state.clipboard.activity_id,
+      expected_version: Number(segment.version) || 0,
     });
-    setCellVisual(td, resp.cell.activity_id, resp.cell.version);
-    state.cells.set(`${personId}:${hour}`, { activity_id: resp.cell.activity_id, version: resp.cell.version });
+    const others = segmentsForHour(personId, hour).filter(
+      (item) => !(item.minute_start === minuteStart && item.minute_end === minuteEnd)
+    );
+    replaceHourSegments(personId, hour, [...others, resp.cell]);
+    renderHourCell(td);
+    focusMatchingSegment(td, minuteStart, minuteEnd);
     refreshSummary();
     showToast(`Klistrade in: ${clipboardLabel(state.clipboard.activity_id)}`);
   } catch (e) {
-    if (e.status === 409) { showToast("Konflikt – läser om", "warn"); await loadSchedule(); }
-    else showToast("Kunde inte klistra in: " + e.message, "error");
+    if (e.status === 409) {
+      showToast("Konflikt – läser om", "warn");
+      await loadSchedule();
+    } else {
+      showToast("Kunde inte klistra in: " + e.message, "error");
+    }
   }
+}
+
+function handleSelectClipboardKeys(e) {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const key = e.key.toLowerCase();
+  if (!["c", "x", "v"].includes(key)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (!state.focusedCell) return;
+  if (key === "c") copyFocused(false);
+  else if (key === "x") copyFocused(true);
+  else if (key === "v") pasteFocused();
 }
 
 function setupKeyboard() {
@@ -375,11 +636,6 @@ function setupKeyboard() {
 
     const active = document.activeElement;
     if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
-
-    // Debug – tas bort senare
-    const debugTag = state.focusedCell ? "cell vald" : "INGEN cell";
-    console.log(`[keyboard] Ctrl+${key}, active=${active?.tagName}, ${debugTag}`);
-
     if (!state.focusedCell) {
       showToast(`Ctrl+${key.toUpperCase()}: klicka först på en cell`, "warn");
       return;
@@ -390,13 +646,10 @@ function setupKeyboard() {
     else if (key === "x") copyFocused(true);
     else if (key === "v") pasteFocused();
   };
-  // Capture-fas på både window och document → fångar event innan select/browser tar det
   window.addEventListener("keydown", handler, true);
   document.addEventListener("keydown", handler, true);
 }
 
-
-// ---- Drag-to-fill ----
 function getDragRect() {
   const r0 = Math.min(drag.sourceRow, drag.currentRow);
   const r1 = Math.max(drag.sourceRow, drag.currentRow);
@@ -412,6 +665,7 @@ function updateDragTargets() {
   document.querySelectorAll("#scheduleBody td[data-row-index]").forEach((td) => {
     const r = Number(td.dataset.rowIndex);
     const c = Number(td.dataset.colIndex);
+    if (td.dataset.split === "1") return;
     if (r >= r0 && r <= r1 && c >= c0 && c <= c1) td.classList.add("drag-target");
   });
 }
@@ -435,7 +689,7 @@ function resetDragState() {
 function startPendingDrag(td, event) {
   drag.pending = true;
   drag.sourceTd = td;
-  drag.sourceActivityId = effectiveActivityId(td);
+  drag.sourceActivityId = effectiveActivityIdForTd(td);
   drag.sourceRow = Number(td.dataset.rowIndex);
   drag.sourceCol = Number(td.dataset.colIndex);
   drag.currentRow = drag.sourceRow;
@@ -469,28 +723,40 @@ async function finishDrag() {
   resetDragState();
 
   if (targets.length === 0 || (targets.length === 1 && targets[0] === sourceTd)) return;
-  if (targets.length > 200) { showToast("För många celler (max 200)", "error"); return; }
+  if (targets.length > 200) {
+    showToast("För många celler (max 200)", "error");
+    return;
+  }
 
   const cells = targets
     .filter((td) => td !== sourceTd)
-    .map((td) => ({
-      year: state.year, week: state.week, weekday: state.weekday,
-      hour: Number(td.dataset.hour),
-      person_id: Number(td.dataset.personId),
-      activity_id: sourceActivityId,
-      expected_version: Number(td.dataset.version) || 0,
-    }));
+    .map((td) => {
+      const personId = Number(td.dataset.personId);
+      const hour = Number(td.dataset.hour);
+      const segment = currentSegment(personId, hour, 0, 60);
+      return {
+        year: state.year,
+        week: state.week,
+        weekday: state.weekday,
+        hour,
+        minute_start: 0,
+        minute_end: 60,
+        person_id: personId,
+        activity_id: sourceActivityId,
+        expected_version: Number(segment.version) || 0,
+      };
+    });
 
   if (cells.length === 0) return;
 
   try {
     const resp = await api.post("/api/schedule/cells", { cells, atomic: true, action: "drag_fill" });
-    resp.applied.forEach((c) => {
+    resp.applied.forEach((segment) => {
+      replaceHourSegments(segment.person_id, segment.hour, [segment]);
       const td = document.querySelector(
-        `#scheduleBody td[data-person-id="${c.person_id}"][data-hour="${c.hour}"]`
+        `#scheduleBody td[data-person-id="${segment.person_id}"][data-hour="${segment.hour}"]`
       );
-      if (td) setCellVisual(td, c.activity_id, c.version);
-      state.cells.set(`${c.person_id}:${c.hour}`, { activity_id: c.activity_id, version: c.version });
+      if (td) renderHourCell(td);
     });
     refreshSummary();
     showToast(`Fyllde ${resp.applied.length} celler`);
@@ -509,9 +775,25 @@ function setupDrag() {
 
   body.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
+    if (e.target.closest("select")) return;
+    const td = e.target.closest("td[data-hour]");
+    if (!td || td.dataset.split === "1") return;
+    startPendingDrag(td, e);
+  });
+
+  body.addEventListener("contextmenu", (e) => {
     const td = e.target.closest("td[data-hour]");
     if (!td) return;
-    startPendingDrag(td, e);
+    e.preventDefault();
+    if (td.dataset.split === "1") {
+      const part = e.target.closest(".hour-segment") || td.querySelector(".hour-segment");
+      if (part) {
+        focusSegment(td, part, Number(part.dataset.minuteStart), Number(part.dataset.minuteEnd));
+      }
+      return;
+    }
+    focusSegment(td, td, 0, 60);
+    void splitHourCell(td);
   });
 
   document.addEventListener("mousemove", (e) => {
@@ -522,7 +804,7 @@ function setupDrag() {
       activateDrag();
     }
     const td = scheduleCellFromPoint(e.clientX, e.clientY);
-    if (!td) return;
+    if (!td || td.dataset.split === "1") return;
     drag.currentRow = Number(td.dataset.rowIndex);
     drag.currentCol = Number(td.dataset.colIndex);
     updateDragTargets();
@@ -546,25 +828,34 @@ function setupDrag() {
     drag.suppressClick = false;
   }, true);
 
-  // Klick på cell → focus (även när man klickar på själva td:n)
   body.addEventListener("click", (e) => {
     if (drag.suppressClick) return;
     const td = e.target.closest("td[data-hour]");
-    if (td) focusCell(td);
+    if (!td) return;
+    if (td.dataset.split === "1") {
+      const part = e.target.closest(".hour-segment");
+      if (part) {
+        focusSegment(td, part, Number(part.dataset.minuteStart), Number(part.dataset.minuteEnd));
+      }
+      return;
+    }
+    focusSegment(td, td, 0, 60);
   });
 
-  // När dropdown stänger (blur), behåll fokus på td så Ctrl+C/V/X funkar
   body.addEventListener("change", (e) => {
     const td = e.target.closest("td[data-hour]");
-    if (td) {
-      focusCell(td);
-      setTimeout(() => td.focus(), 0);
+    if (!td) return;
+    if (td.dataset.split === "1") {
+      const part = e.target.closest(".hour-segment");
+      if (part) {
+        focusSegment(td, part, Number(part.dataset.minuteStart), Number(part.dataset.minuteEnd));
+      }
+      return;
     }
+    focusSegment(td, td, 0, 60);
   });
 }
 
-
-// ---- Summary ----
 async function refreshSummary() {
   const rows = await api.get(
     `/api/schedule/summary?year=${state.year}&week=${state.week}&weekday=${state.weekday}` +
@@ -576,14 +867,12 @@ async function refreshSummary() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td style="background: ${r.color}; padding: 5px;">${escapeHtml(r.activity_label)}</td>
-      <td>${r.hours}</td>
-      <td>${r.persons_equiv.toFixed(1)}</td>`;
+      <td>${formatHours(r.hours)}</td>
+      <td>${Number(r.persons_equiv).toFixed(1)}</td>`;
     tbody.appendChild(tr);
   });
 }
 
-
-// ---- Load ----
 async function loadAreasAndActivities() {
   const [areas, activities, activitiesAll] = await Promise.all([
     api.get("/api/areas"),
@@ -617,11 +906,7 @@ async function loadSchedule() {
   );
   state.allPersons = data.persons;
   refreshPersons();
-  state.cells = new Map();
-  state.focusedCell = null;
-  data.cells.forEach((c) => {
-    state.cells.set(`${c.person_id}:${c.hour}`, { activity_id: c.activity_id, version: c.version });
-  });
+  setAllSegments(data.cells || []);
   state.scheduledHours = {};
   Object.entries(data.scheduled_hours || {}).forEach(([pid, hours]) => {
     state.scheduledHours[Number(pid)] = new Set(hours);
@@ -635,8 +920,6 @@ async function loadSchedule() {
   refreshSummary();
 }
 
-
-// ---- Init ----
 (async () => {
   await initPage("schedule");
   await loadAreasAndActivities();
@@ -674,22 +957,32 @@ async function loadSchedule() {
     if (!confirm("Fyll tomma celler från vänster för alla personer i området?")) return;
     try {
       const r = await api.post("/api/schedule/fill-from-left", {
-        year: state.year, week: state.week, weekday: state.weekday, area_id: state.areaId,
+        year: state.year,
+        week: state.week,
+        weekday: state.weekday,
+        area_id: state.areaId,
       });
       showToast(`Fyllde ${r.updated} celler`);
       await loadSchedule();
-    } catch (e) { showToast("Fel: " + e.message, "error"); }
+    } catch (e) {
+      showToast("Fel: " + e.message, "error");
+    }
   });
 
   document.getElementById("clearBtn").addEventListener("click", async () => {
     if (!confirm("Rensa hela dagen för det valda området?")) return;
     try {
       const r = await api.post("/api/schedule/clear", {
-        year: state.year, week: state.week, weekday: state.weekday, area_id: state.areaId,
+        year: state.year,
+        week: state.week,
+        weekday: state.weekday,
+        area_id: state.areaId,
       });
       showToast(`Rensade ${r.cleared} celler`);
       await loadSchedule();
-    } catch (e) { showToast("Fel: " + e.message, "error"); }
+    } catch (e) {
+      showToast("Fel: " + e.message, "error");
+    }
   });
 
   document.getElementById("copyBtn").addEventListener("click", () => openCopyModal());
@@ -710,7 +1003,10 @@ async function loadSchedule() {
       }
       const key = th.dataset.sort;
       if (state.sortKey === key) state.sortAsc = !state.sortAsc;
-      else { state.sortKey = key; state.sortAsc = true; }
+      else {
+        state.sortKey = key;
+        state.sortAsc = true;
+      }
       refreshPersons();
       buildRows();
     });
@@ -724,15 +1020,15 @@ function openCopyModal() {
   backdrop.innerHTML = `
     <div class="modal">
       <h2>Kopiera dag</h2>
-      <p class="note">Kopierar från en dag till en annan inom området <b>${escapeHtml(state.areas.find(a => a.id === state.areaId)?.name || 'Alla')}</b>.</p>
+      <p class="note">Kopierar från en dag till en annan inom området <b>${escapeHtml(state.areas.find(a => a.id === state.areaId)?.name || "Alla")}</b>.</p>
       <label>Från år</label><input id="cp-fy" type="number" value="${state.year}" />
       <label>Från vecka</label><input id="cp-fw" type="number" value="${state.week}" />
       <label>Från dag</label>
-      <select id="cp-fd">${[1,2,3,4,5,6,7].map(d=>`<option value="${d}" ${d===state.weekday?'selected':''}>${DAYS[d]}</option>`).join("")}</select>
+      <select id="cp-fd">${[1,2,3,4,5,6,7].map((d) => `<option value="${d}" ${d === state.weekday ? "selected" : ""}>${DAYS[d]}</option>`).join("")}</select>
       <label>Till år</label><input id="cp-ty" type="number" value="${state.year}" />
       <label>Till vecka</label><input id="cp-tw" type="number" value="${state.week}" />
       <label>Till dag</label>
-      <select id="cp-td">${[1,2,3,4,5,6,7].map(d=>`<option value="${d}">${DAYS[d]}</option>`).join("")}</select>
+      <select id="cp-td">${[1,2,3,4,5,6,7].map((d) => `<option value="${d}">${DAYS[d]}</option>`).join("")}</select>
       <label><input id="cp-ow" type="checkbox" /> Skriv över befintliga celler i målet</label>
       <div class="actions">
         <button id="cp-cancel">Avbryt</button>
@@ -756,6 +1052,8 @@ function openCopyModal() {
       showToast(`Kopierade ${r.copied} celler`);
       backdrop.remove();
       await loadSchedule();
-    } catch (e) { showToast("Fel: " + e.message, "error"); }
+    } catch (e) {
+      showToast("Fel: " + e.message, "error");
+    }
   });
 }

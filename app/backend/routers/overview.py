@@ -24,7 +24,7 @@ class OverviewCell(BaseModel):
     weekday: int
     activity_id: int | None
     mixed: bool
-    hours_total: int
+    hours_total: float
     template_hours: int
 
 
@@ -47,7 +47,7 @@ class MonthOverviewCell(BaseModel):
     date: str
     activity_id: int | None
     mixed: bool
-    hours_total: int
+    hours_total: float
     template_hours: int
 
 
@@ -65,6 +65,10 @@ class OverviewDayRequest(BaseModel):
     week: int
     weekday: int
     activity_id: int | None
+
+
+def _hours_from_minutes(total_minutes: int) -> float:
+    return round(float(total_minutes) / 60.0, 2)
 
 
 @router.get("", response_model=OverviewOut)
@@ -89,7 +93,7 @@ def get_overview(
                 ScheduleCell.person_id,
                 ScheduleCell.weekday,
                 ScheduleCell.activity_id,
-                func.count(ScheduleCell.id),
+                func.sum(ScheduleCell.minute_end - ScheduleCell.minute_start),
             )
             .where(
                 ScheduleCell.year == year,
@@ -109,13 +113,13 @@ def get_overview(
                 (aid, cnt) for (pid, weekday, aid), cnt in counts.items()
                 if pid == p.id and weekday == wd and aid is not None
             ]
-            hours_total = sum(c for _, c in day_acts)
+            total_minutes = sum(c for _, c in day_acts)
             distinct = {aid for aid, _ in day_acts}
             if not day_acts:
                 dominant = None
                 mixed = False
             else:
-                # välj den med flest timmar
+                # välj den med flest minuter
                 dominant = max(day_acts, key=lambda x: x[1])[0]
                 mixed = len(distinct) > 1
 
@@ -125,7 +129,7 @@ def get_overview(
             matrix.append(OverviewCell(
                 person_id=p.id, weekday=wd,
                 activity_id=dominant, mixed=mixed,
-                hours_total=hours_total, template_hours=template_hours,
+                hours_total=_hours_from_minutes(total_minutes), template_hours=template_hours,
             ))
 
     return OverviewOut(
@@ -175,7 +179,7 @@ def get_month_overview(
                 ScheduleCell.week,
                 ScheduleCell.weekday,
                 ScheduleCell.activity_id,
-                func.count(ScheduleCell.id),
+                func.sum(ScheduleCell.minute_end - ScheduleCell.minute_start),
             )
             .where(
                 ScheduleCell.person_id.in_(person_ids),
@@ -199,7 +203,7 @@ def get_month_overview(
                 (aid, cnt) for (pid, y, w, wd, aid), cnt in counts.items()
                 if pid == p.id and y == d_info.year and w == d_info.week and wd == d_info.weekday and aid is not None
             ]
-            hours_total = sum(c for _, c in day_acts)
+            total_minutes = sum(c for _, c in day_acts)
             distinct = {aid for aid, _ in day_acts}
             if not day_acts:
                 dominant = None
@@ -212,7 +216,7 @@ def get_month_overview(
             matrix.append(MonthOverviewCell(
                 person_id=p.id, date=d_info.date,
                 activity_id=dominant, mixed=mixed,
-                hours_total=hours_total, template_hours=template_hours,
+                hours_total=_hours_from_minutes(total_minutes), template_hours=template_hours,
             ))
 
     return MonthOverviewOut(
@@ -268,43 +272,46 @@ def _set_day_impl(payload: "OverviewDayRequest", db: Session, user: User) -> dic
             ScheduleCell.hour.in_(template_list),
         )
     ).scalars().all()
-    existing_by_hour = {c.hour: c for c in existing}
+    existing_by_hour: dict[int, list[ScheduleCell]] = defaultdict(list)
+    for cell in existing:
+        existing_by_hour[cell.hour].append(cell)
 
     written = 0
     deleted = 0
 
     for hour in sorted(template):
-        cell = existing_by_hour.get(hour)
+        cells_for_hour = sorted(existing_by_hour.get(hour, []), key=lambda cell: (cell.minute_start, cell.minute_end))
         if payload.activity_id is None:
             # Töm cellen / ta bort
-            if cell is not None:
+            for cell in cells_for_hour:
                 audit_log(
                     db, entity_type="schedule_cell", entity_id=cell.id,
                     action="overview_day_clear",
-                    old_value={"activity_id": cell.activity_id, "version": cell.version},
+                    old_value={
+                        "minute_start": cell.minute_start,
+                        "minute_end": cell.minute_end,
+                        "activity_id": cell.activity_id,
+                        "version": cell.version,
+                    },
                     new_value=None, user_id=user.id,
                 )
                 db.delete(cell)
                 deleted += 1
             continue
 
-        if cell is None:
-            cell = ScheduleCell(
-                year=payload.year, week=payload.week, weekday=payload.weekday,
-                hour=hour, person_id=payload.person_id,
-                activity_id=payload.activity_id, version=1, updated_by=user.id,
-            )
-            db.add(cell)
-            db.flush()
-            audit_log(
-                db, entity_type="schedule_cell", entity_id=cell.id,
-                action="overview_day_assign", old_value=None,
-                new_value={"activity_id": cell.activity_id, "version": 1}, user_id=user.id,
-            )
-            written += 1
-        else:
+        if (
+            len(cells_for_hour) == 1
+            and cells_for_hour[0].minute_start == 0
+            and cells_for_hour[0].minute_end == 60
+        ):
+            cell = cells_for_hour[0]
             if cell.activity_id != payload.activity_id:
-                old = {"activity_id": cell.activity_id, "version": cell.version}
+                old = {
+                    "minute_start": cell.minute_start,
+                    "minute_end": cell.minute_end,
+                    "activity_id": cell.activity_id,
+                    "version": cell.version,
+                }
                 cell.activity_id = payload.activity_id
                 cell.version += 1
                 cell.updated_by = user.id
@@ -312,10 +319,53 @@ def _set_day_impl(payload: "OverviewDayRequest", db: Session, user: User) -> dic
                 audit_log(
                     db, entity_type="schedule_cell", entity_id=cell.id,
                     action="overview_day_assign", old_value=old,
-                    new_value={"activity_id": cell.activity_id, "version": cell.version},
+                    new_value={
+                        "minute_start": cell.minute_start,
+                        "minute_end": cell.minute_end,
+                        "activity_id": cell.activity_id,
+                        "version": cell.version,
+                    },
                     user_id=user.id,
                 )
                 written += 1
+            continue
+
+        if cells_for_hour:
+            for cell in cells_for_hour:
+                audit_log(
+                    db, entity_type="schedule_cell", entity_id=cell.id,
+                    action="overview_day_clear",
+                    old_value={
+                        "minute_start": cell.minute_start,
+                        "minute_end": cell.minute_end,
+                        "activity_id": cell.activity_id,
+                        "version": cell.version,
+                    },
+                    new_value=None, user_id=user.id,
+                )
+                db.delete(cell)
+                deleted += 1
+
+        if not cells_for_hour or len(cells_for_hour) != 1 or cells_for_hour[0].minute_end != 60:
+            cell = ScheduleCell(
+                year=payload.year, week=payload.week, weekday=payload.weekday,
+                hour=hour, minute_start=0, minute_end=60, person_id=payload.person_id,
+                activity_id=payload.activity_id, version=1, updated_by=user.id,
+            )
+            db.add(cell)
+            db.flush()
+            audit_log(
+                db, entity_type="schedule_cell", entity_id=cell.id,
+                action="overview_day_assign", old_value=None,
+                new_value={
+                    "minute_start": cell.minute_start,
+                    "minute_end": cell.minute_end,
+                    "activity_id": cell.activity_id,
+                    "version": 1,
+                },
+                user_id=user.id,
+            )
+            written += 1
 
     db.commit()
     return {"written": written, "deleted": deleted}

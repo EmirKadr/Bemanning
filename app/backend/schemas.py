@@ -97,6 +97,8 @@ class CellOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     person_id: int
     hour: int
+    minute_start: int
+    minute_end: int
     activity_id: int | None
     version: int
     updated_at: datetime | None = None
@@ -118,6 +120,8 @@ class CellUpdate(BaseModel):
     week: int
     weekday: int
     hour: int
+    minute_start: int = 0
+    minute_end: int = 60
     person_id: int
     activity_id: int | None
     expected_version: int
@@ -128,6 +132,8 @@ class BulkCellItem(BaseModel):
     week: int
     weekday: int
     hour: int
+    minute_start: int = 0
+    minute_end: int = 60
     person_id: int
     activity_id: int | None
     expected_version: int
@@ -153,8 +159,27 @@ class SummaryRow(BaseModel):
     activity_code: str
     activity_label: str
     color: str
-    hours: int
+    hours: float
     persons_equiv: float
+
+
+class SegmentVersionRef(BaseModel):
+    minute_start: int
+    minute_end: int
+    expected_version: int
+
+
+class SplitCellRequest(BaseModel):
+    year: int
+    week: int
+    weekday: int
+    hour: int
+    person_id: int
+    segments: list[SegmentVersionRef] = Field(default_factory=list)
+
+
+class SplitCellResponse(BaseModel):
+    segments: list[CellOut]
 
 
 class CopyRequest(BaseModel):

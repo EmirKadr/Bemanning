@@ -81,7 +81,7 @@ class Activity(Base):
 class ScheduleCell(Base):
     __tablename__ = "schedule_cells"
     __table_args__ = (
-        UniqueConstraint("year", "week", "weekday", "hour", "person_id", name="uq_schedule_cell"),
+        UniqueConstraint("year", "week", "weekday", "hour", "person_id", "minute_start", name="uq_schedule_cell"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -89,6 +89,8 @@ class ScheduleCell(Base):
     week: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     weekday: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     hour: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    minute_start: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    minute_end: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=60)
     person_id: Mapped[int] = mapped_column(ForeignKey("persons.id"), nullable=False)
     activity_id: Mapped[int | None] = mapped_column(ForeignKey("activities.id"))
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

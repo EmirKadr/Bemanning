@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -50,7 +52,7 @@ def copy_schedule(
         if not src_cells:
             continue
 
-        # Hämta existerande mål-celler för att hantera overwrite
+        # Hämta existerande mål-celler för att hantera overwrite per timme
         person_ids_in_src = list({c.person_id for c in src_cells})
         existing_q = select(ScheduleCell).where(
             ScheduleCell.year == payload.to_year,
@@ -58,34 +60,46 @@ def copy_schedule(
             ScheduleCell.weekday == to_wd,
             ScheduleCell.person_id.in_(person_ids_in_src),
         )
-        existing = {(c.person_id, c.hour): c for c in db.execute(existing_q).scalars().all()}
+        existing_by_hour: dict[tuple[int, int], list[ScheduleCell]] = defaultdict(list)
+        for cell in db.execute(existing_q).scalars().all():
+            existing_by_hour[(cell.person_id, cell.hour)].append(cell)
 
-        for src in src_cells:
-            key = (src.person_id, src.hour)
-            target = existing.get(key)
-            if target and not payload.overwrite:
+        src_by_hour: dict[tuple[int, int], list[ScheduleCell]] = defaultdict(list)
+        for cell in src_cells:
+            src_by_hour[(cell.person_id, cell.hour)].append(cell)
+
+        for key, source_segments in src_by_hour.items():
+            target_segments = existing_by_hour.get(key, [])
+            if target_segments and not payload.overwrite:
                 continue
-            if target:
-                old = {"activity_id": target.activity_id, "version": target.version}
-                target.activity_id = src.activity_id
-                target.version += 1
-                target.updated_by = user.id
+
+            if target_segments:
+                for target in target_segments:
+                    audit_log(
+                        db,
+                        entity_type="schedule_cell",
+                        entity_id=target.id,
+                        action="bulk_copy_clear",
+                        old_value={
+                            "minute_start": target.minute_start,
+                            "minute_end": target.minute_end,
+                            "activity_id": target.activity_id,
+                            "version": target.version,
+                        },
+                        new_value=None,
+                        user_id=user.id,
+                    )
+                    db.delete(target)
                 db.flush()
-                audit_log(
-                    db,
-                    entity_type="schedule_cell",
-                    entity_id=target.id,
-                    action="bulk_copy",
-                    old_value=old,
-                    new_value={"activity_id": target.activity_id, "version": target.version},
-                    user_id=user.id,
-                )
-            else:
+
+            for src in sorted(source_segments, key=lambda cell: (cell.minute_start, cell.minute_end)):
                 new_cell = ScheduleCell(
                     year=payload.to_year,
                     week=payload.to_week,
                     weekday=to_wd,
                     hour=src.hour,
+                    minute_start=src.minute_start,
+                    minute_end=src.minute_end,
                     person_id=src.person_id,
                     activity_id=src.activity_id,
                     version=1,
@@ -99,10 +113,15 @@ def copy_schedule(
                     entity_id=new_cell.id,
                     action="bulk_copy",
                     old_value=None,
-                    new_value={"activity_id": new_cell.activity_id, "version": 1},
+                    new_value={
+                        "minute_start": new_cell.minute_start,
+                        "minute_end": new_cell.minute_end,
+                        "activity_id": new_cell.activity_id,
+                        "version": 1,
+                    },
                     user_id=user.id,
                 )
-            copied += 1
+                copied += 1
 
     db.commit()
     return {"copied": copied}
@@ -164,10 +183,13 @@ def fill_from_left(
         q = q.where(ScheduleCell.person_id.in_(pids))
     cells = db.execute(q).scalars().all()
 
-    # Bygg map person → hour → cell
-    per_person: dict[int, dict[int, ScheduleCell]] = {}
+    # Bygg map person → hour → [segments]
+    per_person: dict[int, dict[int, list[ScheduleCell]]] = {}
     for c in cells:
-        per_person.setdefault(c.person_id, {})[c.hour] = c
+        per_person.setdefault(c.person_id, {}).setdefault(c.hour, []).append(c)
+
+    def _sorted_segments(segments: list[ScheduleCell]) -> list[ScheduleCell]:
+        return sorted(segments, key=lambda cell: (cell.minute_start, cell.minute_end))
 
     # Hämta alla aktuella personer i området (de utan celler ska också få chans att fyllas? nej, fill-from-left förutsätter befintliga celler)
     updated = 0
@@ -175,55 +197,99 @@ def fill_from_left(
 
     person_ids = pids if pids is not None else list(per_person.keys())
     for pid in person_ids:
-        last_activity_id: int | None = None
+        last_pattern: list[tuple[int, int, int | None]] | None = None
         for h in HOURS:
-            existing = per_person.get(pid, {}).get(h)
-            if existing and existing.activity_id is not None:
-                last_activity_id = existing.activity_id
+            existing_segments = _sorted_segments(per_person.get(pid, {}).get(h, []))
+            if existing_segments and any(seg.activity_id is not None for seg in existing_segments):
+                last_pattern = [(seg.minute_start, seg.minute_end, seg.activity_id) for seg in existing_segments]
                 continue
-            if last_activity_id is None:
+            if last_pattern is None:
                 continue
-            if existing:
-                # tom (activity_id is None) cell – fyll
-                old = {"activity_id": existing.activity_id, "version": existing.version}
-                existing.activity_id = last_activity_id
-                existing.version += 1
-                existing.updated_by = user.id
-                db.flush()
+
+            existing_by_start = {seg.minute_start: seg for seg in existing_segments}
+            desired_starts = {minute_start for minute_start, _, _ in last_pattern}
+            new_segments_for_hour: list[ScheduleCell] = []
+            for minute_start, minute_end, activity_id in last_pattern:
+                existing = existing_by_start.get(minute_start)
+                if existing:
+                    old = {
+                        "minute_start": existing.minute_start,
+                        "minute_end": existing.minute_end,
+                        "activity_id": existing.activity_id,
+                        "version": existing.version,
+                    }
+                    existing.minute_end = minute_end
+                    existing.activity_id = activity_id
+                    existing.version += 1
+                    existing.updated_by = user.id
+                    db.flush()
+                    audit_log(
+                        db,
+                        entity_type="schedule_cell",
+                        entity_id=existing.id,
+                        action="fill_left",
+                        old_value=old,
+                        new_value={
+                            "minute_start": existing.minute_start,
+                            "minute_end": existing.minute_end,
+                            "activity_id": existing.activity_id,
+                            "version": existing.version,
+                        },
+                        user_id=user.id,
+                    )
+                    new_segments_for_hour.append(existing)
+                    updated += 1
+                else:
+                    new_cell = ScheduleCell(
+                        year=payload.year,
+                        week=payload.week,
+                        weekday=payload.weekday,
+                        hour=h,
+                        minute_start=minute_start,
+                        minute_end=minute_end,
+                        person_id=pid,
+                        activity_id=activity_id,
+                        version=1,
+                        updated_by=user.id,
+                    )
+                    db.add(new_cell)
+                    db.flush()
+                    audit_log(
+                        db,
+                        entity_type="schedule_cell",
+                        entity_id=new_cell.id,
+                        action="fill_left",
+                        old_value=None,
+                        new_value={
+                            "minute_start": new_cell.minute_start,
+                            "minute_end": new_cell.minute_end,
+                            "activity_id": new_cell.activity_id,
+                            "version": 1,
+                        },
+                        user_id=user.id,
+                    )
+                    new_segments_for_hour.append(new_cell)
+                    updated += 1
+
+            for existing in existing_segments:
+                if existing.minute_start in desired_starts:
+                    continue
                 audit_log(
                     db,
                     entity_type="schedule_cell",
                     entity_id=existing.id,
-                    action="fill_left",
-                    old_value=old,
-                    new_value={"activity_id": existing.activity_id, "version": existing.version},
+                    action="fill_left_clear",
+                    old_value={
+                        "minute_start": existing.minute_start,
+                        "minute_end": existing.minute_end,
+                        "activity_id": existing.activity_id,
+                        "version": existing.version,
+                    },
+                    new_value=None,
                     user_id=user.id,
                 )
-                updated += 1
-            else:
-                new_cell = ScheduleCell(
-                    year=payload.year,
-                    week=payload.week,
-                    weekday=payload.weekday,
-                    hour=h,
-                    person_id=pid,
-                    activity_id=last_activity_id,
-                    version=1,
-                    updated_by=user.id,
-                )
-                db.add(new_cell)
-                db.flush()
-                audit_log(
-                    db,
-                    entity_type="schedule_cell",
-                    entity_id=new_cell.id,
-                    action="fill_left",
-                    old_value=None,
-                    new_value={"activity_id": last_activity_id, "version": 1},
-                    user_id=user.id,
-                )
-                per_person.setdefault(pid, {})[h] = new_cell
-                updated += 1
+                db.delete(existing)
+            per_person.setdefault(pid, {})[h] = new_segments_for_hour
 
     db.commit()
     return {"updated": updated}

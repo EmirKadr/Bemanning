@@ -13,6 +13,7 @@ from ..schemas import (
     CellUpdate,
     PersonOut,
     ScheduleOut,
+    SplitCellRequest,
     SummaryRow,
 )
 
@@ -20,17 +21,91 @@ router = APIRouter(prefix="/api/schedule", tags=["schedule"])
 
 HOURS = list(range(6, 24))           # 06..23 = 18 timslots
 HOURS_PER_PERSON_DAY = 8             # för persons_equiv = hours / 8
+FULL_SEGMENT = (0, 60)
+HALF_SEGMENTS = ((0, 30), (30, 60))
+VALID_SEGMENTS = {FULL_SEGMENT, *HALF_SEGMENTS}
 
 
 def _cell_to_dict(cell: ScheduleCell) -> dict:
     return {
         "person_id": cell.person_id,
         "hour": cell.hour,
+        "minute_start": cell.minute_start,
+        "minute_end": cell.minute_end,
         "activity_id": cell.activity_id,
         "version": cell.version,
         "updated_at": cell.updated_at.isoformat() if cell.updated_at else None,
         "updated_by": cell.updated_by,
     }
+
+
+def _empty_segment_dict(person_id: int, hour: int, minute_start: int, minute_end: int) -> dict:
+    return {
+        "person_id": person_id,
+        "hour": hour,
+        "minute_start": minute_start,
+        "minute_end": minute_end,
+        "activity_id": None,
+        "version": 0,
+        "updated_at": None,
+        "updated_by": None,
+    }
+
+
+def _serialize_segments(cells: list[ScheduleCell]) -> list[dict]:
+    return [_cell_to_dict(cell) for cell in sorted(cells, key=lambda c: (c.minute_start, c.minute_end))]
+
+
+def _load_hour_segments(
+    db: Session,
+    *,
+    year: int,
+    week: int,
+    weekday: int,
+    hour: int,
+    person_id: int,
+    lock: bool = False,
+) -> list[ScheduleCell]:
+    query = select(ScheduleCell).where(
+        ScheduleCell.year == year,
+        ScheduleCell.week == week,
+        ScheduleCell.weekday == weekday,
+        ScheduleCell.hour == hour,
+        ScheduleCell.person_id == person_id,
+    )
+    if lock:
+        query = query.with_for_update()
+    return list(db.execute(query).scalars().all())
+
+
+def _segment_signature(cells: list[ScheduleCell]) -> list[tuple[int, int, int]]:
+    return sorted((cell.minute_start, cell.minute_end, cell.version) for cell in cells)
+
+
+def _expected_signature(segments: list) -> list[tuple[int, int, int]]:
+    return sorted((item.minute_start, item.minute_end, item.expected_version) for item in segments)
+
+
+def _conflict_response(*, person_id: int, hour: int, current: list[ScheduleCell]):
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={
+            "error": "version_conflict",
+            "segments": _serialize_segments(current),
+            "current": _serialize_segments(current) or [_empty_segment_dict(person_id, hour, 0, 60)],
+        },
+    )
+
+
+def _hours_from_minutes(total_minutes: int) -> float:
+    return round(float(total_minutes) / 60.0, 2)
+
+
+def _validate_segment(hour: int, minute_start: int, minute_end: int) -> None:
+    if hour not in HOURS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Timme måste vara {HOURS[0]}-{HOURS[-1]}")
+    if (minute_start, minute_end) not in VALID_SEGMENTS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Ogiltigt segment. Tillåtna värden är 0-60, 0-30 eller 30-60.")
 
 
 @router.get("", response_model=ScheduleOut)
@@ -76,7 +151,7 @@ def get_schedule(
         weekday=weekday,
         area_id=area_id,
         persons=[PersonOut.model_validate(p) for p in persons],
-        cells=[CellOut(**_cell_to_dict(c)) for c in cells],
+        cells=[CellOut(**_cell_to_dict(c)) for c in sorted(cells, key=lambda c: (c.person_id, c.hour, c.minute_start))],
         scheduled_hours=scheduled_hours,
     )
 
@@ -87,54 +162,46 @@ def update_cell(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if payload.hour not in HOURS:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Timme måste vara {HOURS[0]}-{HOURS[-1]}")
+    _validate_segment(payload.hour, payload.minute_start, payload.minute_end)
 
     if not db.get(Person, payload.person_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Person hittades inte")
     if payload.activity_id is not None and not db.get(Activity, payload.activity_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Aktivitet hittades inte")
 
-    cell = (
-        db.execute(
-            select(ScheduleCell)
-            .where(
-                ScheduleCell.year == payload.year,
-                ScheduleCell.week == payload.week,
-                ScheduleCell.weekday == payload.weekday,
-                ScheduleCell.hour == payload.hour,
-                ScheduleCell.person_id == payload.person_id,
-            )
-            .with_for_update()
-        )
-        .scalar_one_or_none()
+    hour_segments = _load_hour_segments(
+        db,
+        year=payload.year,
+        week=payload.week,
+        weekday=payload.weekday,
+        hour=payload.hour,
+        person_id=payload.person_id,
+        lock=True,
+    )
+    matching = next(
+        (
+            cell
+            for cell in hour_segments
+            if cell.minute_start == payload.minute_start and cell.minute_end == payload.minute_end
+        ),
+        None,
     )
 
-    current_version = cell.version if cell else 0
+    current_version = matching.version if matching else 0
     if current_version != payload.expected_version:
-        current = (
-            _cell_to_dict(cell)
-            if cell
-            else {
-                "person_id": payload.person_id,
-                "hour": payload.hour,
-                "activity_id": None,
-                "version": 0,
-                "updated_at": None,
-                "updated_by": None,
-            }
-        )
-        return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
-            content={"error": "version_conflict", "current": current},
-        )
+        return _conflict_response(person_id=payload.person_id, hour=payload.hour, current=hour_segments)
 
-    if cell is None:
+    if matching is None and hour_segments:
+        return _conflict_response(person_id=payload.person_id, hour=payload.hour, current=hour_segments)
+
+    if matching is None:
         cell = ScheduleCell(
             year=payload.year,
             week=payload.week,
             weekday=payload.weekday,
             hour=payload.hour,
+            minute_start=payload.minute_start,
+            minute_end=payload.minute_end,
             person_id=payload.person_id,
             activity_id=payload.activity_id,
             version=1,
@@ -152,6 +219,7 @@ def update_cell(
             user_id=user.id,
         )
     else:
+        cell = matching
         old = _cell_to_dict(cell)
         cell.activity_id = payload.activity_id
         cell.version += 1
@@ -172,6 +240,112 @@ def update_cell(
     return {"cell": _cell_to_dict(cell)}
 
 
+@router.put("/cell/split")
+def split_cell(
+    payload: SplitCellRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if payload.hour not in HOURS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Timme måste vara {HOURS[0]}-{HOURS[-1]}")
+    if not db.get(Person, payload.person_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Person hittades inte")
+
+    hour_segments = _load_hour_segments(
+        db,
+        year=payload.year,
+        week=payload.week,
+        weekday=payload.weekday,
+        hour=payload.hour,
+        person_id=payload.person_id,
+        lock=True,
+    )
+    if _segment_signature(hour_segments) != _expected_signature(payload.segments):
+        return _conflict_response(person_id=payload.person_id, hour=payload.hour, current=hour_segments)
+
+    if len(hour_segments) == 2 and {(cell.minute_start, cell.minute_end) for cell in hour_segments} == set(HALF_SEGMENTS):
+        return {"segments": _serialize_segments(hour_segments)}
+
+    if len(hour_segments) > 1:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Kan bara dela en tom timme eller en hel timcell.")
+
+    if not hour_segments:
+        created: list[ScheduleCell] = []
+        for minute_start, minute_end in HALF_SEGMENTS:
+            cell = ScheduleCell(
+                year=payload.year,
+                week=payload.week,
+                weekday=payload.weekday,
+                hour=payload.hour,
+                minute_start=minute_start,
+                minute_end=minute_end,
+                person_id=payload.person_id,
+                activity_id=None,
+                version=1,
+                updated_by=user.id,
+            )
+            db.add(cell)
+            db.flush()
+            audit_log(
+                db,
+                entity_type="schedule_cell",
+                entity_id=cell.id,
+                action="split_create",
+                old_value=None,
+                new_value=_cell_to_dict(cell),
+                user_id=user.id,
+            )
+            created.append(cell)
+        db.commit()
+        return {"segments": _serialize_segments(created)}
+
+    source = hour_segments[0]
+    if (source.minute_start, source.minute_end) != FULL_SEGMENT:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Cellen är redan delad eller har ogiltigt segmentformat.")
+
+    old = _cell_to_dict(source)
+    source.minute_end = 30
+    source.version += 1
+    source.updated_by = user.id
+    db.flush()
+    audit_log(
+        db,
+        entity_type="schedule_cell",
+        entity_id=source.id,
+        action="split_update",
+        old_value=old,
+        new_value=_cell_to_dict(source),
+        user_id=user.id,
+    )
+
+    second = ScheduleCell(
+        year=source.year,
+        week=source.week,
+        weekday=source.weekday,
+        hour=source.hour,
+        minute_start=30,
+        minute_end=60,
+        person_id=source.person_id,
+        activity_id=source.activity_id,
+        version=1,
+        updated_by=user.id,
+    )
+    db.add(second)
+    db.flush()
+    audit_log(
+        db,
+        entity_type="schedule_cell",
+        entity_id=second.id,
+        action="split_create",
+        old_value=None,
+        new_value=_cell_to_dict(second),
+        user_id=user.id,
+    )
+
+    db.commit()
+    return {"segments": _serialize_segments([source, second])}
+
+
 @router.post("/cells")
 def bulk_update_cells(
     payload: BulkCellRequest,
@@ -188,42 +362,39 @@ def bulk_update_cells(
 
     try:
         for item in payload.cells:
-            if item.hour not in HOURS:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Ogiltig timme {item.hour}")
+            _validate_segment(item.hour, item.minute_start, item.minute_end)
             if not db.get(Person, item.person_id):
                 raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Person {item.person_id} hittades inte")
             if item.activity_id is not None and not db.get(Activity, item.activity_id):
                 raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Aktivitet {item.activity_id} hittades inte")
 
-            cell = (
-                db.execute(
-                    select(ScheduleCell)
-                    .where(
-                        ScheduleCell.year == item.year,
-                        ScheduleCell.week == item.week,
-                        ScheduleCell.weekday == item.weekday,
-                        ScheduleCell.hour == item.hour,
-                        ScheduleCell.person_id == item.person_id,
-                    )
-                    .with_for_update()
-                )
-                .scalar_one_or_none()
+            hour_segments = _load_hour_segments(
+                db,
+                year=item.year,
+                week=item.week,
+                weekday=item.weekday,
+                hour=item.hour,
+                person_id=item.person_id,
+                lock=True,
+            )
+            matching = next(
+                (
+                    cell
+                    for cell in hour_segments
+                    if cell.minute_start == item.minute_start and cell.minute_end == item.minute_end
+                ),
+                None,
             )
 
-            current_version = cell.version if cell else 0
-            if current_version != item.expected_version:
+            current_version = matching.version if matching else 0
+            if current_version != item.expected_version or (matching is None and hour_segments):
                 conflicts.append(
                     {
                         "person_id": item.person_id,
                         "hour": item.hour,
-                        "current": _cell_to_dict(cell) if cell else {
-                            "person_id": item.person_id,
-                            "hour": item.hour,
-                            "activity_id": None,
-                            "version": 0,
-                            "updated_at": None,
-                            "updated_by": None,
-                        },
+                        "minute_start": item.minute_start,
+                        "minute_end": item.minute_end,
+                        "current": _serialize_segments(hour_segments) or [_empty_segment_dict(item.person_id, item.hour, item.minute_start, item.minute_end)],
                     }
                 )
                 if payload.atomic:
@@ -234,12 +405,14 @@ def bulk_update_cells(
                     )
                 continue
 
-            if cell is None:
+            if matching is None:
                 cell = ScheduleCell(
                     year=item.year,
                     week=item.week,
                     weekday=item.weekday,
                     hour=item.hour,
+                    minute_start=item.minute_start,
+                    minute_end=item.minute_end,
                     person_id=item.person_id,
                     activity_id=item.activity_id,
                     version=1,
@@ -248,20 +421,29 @@ def bulk_update_cells(
                 db.add(cell)
                 db.flush()
                 audit_log(
-                    db, entity_type="schedule_cell", entity_id=cell.id,
-                    action=payload.action, old_value=None,
-                    new_value=_cell_to_dict(cell), user_id=user.id,
+                    db,
+                    entity_type="schedule_cell",
+                    entity_id=cell.id,
+                    action=payload.action,
+                    old_value=None,
+                    new_value=_cell_to_dict(cell),
+                    user_id=user.id,
                 )
             else:
+                cell = matching
                 old = _cell_to_dict(cell)
                 cell.activity_id = item.activity_id
                 cell.version += 1
                 cell.updated_by = user.id
                 db.flush()
                 audit_log(
-                    db, entity_type="schedule_cell", entity_id=cell.id,
-                    action=payload.action, old_value=old,
-                    new_value=_cell_to_dict(cell), user_id=user.id,
+                    db,
+                    entity_type="schedule_cell",
+                    entity_id=cell.id,
+                    action=payload.action,
+                    old_value=old,
+                    new_value=_cell_to_dict(cell),
+                    user_id=user.id,
                 )
             applied.append(_cell_to_dict(cell))
 
@@ -287,7 +469,7 @@ def get_summary(
             Activity.code,
             Activity.label,
             Activity.color,
-            func.count(ScheduleCell.id).label("hours"),
+            func.sum(ScheduleCell.minute_end - ScheduleCell.minute_start).label("minutes"),
         )
         .join(ScheduleCell, ScheduleCell.activity_id == Activity.id)
         .where(
@@ -308,8 +490,8 @@ def get_summary(
             activity_code=r.code,
             activity_label=r.label,
             color=r.color,
-            hours=r.hours,
-            persons_equiv=round(r.hours / HOURS_PER_PERSON_DAY, 1),
+            hours=_hours_from_minutes(int(r.minutes or 0)),
+            persons_equiv=round(_hours_from_minutes(int(r.minutes or 0)) / HOURS_PER_PERSON_DAY, 1),
         )
         for r in rows
     ]
