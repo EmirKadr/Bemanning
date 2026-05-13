@@ -283,7 +283,7 @@ async function pasteFocused() {
 }
 
 function setupKeyboard() {
-  document.addEventListener("keydown", (e) => {
+  const handler = (e) => {
     const active = document.activeElement;
     if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
     if (!(e.ctrlKey || e.metaKey)) return;
@@ -291,14 +291,18 @@ function setupKeyboard() {
     if (!["c", "x", "v"].includes(key)) return;
 
     if (!state.focusedCell) {
-      showToast("Klicka först på en cell för att markera den", "warn");
+      showToast("Klicka först på en cell", "warn");
       return;
     }
     e.preventDefault();
+    e.stopPropagation();
     if (key === "c") copyFocused(false);
     else if (key === "x") copyFocused(true);
     else if (key === "v") pasteFocused();
-  });
+  };
+  // Capture-fas på både window och document → fångar event innan select/browser tar det
+  window.addEventListener("keydown", handler, true);
+  document.addEventListener("keydown", handler, true);
 }
 
 

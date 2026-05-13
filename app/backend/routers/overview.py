@@ -1,3 +1,5 @@
+import logging
+import traceback
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -5,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger("overview")
 
 from ..audit import log as audit_log
 from ..deps import get_current_user, get_db
@@ -224,6 +228,21 @@ def set_day(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict:
+    try:
+        return _set_day_impl(payload, db, user)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        tb = traceback.format_exc()
+        print("ERROR in /api/overview/day:", tb, flush=True)
+        logger.error("set_day failed: %s\n%s", exc, tb)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Serverfel: {type(exc).__name__}: {exc}",
+        )
+
+
+def _set_day_impl(payload: "OverviewDayRequest", db: Session, user: User) -> dict:
     if not db.get(Person, payload.person_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Person hittades inte")
     if payload.activity_id is not None and not db.get(Activity, payload.activity_id):
