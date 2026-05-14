@@ -9,6 +9,7 @@ from ..audit import log as audit_log
 from ..deps import get_current_user, get_db
 from ..home_activity import build_home_activity_resolver, person_out_with_home_activity
 from ..models import Activity, Area, Person, ScheduleCell, User
+from ..schedule_locks import assert_can_modify_schedule_cells, foreign_schedule_cell_lock_applies
 from ..template_service import get_template_hours, get_template_hours_map
 from ..schemas import (
     BulkCellRequest,
@@ -176,7 +177,7 @@ def get_schedule(
     weekday: int = Query(..., ge=1, le=7),
     area_id: int | None = Query(None),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> ScheduleOut:
     persons_q = select(Person).where(Person.is_active.is_(True))
     if area_id is not None:
@@ -224,6 +225,7 @@ def get_schedule(
         cells=[CellOut(**_cell_to_dict(c)) for c in sorted(cells, key=lambda c: (c.person_id, c.hour, c.minute_start))],
         scheduled_hours=scheduled_hours,
         scheduled_defaults=scheduled_defaults,
+        lock_foreign_schedule_cells=foreign_schedule_cell_lock_applies(db, user),
     )
 
 
@@ -249,6 +251,7 @@ def update_cell(
         person_id=payload.person_id,
         lock=True,
     )
+    owner_lock_enabled = foreign_schedule_cell_lock_applies(db, user)
     matching = next(
         (
             cell
@@ -298,7 +301,6 @@ def update_cell(
         )
     else:
         cell = matching
-        old = _cell_to_dict(cell)
         desired_empty_override = _empty_override_for(
             db,
             person_id=payload.person_id,
@@ -308,6 +310,8 @@ def update_cell(
         )
         if cell.activity_id == payload.activity_id and cell.empty_override == desired_empty_override:
             return {"cell": _cell_to_dict(cell)}
+        assert_can_modify_schedule_cells([cell], user, owner_lock_enabled)
+        old = _cell_to_dict(cell)
         cell.activity_id = payload.activity_id
         cell.empty_override = desired_empty_override
         cell.version += 1
@@ -348,10 +352,12 @@ def split_cell(
         person_id=payload.person_id,
         lock=True,
     )
+    owner_lock_enabled = foreign_schedule_cell_lock_applies(db, user)
     if _segment_signature(hour_segments) != _expected_signature(payload.segments):
         return _conflict_response(person_id=payload.person_id, hour=payload.hour, current=hour_segments)
 
     if len(hour_segments) == 2 and {(cell.minute_start, cell.minute_end) for cell in hour_segments} == set(HALF_SEGMENTS):
+        assert_can_modify_schedule_cells(hour_segments, user, owner_lock_enabled)
         preferred = next(
             (
                 cell
@@ -436,6 +442,7 @@ def split_cell(
     if (source.minute_start, source.minute_end) != FULL_SEGMENT:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Cellen är redan delad eller har ogiltigt segmentformat.")
 
+    assert_can_modify_schedule_cells([source], user, owner_lock_enabled)
     old = _cell_to_dict(source)
     source.minute_end = 30
     source.version += 1
@@ -528,6 +535,7 @@ def bulk_update_cells(
             )
 
     template_hours_map = get_template_hours_map(db, person_ids, weekdays)
+    owner_lock_enabled = foreign_schedule_cell_lock_applies(db, user)
 
     try:
         for (person_id, year, week, weekday, hour), group_items in grouped_items.items():
@@ -581,6 +589,7 @@ def bulk_update_cells(
                             )
                         continue
 
+                    assert_can_modify_schedule_cells([full_segment], user, owner_lock_enabled)
                     old_full = _cell_to_dict(full_segment)
                     original_activity_id = full_segment.activity_id
                     original_empty_override = full_segment.empty_override
@@ -731,6 +740,7 @@ def bulk_update_cells(
                 ):
                     continue
 
+                assert_can_modify_schedule_cells([matching], user, owner_lock_enabled)
                 old = _cell_to_dict(matching)
                 matching.activity_id = item.activity_id
                 matching.empty_override = desired_empty_override
@@ -819,6 +829,7 @@ def restore_hours(
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Aktivitet {missing_activity_ids[0]} hittades inte")
 
     restored: list[dict] = []
+    owner_lock_enabled = foreign_schedule_cell_lock_applies(db, user)
     try:
         for item in payload.hours:
             current = _load_hour_segments(
@@ -847,6 +858,7 @@ def restore_hours(
                     },
                 )
 
+            assert_can_modify_schedule_cells(current, user, owner_lock_enabled)
             for cell in current:
                 audit_log(
                     db,

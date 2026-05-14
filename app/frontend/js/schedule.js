@@ -10,6 +10,7 @@ const HALF_SEGMENTS = [
 const CALC_AREA_KEYS = ["GG", "MG", "AS"];
 
 const state = {
+  currentUser: null,
   year: 0,
   week: 0,
   weekday: 1,
@@ -31,6 +32,7 @@ const state = {
   sortAsc: true,
   summaryRows: [],
   allSummaryRows: [],
+  lockForeignScheduleCells: false,
   calcSelection: "",
   calcInputs: {
     GG: { rows: "", time: "", goal: "" },
@@ -260,6 +262,31 @@ function currentSegment(personId, hour, minuteStart, minuteEnd) {
     empty_override: false,
     version: 0,
   };
+}
+
+function currentUserCanBypassCellLock() {
+  return state.currentUser?.role === "admin" || state.currentUser?.role === "super_admin";
+}
+
+function isForeignLockedSegment(segment) {
+  if (!state.lockForeignScheduleCells || currentUserCanBypassCellLock()) return false;
+  if (!segment || segment.updated_by == null || state.currentUser?.id == null) return false;
+  return Number(segment.updated_by) !== Number(state.currentUser.id);
+}
+
+function isRangeLocked(personId, hour, minuteStart, minuteEnd) {
+  const segment = segmentsForHour(personId, hour).find(
+    (item) => item.minute_start === minuteStart && item.minute_end === minuteEnd
+  );
+  return isForeignLockedSegment(segment);
+}
+
+function isHourLocked(personId, hour) {
+  return segmentsForHour(personId, hour).some((segment) => isForeignLockedSegment(segment));
+}
+
+function showLockedCellToast() {
+  showToast("Cellen är låst eftersom en annan användare har fyllt i den.", "warn");
 }
 
 function cloneSegment(segment) {
@@ -902,6 +929,10 @@ function openSelectPicker(select) {
 function openFullHourSelect(e, td) {
   e.preventDefault();
   e.stopPropagation();
+  if (isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))) {
+    showLockedCellToast();
+    return;
+  }
   focusSegment(td, td, 0, 60);
   const select = td.querySelector("select.cell-select");
   setTimeout(() => openSelectPicker(select), 0);
@@ -910,6 +941,10 @@ function openFullHourSelect(e, td) {
 function openSplitSegmentSelect(e, td, part, minuteStart, minuteEnd) {
   e.preventDefault();
   e.stopPropagation();
+  if (isRangeLocked(Number(td.dataset.personId), Number(td.dataset.hour), minuteStart, minuteEnd)) {
+    showLockedCellToast();
+    return;
+  }
   focusSegment(td, part, minuteStart, minuteEnd);
   const select = part.querySelector("select.half-select");
   setTimeout(() => openSelectPicker(select), 0);
@@ -918,6 +953,10 @@ function openSplitSegmentSelect(e, td, part, minuteStart, minuteEnd) {
 function toggleFullHourSplitFromEvent(e, td) {
   e.preventDefault();
   e.stopPropagation();
+  if (isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))) {
+    showLockedCellToast();
+    return;
+  }
   focusSegment(td, td, 0, 60);
   void toggleHourSplit(td, 0);
 }
@@ -925,6 +964,10 @@ function toggleFullHourSplitFromEvent(e, td) {
 function toggleSplitSegmentFromEvent(e, td, part, minuteStart, minuteEnd) {
   e.preventDefault();
   e.stopPropagation();
+  if (isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))) {
+    showLockedCellToast();
+    return;
+  }
   focusSegment(td, part, minuteStart, minuteEnd);
   void toggleHourSplit(td, minuteStart);
 }
@@ -962,9 +1005,10 @@ function armHalfHourDrag(td, minuteStart, minuteEnd, event) {
 }
 
 function resetRenderedHourState(td) {
-  td.classList.remove("split-hour", "scheduled-empty", "base-value", "with-display-label");
+  td.classList.remove("split-hour", "scheduled-empty", "base-value", "with-display-label", "locked-cell");
   td.style.background = "#fff";
   td.dataset.isBase = "";
+  td.title = "";
 }
 
 function renderFullHourCell(td, segment, isScheduled) {
@@ -978,6 +1022,11 @@ function renderFullHourCell(td, segment, isScheduled) {
   const explicitEmptyOverride = !!segment?.empty_override;
   const scheduledActivityId = isScheduled ? scheduledActivityIdForHour(personId, Number(td.dataset.hour)) : null;
   const showScheduledDefault = explicitActivityId == null && !explicitEmptyOverride && scheduledActivityId != null;
+  const locked = isForeignLockedSegment(segment);
+  if (locked) {
+    td.classList.add("locked-cell");
+    td.title = "Låst av annan användare";
+  }
 
   if (explicitActivityId != null) {
     td.style.background = colorFor(explicitActivityId);
@@ -1004,6 +1053,7 @@ function renderFullHourCell(td, segment, isScheduled) {
   select.dataset.minuteStart = "0";
   select.dataset.minuteEnd = "60";
   select.dataset.version = String(segment?.version || 0);
+  select.disabled = locked;
 
   select.addEventListener("change", () => onSegmentChange(td, 0, 60));
   select.addEventListener("focus", () => focusSegment(td, td, 0, 60));
@@ -1050,6 +1100,10 @@ function renderSplitHourCell(td, segments, isScheduled) {
   const personId = Number(td.dataset.personId);
   const hour = Number(td.dataset.hour);
   const scheduledActivityId = isScheduled ? scheduledActivityIdForHour(personId, hour) : null;
+  if (segments.some((segment) => isForeignLockedSegment(segment))) {
+    td.classList.add("locked-cell");
+    td.title = "En eller flera halvtimmar är låsta av annan användare";
+  }
 
   HALF_SEGMENTS.forEach(({ minute_start, minute_end }) => {
     const segment = currentSegment(personId, hour, minute_start, minute_end);
@@ -1058,6 +1112,11 @@ function renderSplitHourCell(td, segments, isScheduled) {
     part.dataset.minuteStart = String(minute_start);
     part.dataset.minuteEnd = String(minute_end);
     part.tabIndex = -1;
+    const locked = isForeignLockedSegment(segment);
+    if (locked) {
+      part.classList.add("locked-cell");
+      part.title = "Låst av annan användare";
+    }
 
     if (segment.activity_id != null) {
       part.style.background = colorFor(segment.activity_id);
@@ -1084,6 +1143,7 @@ function renderSplitHourCell(td, segments, isScheduled) {
     select.dataset.minuteStart = String(minute_start);
     select.dataset.minuteEnd = String(minute_end);
     select.dataset.version = String(segment.version || 0);
+    select.disabled = locked;
 
     select.addEventListener("change", () => onSegmentChange(td, minute_start, minute_end));
     select.addEventListener("focus", () => focusSegment(td, part, minute_start, minute_end));
@@ -1243,6 +1303,11 @@ function scheduleSummaryRefresh(delay = 90) {
 async function onSegmentChange(td, minuteStart, minuteEnd) {
   const personId = Number(td.dataset.personId);
   const hour = Number(td.dataset.hour);
+  if (isRangeLocked(personId, hour, minuteStart, minuteEnd)) {
+    showLockedCellToast();
+    renderHourCell(td);
+    return;
+  }
   const segment = currentSegment(personId, hour, minuteStart, minuteEnd);
   const undoSnapshot = snapshotHour(personId, hour);
   const selector = td.querySelector(
@@ -1298,6 +1363,10 @@ function focusMatchingSegment(td, minuteStart, minuteEnd) {
 async function toggleHourSplit(td, mergeMinuteStart = 0) {
   const personId = Number(td.dataset.personId);
   const hour = Number(td.dataset.hour);
+  if (isHourLocked(personId, hour)) {
+    showLockedCellToast();
+    return;
+  }
   const currentSegments = sortSegments(segmentsForHour(personId, hour));
   const undoSnapshot = snapshotHour(personId, hour);
 
@@ -1351,6 +1420,10 @@ async function copyFocused(cut = false) {
 
   if (cut && activityId != null) {
     const { td, personId, hour, minuteStart, minuteEnd } = state.focusedCell;
+    if (isRangeLocked(personId, hour, minuteStart, minuteEnd)) {
+      showLockedCellToast();
+      return;
+    }
     const segment = currentSegment(personId, hour, minuteStart, minuteEnd);
     const undoSnapshot = snapshotHour(personId, hour);
     try {
@@ -1390,6 +1463,10 @@ async function copyFocused(cut = false) {
 async function pasteFocused() {
   if (!state.focusedCell || state.clipboard == null) return;
   const { td, personId, hour, minuteStart, minuteEnd } = state.focusedCell;
+  if (isRangeLocked(personId, hour, minuteStart, minuteEnd)) {
+    showLockedCellToast();
+    return;
+  }
   const segment = currentSegment(personId, hour, minuteStart, minuteEnd);
   const undoSnapshot = snapshotHour(personId, hour);
   try {
@@ -1547,8 +1624,19 @@ async function finishDrag() {
 
   if (targets.length === 0 || (targets.length === 1 && targets[0] === sourceTd)) return;
 
+  const editableTargets = targets.filter((td) =>
+    td !== sourceTd && !isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))
+  );
+  const lockedTargetCount = targets.filter((td) =>
+    td !== sourceTd && isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))
+  ).length;
+  if (!editableTargets.length) {
+    if (lockedTargetCount) showLockedCellToast();
+    return;
+  }
+
   const cells = targets
-    .filter((td) => td !== sourceTd)
+    .filter((td) => editableTargets.includes(td))
     .flatMap((td) => {
       const personId = Number(td.dataset.personId);
       const hour = Number(td.dataset.hour);
@@ -1610,7 +1698,11 @@ async function finishDrag() {
     pushScheduleUndo("drag-fyll", snapshots);
     applySegmentsByHourResponse(resp.applied);
     scheduleSummaryRefresh(0);
-    showToast(`Fyllde ${targetCount} celler`);
+    showToast(
+      lockedTargetCount
+        ? `Fyllde ${editableTargets.length} celler, hoppade över ${lockedTargetCount} låsta`
+        : `Fyllde ${targetCount} celler`
+    );
   } catch (e) {
     restoreHourSnapshots(snapshots);
     if (e.status === 409) {
@@ -1813,6 +1905,7 @@ async function loadSchedule() {
     if (controller.signal.aborted || requestSeq !== scheduleLoadState.requestSeq) return false;
 
     state.allPersons = data.persons;
+    state.lockForeignScheduleCells = !!data.lock_foreign_schedule_cells;
     refreshPersons();
     setAllSegments(data.cells || []);
     state.scheduledHours = {};
@@ -1844,7 +1937,8 @@ async function loadSchedule() {
 }
 
 (async () => {
-  await initPage("schedule");
+  state.currentUser = await initPage("schedule");
+  if (!state.currentUser) return;
   await loadAreasAndActivities();
 
   const now = isoWeek();

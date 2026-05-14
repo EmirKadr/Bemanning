@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..audit import log as audit_log
 from ..deps import get_current_user, get_db
 from ..models import Person, ScheduleCell, User
+from ..schedule_locks import assert_can_modify_schedule_cells, foreign_schedule_cell_lock_applies
 from ..schemas import ClearRequest, CopyRequest, FillFromLeftRequest
 
 router = APIRouter(prefix="/api/schedule", tags=["schedule-bulk"])
@@ -55,6 +56,7 @@ def copy_schedule(
 
     copied = 0
     applied: list[dict] = []
+    owner_lock_enabled = foreign_schedule_cell_lock_applies(db, user)
     for from_wd, to_wd in zip(weekdays, to_weekdays):
         src_q = select(ScheduleCell).where(
             ScheduleCell.year == payload.from_year,
@@ -91,6 +93,7 @@ def copy_schedule(
                 continue
 
             if target_segments:
+                assert_can_modify_schedule_cells(target_segments, user, owner_lock_enabled)
                 for target in target_segments:
                     audit_log(
                         db,
@@ -175,6 +178,7 @@ def clear_schedule(
         q = q.where(ScheduleCell.person_id.in_(pids))
 
     cells = db.execute(q).scalars().all()
+    assert_can_modify_schedule_cells(cells, user, foreign_schedule_cell_lock_applies(db, user))
     for c in cells:
         audit_log(
             db,
@@ -210,6 +214,7 @@ def fill_from_left(
             return {"updated": 0}
         q = q.where(ScheduleCell.person_id.in_(pids))
     cells = db.execute(q).scalars().all()
+    owner_lock_enabled = foreign_schedule_cell_lock_applies(db, user)
 
     # Bygg map person → hour → [segments]
     per_person: dict[int, dict[int, list[ScheduleCell]]] = {}
@@ -240,6 +245,7 @@ def fill_from_left(
             for minute_start, minute_end, activity_id in last_pattern:
                 existing = existing_by_start.get(minute_start)
                 if existing:
+                    assert_can_modify_schedule_cells([existing], user, owner_lock_enabled)
                     old = {
                         "minute_start": existing.minute_start,
                         "minute_end": existing.minute_end,
@@ -303,6 +309,7 @@ def fill_from_left(
             for existing in existing_segments:
                 if existing.minute_start in desired_starts:
                     continue
+                assert_can_modify_schedule_cells([existing], user, owner_lock_enabled)
                 audit_log(
                     db,
                     entity_type="schedule_cell",

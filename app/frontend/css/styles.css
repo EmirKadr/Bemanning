@@ -674,6 +674,25 @@ table.matrix td.focused {
   z-index: 2;
 }
 
+table.matrix td.locked-cell,
+.hour-segment.locked-cell {
+  cursor: not-allowed;
+  filter: saturate(0.72);
+}
+
+table.matrix td.locked-cell::after,
+.hour-segment.locked-cell::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.45);
+  pointer-events: none;
+}
+
 table.matrix td.pending-save,
 table.overview td.day.pending-save {
   opacity: 0.72;

@@ -1,5 +1,8 @@
 let currentUser = null;
 let users = [];
+let appSettings = {
+  lock_foreign_schedule_cells: false,
+};
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) =>
@@ -34,6 +37,26 @@ async function loadUsers() {
   const includeInactive = document.getElementById("show-inactive").checked;
   users = await api.get(`/api/users?include_inactive=${includeInactive}`);
   renderUsers();
+}
+
+async function loadSettings() {
+  appSettings = await api.get("/api/settings");
+  document.getElementById("lock-foreign-schedule-cells").checked = !!appSettings.lock_foreign_schedule_cells;
+}
+
+function setupSettingsControls() {
+  document.getElementById("save-settings").addEventListener("click", async () => {
+    const payload = {
+      lock_foreign_schedule_cells: document.getElementById("lock-foreign-schedule-cells").checked,
+    };
+    try {
+      appSettings = await api.put("/api/settings", payload);
+      document.getElementById("lock-foreign-schedule-cells").checked = !!appSettings.lock_foreign_schedule_cells;
+      showToast("Inställningar sparade", "success");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
 }
 
 function renderUsers() {
@@ -237,6 +260,8 @@ function setupImportControls() {
   if (!currentUser) return;
 
   setupImportControls();
+  setupSettingsControls();
+  await loadSettings();
   await loadUsers();
   document.getElementById("new-user").addEventListener("click", () => openModal(null));
   document.getElementById("show-inactive").addEventListener("change", loadUsers);

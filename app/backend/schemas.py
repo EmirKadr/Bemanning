@@ -132,6 +132,7 @@ class ScheduleOut(BaseModel):
     cells: list[CellOut]
     scheduled_hours: dict[int, list[int]] = Field(default_factory=dict)  # person_id → [7,8,9,...]
     scheduled_defaults: dict[int, dict[int, int]] = Field(default_factory=dict)  # person_id → {hour → activity_id}
+    lock_foreign_schedule_cells: bool = False
 
 
 class CellUpdate(BaseModel):
@@ -385,3 +386,11 @@ class AuditSummaryOut(BaseModel):
     top_users: list[AuditSummaryBucket]
     top_actions: list[AuditSummaryBucket]
     top_entities: list[AuditSummaryBucket]
+
+
+class AppSettingsOut(BaseModel):
+    lock_foreign_schedule_cells: bool = False
+
+
+class AppSettingsUpdate(BaseModel):
+    lock_foreign_schedule_cells: bool

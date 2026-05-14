@@ -12,6 +12,7 @@ from ..audit import log as audit_log
 from ..deps import get_current_user, get_db
 from ..home_activity import build_home_activity_resolver, person_out_with_home_activity
 from ..models import Activity, Area, Person, ScheduleCell, User
+from ..schedule_locks import assert_can_modify_schedule_cells, foreign_schedule_cell_lock_applies
 from ..schemas import PersonOut
 from ..template_service import get_template_hours_map
 
@@ -152,6 +153,7 @@ def _apply_day_impl(
     user: User,
     *,
     template_hours: set[int] | None,
+    owner_lock_enabled: bool,
 ) -> dict:
     if template_hours is None:
         raise HTTPException(
@@ -176,6 +178,7 @@ def _apply_day_impl(
     existing_by_hour: dict[int, list[ScheduleCell]] = defaultdict(list)
     for cell in existing:
         existing_by_hour[cell.hour].append(cell)
+    assert_can_modify_schedule_cells(existing, user, owner_lock_enabled)
 
     written = 0
     deleted = 0
@@ -576,7 +579,13 @@ def set_day(
             [payload.person_id],
             [payload.weekday],
         ).get((payload.person_id, payload.weekday))
-        result = _apply_day_impl(payload, db, user, template_hours=template_hours)
+        result = _apply_day_impl(
+            payload,
+            db,
+            user,
+            template_hours=template_hours,
+            owner_lock_enabled=foreign_schedule_cell_lock_applies(db, user),
+        )
         db.commit()
         return result
     except HTTPException:
@@ -634,12 +643,19 @@ def set_days_bulk(
     errors: list[dict] = []
     total_written = 0
     total_deleted = 0
+    owner_lock_enabled = foreign_schedule_cell_lock_applies(db, user)
 
     try:
         for item in payload.days:
             template_hours = template_hours_map.get((item.person_id, item.weekday))
             if payload.atomic:
-                result = _apply_day_impl(item, db, user, template_hours=template_hours)
+                result = _apply_day_impl(
+                    item,
+                    db,
+                    user,
+                    template_hours=template_hours,
+                    owner_lock_enabled=owner_lock_enabled,
+                )
                 applied.append(result["cell"])
                 total_written += result["written"]
                 total_deleted += result["deleted"]
@@ -647,7 +663,13 @@ def set_days_bulk(
 
             try:
                 with db.begin_nested():
-                    result = _apply_day_impl(item, db, user, template_hours=template_hours)
+                    result = _apply_day_impl(
+                        item,
+                        db,
+                        user,
+                        template_hours=template_hours,
+                        owner_lock_enabled=owner_lock_enabled,
+                    )
                 applied.append(result["cell"])
                 total_written += result["written"]
                 total_deleted += result["deleted"]

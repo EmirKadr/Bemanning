@@ -5,7 +5,20 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from .config import settings
-from .routers import activities, areas, audit_logs, auth, bulk, overview, person_schedules, persons, public, schedule, users
+from .routers import (
+    activities,
+    areas,
+    audit_logs,
+    auth,
+    bulk,
+    overview,
+    person_schedules,
+    persons,
+    public,
+    schedule,
+    settings as app_settings,
+    users,
+)
 
 app = FastAPI(title="Bemanningssystem", version="0.1.1")
 
@@ -32,6 +45,7 @@ app.include_router(person_schedules.router)
 app.include_router(schedule.router)
 app.include_router(bulk.router)
 app.include_router(overview.router)
+app.include_router(app_settings.router)
 app.include_router(users.router)
 app.include_router(public.router)
 
