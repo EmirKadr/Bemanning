@@ -70,6 +70,11 @@ function renderSidebar(user, activePage) {
     : "";
 
   sidebar.innerHTML = `
+    <button class="sidebar-toggle" id="sidebar-toggle" title="Visa/dölj meny" aria-label="Visa/dölj meny">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
+        <path d="M4 6h14M4 11h14M4 16h14"/>
+      </svg>
+    </button>
     <div class="brand">
       <div class="brand-dot">B</div>
       <div>
@@ -102,6 +107,23 @@ function renderSidebar(user, activePage) {
       window.location.href = "/login.html";
     });
   }
+
+  // Toggle collapsed state – hamburger snurrar 90° och sidopanelen krymper till ikoner
+  const toggleBtn = document.getElementById("sidebar-toggle");
+  const app = document.querySelector(".app");
+  const setCollapsed = (collapsed) => {
+    sidebar.classList.toggle("collapsed", collapsed);
+    if (app) app.classList.toggle("sidebar-collapsed", collapsed);
+    try { localStorage.setItem("sidebar-collapsed", collapsed ? "1" : "0"); } catch (e) {}
+  };
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", () => {
+      setCollapsed(!sidebar.classList.contains("collapsed"));
+    });
+  }
+  try {
+    if (localStorage.getItem("sidebar-collapsed") === "1") setCollapsed(true);
+  } catch (e) {}
 }
 
 // Bakåtkompatibilitet
