@@ -45,15 +45,17 @@ async function loadSettings() {
 }
 
 function setupSettingsControls() {
-  document.getElementById("save-settings").addEventListener("click", async () => {
-    const payload = {
-      lock_foreign_schedule_cells: document.getElementById("lock-foreign-schedule-cells").checked,
-    };
+  const checkbox = document.getElementById("lock-foreign-schedule-cells");
+  checkbox.addEventListener("change", async () => {
+    const previous = !checkbox.checked;
     try {
-      appSettings = await api.put("/api/settings", payload);
-      document.getElementById("lock-foreign-schedule-cells").checked = !!appSettings.lock_foreign_schedule_cells;
-      showToast("Inställningar sparade", "success");
+      appSettings = await api.put("/api/settings", {
+        lock_foreign_schedule_cells: checkbox.checked,
+      });
+      checkbox.checked = !!appSettings.lock_foreign_schedule_cells;
+      showToast("Inställning sparad", "success", 2000);
     } catch (error) {
+      checkbox.checked = previous;
       showToast(error.message, "error");
     }
   });

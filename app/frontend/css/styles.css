@@ -284,6 +284,14 @@ button, input, select, textarea { font-family: inherit; color: inherit; }
   align-items: center;
   gap: 6px;
 }
+.controls .controls-checkbox {
+  margin-left: auto;
+  text-transform: none;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
 
 
 /* ============================================================
