@@ -1,4 +1,4 @@
-// Personregister – CRUD-vy med filter + sortering.
+// Personregister – inline-redigering direkt i tabellen.
 
 let areas = [];
 let activities = [];
@@ -26,7 +26,7 @@ function activityLabel(id) {
 }
 function activityColor(id) {
   const a = activities.find((x) => x.id === id);
-  return a ? a.color : "#ffffff";
+  return a ? a.color : "transparent";
 }
 
 function escapeHtml(s) {
@@ -38,10 +38,7 @@ function escapeHtml(s) {
 
 // ---- Filter + sort ----
 function passesFilter(p) {
-  const match = (val, q) => {
-    if (!q) return true;
-    return String(val ?? "").toLowerCase().includes(q.toLowerCase());
-  };
+  const match = (val, q) => !q || String(val ?? "").toLowerCase().includes(q.toLowerCase());
   if (!match(p.name, filters.name)) return false;
   if (!match(areaName(p.home_area_id), filters.home_area)) return false;
   if (!match(activityLabel(p.home_activity_id), filters.home_activity)) return false;
@@ -61,6 +58,109 @@ function sortKeyValue(p) {
   }
 }
 
+
+// ---- Inline edit-helpers ----
+async function savePersonField(personId, payload) {
+  try {
+    await api.put(`/api/persons/${personId}`, payload);
+  } catch (e) {
+    showToast(e.message || "Kunde inte spara", "error");
+    throw e;
+  }
+}
+
+function editText(td, person, field, currentValue) {
+  if (td.querySelector("input,select")) return;
+  td.classList.add("editing");
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "inline-input";
+  input.value = currentValue || "";
+  td.innerHTML = "";
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const finish = async (commit) => {
+    if (done) return; done = true;
+    td.classList.remove("editing");
+    if (commit && input.value !== currentValue) {
+      try {
+        await savePersonField(person.id, { [field]: input.value.trim() });
+        person[field] = input.value.trim();
+      } catch (e) {}
+    }
+    await loadPersons();
+  };
+  input.addEventListener("blur", () => finish(true));
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  });
+}
+
+function editNumber(td, person, field, currentValue) {
+  if (td.querySelector("input,select")) return;
+  td.classList.add("editing");
+  const input = document.createElement("input");
+  input.type = "number";
+  input.className = "inline-input";
+  input.value = currentValue ?? 0;
+  input.style.maxWidth = "80px";
+  td.innerHTML = "";
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const finish = async (commit) => {
+    if (done) return; done = true;
+    td.classList.remove("editing");
+    const num = Number(input.value) || 0;
+    if (commit && num !== currentValue) {
+      try { await savePersonField(person.id, { [field]: num }); } catch (e) {}
+    }
+    await loadPersons();
+  };
+  input.addEventListener("blur", () => finish(true));
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  });
+}
+
+function editSelect(td, person, field, currentId, options, getId, getLabel) {
+  if (td.querySelector("input,select")) return;
+  td.classList.add("editing");
+  const select = document.createElement("select");
+  select.className = "inline-input";
+  select.innerHTML = `<option value="">(inget)</option>` +
+    options.map((o) => `<option value="${getId(o)}" ${getId(o) === currentId ? "selected" : ""}>${escapeHtml(getLabel(o))}</option>`).join("");
+  td.style.background = "";
+  td.innerHTML = "";
+  td.appendChild(select);
+  select.focus();
+
+  let done = false;
+  const finish = async (commit) => {
+    if (done) return; done = true;
+    td.classList.remove("editing");
+    const newId = select.value ? Number(select.value) : null;
+    if (commit && newId !== currentId) {
+      try { await savePersonField(person.id, { [field]: newId }); } catch (e) {}
+    }
+    await loadPersons();
+  };
+  select.addEventListener("change", () => select.blur());
+  select.addEventListener("blur", () => finish(true));
+  select.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  });
+}
+
+
+// ---- Rendering ----
 function renderRows() {
   const filtered = persons.filter(passesFilter).sort((a, b) => {
     const av = sortKeyValue(a);
@@ -72,38 +172,86 @@ function renderRows() {
 
   const tbody = document.getElementById("persons-body");
   tbody.innerHTML = "";
+
   filtered.forEach((p) => {
     const tr = document.createElement("tr");
-    const haColor = p.home_activity_id ? activityColor(p.home_activity_id) : "transparent";
-    tr.innerHTML = `
-      <td>${escapeHtml(p.name)}</td>
-      <td>${escapeHtml(areaName(p.home_area_id))}</td>
-      <td style="background: ${haColor};">${escapeHtml(activityLabel(p.home_activity_id))}</td>
-      <td>${p.is_active ? "Ja" : "Nej"}</td>
-      <td>${p.sort_order}</td>
-      <td>
-        <button data-edit="${p.id}">Redigera</button>
-        <button data-schedule="${p.id}">Schema</button>
-        ${p.is_active ? `<button data-delete="${p.id}" class="danger">Inaktivera</button>` : ""}
-      </td>`;
+
+    // Namn
+    const tdName = document.createElement("td");
+    tdName.className = "editable";
+    tdName.textContent = p.name;
+    tdName.addEventListener("click", () => editText(tdName, p, "name", p.name));
+    tr.appendChild(tdName);
+
+    // Hemområde
+    const tdArea = document.createElement("td");
+    tdArea.className = "editable";
+    tdArea.textContent = areaName(p.home_area_id);
+    tdArea.addEventListener("click", () =>
+      editSelect(tdArea, p, "home_area_id", p.home_area_id, areas, (a) => a.id, (a) => a.name)
+    );
+    tr.appendChild(tdArea);
+
+    // Huvudställe
+    const tdAct = document.createElement("td");
+    tdAct.className = "editable";
+    if (p.home_activity_id) tdAct.style.background = activityColor(p.home_activity_id);
+    tdAct.textContent = activityLabel(p.home_activity_id);
+    tdAct.addEventListener("click", () =>
+      editSelect(
+        tdAct, p, "home_activity_id", p.home_activity_id,
+        activities.filter((a) => a.is_active),
+        (a) => a.id,
+        (a) => a.label,
+      )
+    );
+    tr.appendChild(tdAct);
+
+    // Aktiv (toggle)
+    const tdActive = document.createElement("td");
+    tdActive.className = "editable";
+    tdActive.textContent = p.is_active ? "Ja" : "Nej";
+    tdActive.addEventListener("click", async () => {
+      try {
+        await savePersonField(p.id, { is_active: !p.is_active });
+        await loadPersons();
+      } catch (e) {}
+    });
+    tr.appendChild(tdActive);
+
+    // Sortering
+    const tdSort = document.createElement("td");
+    tdSort.className = "editable";
+    tdSort.textContent = p.sort_order;
+    tdSort.addEventListener("click", () => editNumber(tdSort, p, "sort_order", p.sort_order));
+    tr.appendChild(tdSort);
+
+    // Åtgärder (Schema + Inaktivera)
+    const tdActions = document.createElement("td");
+    tdActions.innerHTML = `
+      <button data-schedule="${p.id}">Schema</button>
+      ${p.is_active ? `<button data-delete="${p.id}" class="danger">Inaktivera</button>` : ""}
+    `;
+    tr.appendChild(tdActions);
+
     tbody.appendChild(tr);
   });
 
-  tbody.querySelectorAll("button[data-edit]").forEach((b) =>
-    b.addEventListener("click", () => openModal(persons.find((p) => p.id === Number(b.dataset.edit))))
-  );
   tbody.querySelectorAll("button[data-delete]").forEach((b) =>
-    b.addEventListener("click", async () => {
+    b.addEventListener("click", async (e) => {
+      e.stopPropagation();
       if (!confirm("Inaktivera person?")) return;
       await api.del(`/api/persons/${b.dataset.delete}`);
       await loadPersons();
     })
   );
   tbody.querySelectorAll("button[data-schedule]").forEach((b) =>
-    b.addEventListener("click", () => openScheduleModal(persons.find((p) => p.id === Number(b.dataset.schedule))))
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openScheduleModal(persons.find((p) => p.id === Number(b.dataset.schedule)));
+    })
   );
 
-  // Sortindikator
   document.querySelectorAll("tr.sort-row th[data-sort]").forEach((th) => {
     const ind = th.querySelector(".sort-ind");
     ind.textContent = th.dataset.sort === sortKey ? (sortAsc ? "▲" : "▼") : "";
@@ -118,7 +266,7 @@ async function loadPersons() {
 }
 
 
-// ---- Modal: redigera/lägg till person ----
+// ---- Ny person-modal (kvar för att kunna lägga till) ----
 function openModal(person) {
   const isEdit = !!person;
   const backdrop = document.createElement("div");
@@ -163,9 +311,7 @@ function openModal(person) {
       else await api.post("/api/persons", payload);
       backdrop.remove();
       await loadPersons();
-    } catch (e) {
-      showToast(e.message, "error");
-    }
+    } catch (e) { showToast(e.message, "error"); }
   });
 }
 
@@ -272,14 +418,12 @@ function updateRowDisabled(row) {
   document.getElementById("new-person").addEventListener("click", () => openModal(null));
   document.getElementById("show-inactive").addEventListener("change", loadPersons);
 
-  // Filter
   document.querySelectorAll("tr.filter-row input").forEach((inp) => {
     inp.addEventListener("input", () => {
       filters[inp.dataset.filter] = inp.value;
       renderRows();
     });
   });
-  // Sort
   document.querySelectorAll("tr.sort-row th[data-sort]").forEach((th) => {
     th.addEventListener("click", () => {
       const key = th.dataset.sort;

@@ -398,6 +398,31 @@ table#persons-table td:nth-child(5) {
   width: 90px;
 }
 
+/* Inline-redigerbara celler */
+table.data td.editable {
+  cursor: pointer;
+  position: relative;
+}
+table.data td.editable:hover {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+table.data td.editing {
+  padding: 4px 8px;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+table.data td .inline-input {
+  width: 100%;
+  border: 0;
+  background: var(--surface);
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  outline: none;
+}
+table.data td .inline-input:focus {
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
 
 /* ============================================================
    Bemanningsmatris
@@ -1064,6 +1089,7 @@ tr.filter-row input {
   padding: 22px 24px;
   animation: pop .16s ease-out;
 }
+.modal.wide { min-width: min(760px, 92vw); }
 .modal h2 { margin: 0 0 14px; font-size: 17px; font-weight: 700; }
 .modal label {
   display: block;
@@ -1075,6 +1101,13 @@ tr.filter-row input {
   letter-spacing: 0.04em;
 }
 .modal input, .modal textarea, .modal select { width: 100%; }
+.modal-table-scroll {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.modal-table-scroll table { box-shadow: none; border: 0; }
 .modal .actions {
   margin-top: 20px;
   display: flex;
