@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Logga in – Bemanning</title>
+  <title>Logga in - Bemanning</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </head>
 <body>
@@ -22,7 +22,8 @@
       <input id="username" name="username" autocomplete="username" required />
 
       <label for="password">Lösenord</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" required />
+      <input id="password" name="password" type="password" autocomplete="current-password" />
+      <p class="note">Lämna tomt om det är första inloggningen.</p>
 
       <button class="primary" type="submit">Logga in</button>
       <div class="err" id="err" hidden></div>
@@ -34,15 +35,19 @@
     const form = document.getElementById("login-form");
     const errEl = document.getElementById("err");
 
+    function nextPage(user) {
+      return user?.must_change_password ? "/set-password.html" : "/index.html";
+    }
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       errEl.hidden = true;
       try {
-        await api.post("/api/auth/login", {
+        const user = await api.post("/api/auth/login", {
           username: document.getElementById("username").value,
           password: document.getElementById("password").value,
         });
-        window.location.href = "/index.html";
+        window.location.href = nextPage(user);
       } catch (err) {
         errEl.textContent = err.message || "Inloggning misslyckades";
         errEl.hidden = false;
@@ -51,8 +56,8 @@
 
     (async () => {
       try {
-        await api.get("/api/auth/me");
-        window.location.href = "/index.html";
+        const user = await api.get("/api/auth/me");
+        window.location.href = nextPage(user);
       } catch (_) { /* inte inloggad */ }
     })();
   </script>

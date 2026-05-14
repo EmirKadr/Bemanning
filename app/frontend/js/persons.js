@@ -266,6 +266,92 @@ async function loadPersons() {
 }
 
 
+// ---- Excelimport ----
+function openImportResultModal(result) {
+  const errors = result.errors || [];
+  const shownErrors = errors.slice(0, 25);
+  const extra = Math.max(0, errors.length - shownErrors.length);
+  const rows = shownErrors.map((entry) => `
+    <tr>
+      <td>${entry.row}</td>
+      <td>${escapeHtml(entry.name || "-")}</td>
+      <td>${escapeHtml(entry.error)}</td>
+    </tr>`).join("");
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal wide">
+      <h2>Importresultat</h2>
+      <p class="note">${result.created} skapade, ${result.skipped} hoppades över.</p>
+      ${rows ? `
+        <div class="modal-table-scroll">
+          <table>
+            <thead><tr><th>Rad</th><th>Namn</th><th>Fel</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      ` : ""}
+      ${extra ? `<p class="note">${extra} fler fel visas inte här.</p>` : ""}
+      <div class="actions">
+        <button class="primary" id="import-result-close">Stäng</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  document.getElementById("import-result-close").addEventListener("click", () => backdrop.remove());
+}
+
+function showImportResult(result) {
+  if (result.created && result.skipped) {
+    showToast(`${result.created} personer importerades. ${result.skipped} rad(er) hoppades över.`, "warn", 7000);
+    openImportResultModal(result);
+    return;
+  }
+  if (result.created) {
+    showToast(`${result.created} personer importerades`, "success");
+    return;
+  }
+  if (result.skipped) {
+    showToast("Inga personer importerades", "error", 7000);
+    openImportResultModal(result);
+    return;
+  }
+  showToast("Excel-filen innehöll inga personer", "warn");
+}
+
+async function importPersonFile(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const importButton = document.getElementById("import-persons");
+  importButton.disabled = true;
+  try {
+    const result = await api.postForm("/api/persons/import", formData);
+    showImportResult(result);
+    await loadPersons();
+  } catch (error) {
+    showToast(error.message, "error", 7000);
+  } finally {
+    importButton.disabled = false;
+  }
+}
+
+function setupImportControls() {
+  const downloadButton = document.getElementById("download-person-template");
+  const importButton = document.getElementById("import-persons");
+  const fileInput = document.getElementById("person-import-file");
+
+  downloadButton.addEventListener("click", () => {
+    window.location.href = "/api/persons/import-template";
+  });
+  importButton.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = "";
+    if (!file) return;
+    await importPersonFile(file);
+  });
+}
+
+
 // ---- Ny person-modal (kvar för att kunna lägga till) ----
 function openModal(person) {
   const isEdit = !!person;
@@ -415,6 +501,7 @@ function updateRowDisabled(row) {
   await initPage("persons");
   await loadInitial();
   await loadPersons();
+  setupImportControls();
   document.getElementById("new-person").addEventListener("click", () => openModal(null));
   document.getElementById("show-inactive").addEventListener("change", loadPersons);
 

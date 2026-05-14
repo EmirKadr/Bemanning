@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Användare – Bemanning</title>
+  <title>Användare - Bemanning</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </head>
 <body>
@@ -11,6 +11,9 @@
 
   <section class="controls">
     <button class="primary" id="new-user">+ Ny användare</button>
+    <button id="download-user-template" hidden>Ladda ner importmall</button>
+    <button id="import-users" hidden>Importera Excel</button>
+    <input id="user-import-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
     <label><input type="checkbox" id="show-inactive" /> Visa inaktiva</label>
   </section>
 
@@ -24,6 +27,7 @@
             <th>Visningsnamn</th>
             <th>Roll</th>
             <th>Aktiv</th>
+            <th>Lösenord</th>
             <th>Skapad</th>
             <th></th>
           </tr>

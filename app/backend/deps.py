@@ -5,7 +5,14 @@ from sqlalchemy.orm import Session
 
 from .database import SessionLocal
 from .models import User
-from .user_access import is_super_admin
+from .user_access import is_super_admin, user_needs_password_setup
+
+
+PASSWORD_SETUP_ALLOWED_PATHS = {
+    "/api/auth/me",
+    "/api/auth/logout",
+    "/api/auth/set-password",
+}
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -23,6 +30,8 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive")
+    if user_needs_password_setup(user) and request.url.path not in PASSWORD_SETUP_ALLOWED_PATHS:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="password_setup_required")
     return user
 
 

@@ -13,6 +13,10 @@ function roleLabel(user) {
   return role === "admin" ? "Administratör" : "Arbetsledare";
 }
 
+function passwordStatus(user) {
+  return user?.must_change_password ? "Väntar" : "Skapat";
+}
+
 function formatDate(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -41,9 +45,10 @@ function renderUsers() {
     const selfLabel = user.id === currentUser.id ? " (du)" : "";
     tr.innerHTML = `
       <td>${escapeHtml(user.username)}${escapeHtml(selfLabel)}</td>
-      <td>${escapeHtml(user.display_name || "–")}</td>
+      <td>${escapeHtml(user.display_name || "-")}</td>
       <td>${escapeHtml(roleLabel(user))}</td>
       <td>${user.is_active ? "Ja" : "Nej"}</td>
+      <td>${escapeHtml(passwordStatus(user))}</td>
       <td>${escapeHtml(formatDate(user.created_at))}</td>
       <td>
         <button data-edit="${user.id}">Redigera</button>
@@ -74,6 +79,7 @@ function renderUsers() {
 
 function openModal(user) {
   const isEdit = !!user;
+  const selectedRole = user?.role === "admin" || user?.role === "super_admin" ? "admin" : "leader";
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
   backdrop.innerHTML = `
@@ -85,8 +91,8 @@ function openModal(user) {
       <input id="m-display-name" value="${escapeHtml(user?.display_name || "")}" />
       <label>Roll</label>
       <select id="m-role">
-        <option value="leader" ${user?.role !== "admin" ? "selected" : ""}>Arbetsledare</option>
-        <option value="admin" ${user?.role === "admin" ? "selected" : ""}>Administratör</option>
+        <option value="leader" ${selectedRole === "leader" ? "selected" : ""}>Arbetsledare</option>
+        <option value="admin" ${selectedRole === "admin" ? "selected" : ""}>Administratör</option>
       </select>
       <label>${isEdit ? "Nytt lösenord" : "Lösenord"}</label>
       <input id="m-password" type="password" autocomplete="new-password" />
@@ -137,10 +143,100 @@ function openModal(user) {
   });
 }
 
+function openImportResultModal(result) {
+  const errors = result.errors || [];
+  const shownErrors = errors.slice(0, 25);
+  const extra = Math.max(0, errors.length - shownErrors.length);
+  const rows = shownErrors.map((entry) => `
+    <tr>
+      <td>${entry.row}</td>
+      <td>${escapeHtml(entry.username || "-")}</td>
+      <td>${escapeHtml(entry.error)}</td>
+    </tr>`).join("");
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal wide">
+      <h2>Importresultat</h2>
+      <p class="note">${result.created} skapade, ${result.skipped} hoppades över.</p>
+      ${rows ? `
+        <div class="modal-table-scroll">
+          <table>
+            <thead><tr><th>Rad</th><th>Användarnamn</th><th>Fel</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      ` : ""}
+      ${extra ? `<p class="note">${extra} fler fel visas inte här.</p>` : ""}
+      <div class="actions">
+        <button class="primary" id="import-result-close">Stäng</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  document.getElementById("import-result-close").addEventListener("click", () => backdrop.remove());
+}
+
+function showImportResult(result) {
+  if (result.created && result.skipped) {
+    showToast(`${result.created} användare importerades. ${result.skipped} rad(er) hoppades över.`, "warn", 7000);
+    openImportResultModal(result);
+    return;
+  }
+  if (result.created) {
+    showToast(`${result.created} användare importerades`, "success");
+    return;
+  }
+  if (result.skipped) {
+    showToast("Inga användare importerades", "error", 7000);
+    openImportResultModal(result);
+    return;
+  }
+  showToast("Excel-filen innehöll inga användare", "warn");
+}
+
+async function importUserFile(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const importButton = document.getElementById("import-users");
+  importButton.disabled = true;
+  try {
+    const result = await api.postForm("/api/users/import", formData);
+    showImportResult(result);
+    await loadUsers();
+  } catch (error) {
+    showToast(error.message, "error", 7000);
+  } finally {
+    importButton.disabled = false;
+  }
+}
+
+function setupImportControls() {
+  const downloadButton = document.getElementById("download-user-template");
+  const importButton = document.getElementById("import-users");
+  const fileInput = document.getElementById("user-import-file");
+
+  if (!currentUser?.is_super_admin) return;
+
+  downloadButton.hidden = false;
+  importButton.hidden = false;
+
+  downloadButton.addEventListener("click", () => {
+    window.location.href = "/api/users/import-template";
+  });
+  importButton.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = "";
+    if (!file) return;
+    await importUserFile(file);
+  });
+}
+
 (async () => {
   currentUser = await initPage("users", { requireAdmin: true });
   if (!currentUser) return;
 
+  setupImportControls();
   await loadUsers();
   document.getElementById("new-user").addEventListener("click", () => openModal(null));
   document.getElementById("show-inactive").addEventListener("change", loadUsers);

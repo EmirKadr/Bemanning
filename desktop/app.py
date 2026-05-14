@@ -149,6 +149,7 @@ class MainWindow(QMainWindow):
 
         # Färga title-baren så den smälter in med appen på Windows 11
         self._titlebar_styled = False
+        self._setup_content()
         QTimer.singleShot(0, self._apply_titlebar_styling)
 
     def _apply_titlebar_styling(self) -> None:
@@ -164,6 +165,7 @@ class MainWindow(QMainWindow):
             self._titlebar_styled = True
         self._apply_titlebar_styling()
 
+    def _setup_content(self) -> None:
         self._stack = QStackedWidget(self)
         self.setCentralWidget(self._stack)
 

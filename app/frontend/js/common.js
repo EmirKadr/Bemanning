@@ -144,6 +144,10 @@ async function initPage(activePage, options = {}) {
     window.location.href = "/login.html";
     return null;
   }
+  if (user.must_change_password && activePage !== "passwordSetup") {
+    window.location.href = "/set-password.html";
+    return null;
+  }
   if (options.requireAdmin && user.role !== "admin" && user.role !== "super_admin") {
     queueToast("Sidan kräver administratörsbehörighet", "error");
     window.location.href = "/index.html";

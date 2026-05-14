@@ -98,6 +98,18 @@ class PersonUpdate(BaseModel):
     sort_order: int | None = None
 
 
+class PersonImportError(BaseModel):
+    row: int
+    name: str | None = None
+    error: str
+
+
+class PersonImportResult(BaseModel):
+    created: int
+    skipped: int
+    errors: list[PersonImportError] = Field(default_factory=list)
+
+
 class CellOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     person_id: int
@@ -240,7 +252,11 @@ class FillFromLeftRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     username: str
-    password: str
+    password: str = ""
+
+
+class PasswordSetRequest(BaseModel):
+    password: str = Field(min_length=8, max_length=72)
 
 
 class TemplateDay(BaseModel):
@@ -265,6 +281,7 @@ class UserOut(BaseModel):
     username: str
     display_name: str | None
     role: str
+    must_change_password: bool = False
     is_super_admin: bool = False
 
 
@@ -275,6 +292,7 @@ class UserAdminOut(BaseModel):
     display_name: str | None
     role: str
     is_active: bool
+    must_change_password: bool = False
     created_at: datetime
     is_super_admin: bool = False
 
@@ -327,6 +345,18 @@ class UserUpdate(BaseModel):
             return None
         cleaned = value.strip()
         return cleaned or None
+
+
+class UserImportError(BaseModel):
+    row: int
+    username: str | None = None
+    error: str
+
+
+class UserImportResult(BaseModel):
+    created: int
+    skipped: int
+    errors: list[UserImportError] = Field(default_factory=list)
 
 
 class AuditEntryOut(BaseModel):
