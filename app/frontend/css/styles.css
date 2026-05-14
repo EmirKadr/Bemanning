@@ -355,6 +355,7 @@ button.icon-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
+.controls #undoBtn { margin-left: auto; }
 .date-display-wrap {
   position: relative;
   display: inline-flex;

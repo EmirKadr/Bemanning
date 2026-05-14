@@ -899,7 +899,6 @@ function updateViewVisibility() {
   document.getElementById("weekInput").addEventListener("change", onControlChange);
   document.getElementById("monthSelect").addEventListener("change", onControlChange);
   document.getElementById("areaSelect").addEventListener("change", onControlChange);
-  document.getElementById("reloadBtn").addEventListener("click", onControlChange);
   document.getElementById("prev").addEventListener("click", () => shiftPeriod(-1));
   document.getElementById("next").addEventListener("click", () => shiftPeriod(1));
   document.getElementById("undoBtn").addEventListener("click", () => undoLastOverviewAction());

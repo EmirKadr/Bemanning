@@ -306,7 +306,7 @@ function currentSegment(personId, hour, minuteStart, minuteEnd) {
 }
 
 function currentUserCanBypassCellLock() {
-  return state.currentUser?.role === "admin" || state.currentUser?.role === "super_admin";
+  return state.currentUser?.role === "admin" || state.currentUser?.is_super_user;
 }
 
 function isForeignLockedSegment(segment) {
@@ -2120,7 +2120,6 @@ async function loadSchedule() {
   document.getElementById("weekInput").addEventListener("change", onControlChange);
   document.getElementById("daySelect").addEventListener("change", onControlChange);
   document.getElementById("areaSelect").addEventListener("change", onControlChange);
-  document.getElementById("reloadBtn").addEventListener("click", onControlChange);
   document.getElementById("dateInput").addEventListener("change", onDateChange);
   document.getElementById("prevDayBtn").addEventListener("click", () => stepDay(-1));
   document.getElementById("nextDayBtn").addEventListener("click", () => stepDay(1));
