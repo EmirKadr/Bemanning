@@ -951,9 +951,14 @@ function renderFullHourCell(td, segment, isScheduled) {
     td.style.background = colorFor(scheduledActivityId);
     td.dataset.isBase = "1";
   } else if (isScheduled) {
-    // Rensa inline-bakgrund så .scheduled-empty CSS-gradienten kan synas
-    td.style.background = "";
-    td.classList.add("scheduled-empty");
+    if (scheduledActivityId) {
+      // Explicit tömd eller bas-cell: ranig version av hemaktivitetens färg (svagare)
+      const c = colorFor(scheduledActivityId);
+      td.style.background = `repeating-linear-gradient(45deg, ${c} 0, ${c} 5px, var(--surface) 5px, var(--surface) 10px)`;
+    } else {
+      td.style.background = "";
+      td.classList.add("scheduled-empty");
+    }
   }
 
   const select = buildActivitySelect([explicitActivityId, scheduledActivityId]);
@@ -1025,8 +1030,13 @@ function renderSplitHourCell(td, segments, isScheduled) {
     } else if (!segment.empty_override && scheduledActivityId != null) {
       part.style.background = colorFor(scheduledActivityId);
     } else if (isScheduled) {
-      part.style.background = "";
-      part.classList.add("scheduled-empty-half");
+      if (scheduledActivityId) {
+        const c = colorFor(scheduledActivityId);
+        part.style.background = `repeating-linear-gradient(45deg, ${c} 0, ${c} 4px, var(--surface) 4px, var(--surface) 8px)`;
+      } else {
+        part.style.background = "";
+        part.classList.add("scheduled-empty-half");
+      }
     } else {
       part.style.background = "#fff";
     }
