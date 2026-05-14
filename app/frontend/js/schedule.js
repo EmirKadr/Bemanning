@@ -952,9 +952,9 @@ function renderFullHourCell(td, segment, isScheduled) {
     td.dataset.isBase = "1";
   } else if (isScheduled) {
     if (scheduledActivityId) {
-      // Explicit tömd eller bas-cell: ranig version av hemaktivitetens färg (svagare)
+      // Explicit tömd: subtilt randig version av hemaktivitetens färg
       const c = colorFor(scheduledActivityId);
-      td.style.background = `repeating-linear-gradient(45deg, ${c} 0, ${c} 5px, var(--surface) 5px, var(--surface) 10px)`;
+      td.style.background = `repeating-linear-gradient(45deg, ${c}40 0, ${c}40 2px, var(--surface) 2px, var(--surface) 10px)`;
     } else {
       td.style.background = "";
       td.classList.add("scheduled-empty");
@@ -1032,7 +1032,7 @@ function renderSplitHourCell(td, segments, isScheduled) {
     } else if (isScheduled) {
       if (scheduledActivityId) {
         const c = colorFor(scheduledActivityId);
-        part.style.background = `repeating-linear-gradient(45deg, ${c} 0, ${c} 4px, var(--surface) 4px, var(--surface) 8px)`;
+        part.style.background = `repeating-linear-gradient(45deg, ${c}40 0, ${c}40 2px, var(--surface) 2px, var(--surface) 8px)`;
       } else {
         part.style.background = "";
         part.classList.add("scheduled-empty-half");
