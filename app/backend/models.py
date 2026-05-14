@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     DateTime,
@@ -17,6 +18,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
+
+
+# JSONB on PostgreSQL (production), plain JSON on SQLite (local dev).
+JsonField = JSON().with_variant(JSONB(), "postgresql")
 
 
 class User(Base):
@@ -52,7 +57,7 @@ class Person(Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     home_area_id: Mapped[int | None] = mapped_column(ForeignKey("areas.id"))
     home_activity_id: Mapped[int | None] = mapped_column(ForeignKey("activities.id"))
-    competencies: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    competencies: Mapped[list] = mapped_column(JsonField, nullable=False, default=list)
     comment: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -130,8 +135,8 @@ class AuditLog(Base):
     entity_type: Mapped[str] = mapped_column(String(30), nullable=False)
     entity_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     action: Mapped[str] = mapped_column(String(50), nullable=False)
-    old_value: Mapped[dict | None] = mapped_column(JSONB)
-    new_value: Mapped[dict | None] = mapped_column(JSONB)
+    old_value: Mapped[dict | None] = mapped_column(JsonField)
+    new_value: Mapped[dict | None] = mapped_column(JsonField)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
