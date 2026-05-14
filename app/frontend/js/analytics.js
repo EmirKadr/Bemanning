@@ -235,7 +235,7 @@ async function refreshAnalytics() {
 }
 
 (async () => {
-  currentUser = await initPage("analytics", { requireSuperAdmin: true });
+  currentUser = await initPage("analytics", { requireSuperUser: true });
   if (!currentUser) return;
 
   await loadLookups();

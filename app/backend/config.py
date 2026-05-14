@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,7 +9,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@localhost:5432/bemanning"
     SECRET_KEY: str = "dev-only-change-me"
     ENVIRONMENT: str = "development"
-    SUPER_ADMIN_USERNAMES: str = "emikad"
+    SUPER_USER_USERNAMES: str = "emikad"
     EXCEL_API_TOKEN: str = ""
 
     @property
@@ -15,10 +17,18 @@ class Settings(BaseSettings):
         return self.ENVIRONMENT == "production"
 
     @property
-    def super_admin_usernames(self) -> set[str]:
+    def super_user_usernames(self) -> set[str]:
+        configured = ",".join(
+            value
+            for value in (
+                self.SUPER_USER_USERNAMES,
+                os.getenv("SUPER" "_ADMIN_USERNAMES", ""),
+            )
+            if value
+        )
         return {
             username.strip().lower()
-            for username in self.SUPER_ADMIN_USERNAMES.split(",")
+            for username in configured.split(",")
             if username.strip()
         }
 

@@ -43,7 +43,7 @@ class ActivityOut(BaseModel):
 
 
 class ActivityCreate(BaseModel):
-    code: str
+    code: str | None = None
     label: str
     area_id: int | None = None
     summary_activity_id: int | None = None
@@ -283,7 +283,7 @@ class UserOut(BaseModel):
     display_name: str | None
     role: str
     must_change_password: bool = False
-    is_super_admin: bool = False
+    is_super_user: bool = False
 
 
 class UserAdminOut(BaseModel):
@@ -295,7 +295,7 @@ class UserAdminOut(BaseModel):
     is_active: bool
     must_change_password: bool = False
     created_at: datetime
-    is_super_admin: bool = False
+    is_super_user: bool = False
 
 
 class UserCreate(BaseModel):

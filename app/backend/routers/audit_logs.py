@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..deps import get_db, require_super_admin
+from ..deps import get_db, require_super_user
 from ..models import AuditLog, User
 from ..schemas import AuditEntryOut, AuditSummaryBucket, AuditSummaryOut
 
@@ -47,7 +47,7 @@ def list_audit_entries(
     from_at: datetime | None = Query(None),
     to_at: datetime | None = Query(None),
     db: Session = Depends(get_db),
-    _: User = Depends(require_super_admin),
+    _: User = Depends(require_super_user),
 ) -> list[AuditEntryOut]:
     query = (
         select(AuditLog, User.username, User.display_name)
@@ -91,7 +91,7 @@ def audit_summary(
     from_at: datetime | None = Query(None),
     to_at: datetime | None = Query(None),
     db: Session = Depends(get_db),
-    _: User = Depends(require_super_admin),
+    _: User = Depends(require_super_user),
 ) -> AuditSummaryOut:
     base = select(AuditLog.id).select_from(AuditLog)
     base = _apply_filters(

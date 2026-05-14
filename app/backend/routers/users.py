@@ -13,11 +13,11 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from .. import audit
-from ..deps import get_db, require_admin, require_super_admin
+from ..deps import get_db, require_admin, require_super_user
 from ..models import User
 from ..schemas import UserAdminOut, UserCreate, UserImportError, UserImportResult, UserUpdate
 from ..security import hash_password
-from ..user_access import user_admin_out
+from ..user_access import ADMIN_ROLES, user_admin_out
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -61,7 +61,7 @@ def _find_username_conflict(db: Session, username: str, *, exclude_user_id: int 
 
 
 def _active_admin_count(db: Session, *, exclude_user_id: int | None = None) -> int:
-    query = db.query(func.count(User.id)).filter(User.role.in_(("admin", "super_admin")), User.is_active.is_(True))
+    query = db.query(func.count(User.id)).filter(User.role.in_(tuple(ADMIN_ROLES)), User.is_active.is_(True))
     if exclude_user_id is not None:
         query = query.filter(User.id != exclude_user_id)
     return int(query.scalar() or 0)
@@ -194,12 +194,12 @@ def list_users(
     query = db.query(User)
     if not include_inactive:
         query = query.filter(User.is_active.is_(True))
-    users = query.order_by(case((User.role.in_(("admin", "super_admin")), 0), else_=1), User.username.asc()).all()
+    users = query.order_by(case((User.role.in_(tuple(ADMIN_ROLES)), 0), else_=1), User.username.asc()).all()
     return [user_admin_out(user) for user in users]
 
 
 @router.get("/import-template")
-def download_import_template(_admin: User = Depends(require_super_admin)) -> Response:
+def download_import_template(_admin: User = Depends(require_super_user)) -> Response:
     return Response(
         content=build_user_import_template_excel(),
         media_type=EXCEL_MEDIA_TYPE,
@@ -211,7 +211,7 @@ def download_import_template(_admin: User = Depends(require_super_admin)) -> Res
 async def import_users(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    admin: User = Depends(require_super_admin),
+    admin: User = Depends(require_super_user),
 ) -> UserImportResult:
     content = await file.read()
     if len(content) > MAX_IMPORT_BYTES:

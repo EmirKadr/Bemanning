@@ -2,6 +2,7 @@
 
 let areas = [];
 let activities = [];
+let currentUser = null;
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) =>
@@ -19,18 +20,23 @@ function activityLabel(id) {
   return a ? a.label : "";
 }
 
+function canSeeCodes() {
+  return !!currentUser?.is_super_user;
+}
+
 async function load() {
   activities = await api.get("/api/activities?include_inactive=true");
   const includeInactive = document.getElementById("show-inactive").checked;
   const acts = includeInactive ? activities : activities.filter((a) => a.is_active);
   const tbody = document.getElementById("acts-body");
+  document.getElementById("code-column-header").hidden = !canSeeCodes();
   tbody.innerHTML = "";
   acts.forEach((a) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td style="background: ${a.color}; min-width: 40px;"></td>
       <td>${escapeHtml(a.label)}</td>
-      <td>${escapeHtml(a.code)}</td>
+      ${canSeeCodes() ? `<td>${escapeHtml(a.code)}</td>` : ""}
       <td>${escapeHtml(areaName(a.area_id))}</td>
       <td>${escapeHtml(activityLabel(a.summary_activity_id) || "–")}</td>
       <td>${escapeHtml(a.category)}</td>
@@ -68,8 +74,10 @@ function openModal(act) {
       <h2>${isEdit ? "Redigera aktivitet" : "Ny aktivitet"}</h2>
       <label>Etikett (visas i celler)</label>
       <input id="m-label" value="${escapeHtml(act?.label || "")}" />
-      <label>Kod (unik nyckel, ej synlig)</label>
-      <input id="m-code" value="${escapeHtml(act?.code || "")}" />
+      ${canSeeCodes() && act ? `
+        <label>Kod (systemnyckel)</label>
+        <input value="${escapeHtml(act.code || "")}" readonly />
+      ` : ""}
       <label>Område</label>
       <select id="m-area">
         <option value="">(inget)</option>
@@ -100,7 +108,6 @@ function openModal(act) {
   document.getElementById("m-cancel").addEventListener("click", () => backdrop.remove());
   document.getElementById("m-save").addEventListener("click", async () => {
     const payload = {
-      code: document.getElementById("m-code").value.trim(),
       label: document.getElementById("m-label").value.trim(),
       area_id: document.getElementById("m-area").value ? Number(document.getElementById("m-area").value) : null,
       summary_activity_id: document.getElementById("m-summary").value ? Number(document.getElementById("m-summary").value) : null,
@@ -110,8 +117,8 @@ function openModal(act) {
       is_active: document.getElementById("m-active").checked,
     };
 
-    if (!payload.label || !payload.code) {
-      showToast("Etikett och kod krävs", "error");
+    if (!payload.label) {
+      showToast("Etikett krävs", "error");
       return;
     }
     try {
@@ -124,7 +131,7 @@ function openModal(act) {
 }
 
 (async () => {
-  await initPage("stallen");
+  currentUser = await initPage("stallen");
   areas = await api.get("/api/areas");
   await load();
   document.getElementById("new-act").addEventListener("click", () => openModal(null));

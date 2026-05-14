@@ -7,14 +7,14 @@ from sqlalchemy.orm import Session
 
 from .models import ScheduleCell, User
 from .settings_service import get_lock_foreign_schedule_cells
-from .user_access import is_super_admin
+from .user_access import is_super_user
 
 
 LOCKED_CELL_DETAIL = "Cellen är låst eftersom en annan användare har fyllt i den."
 
 
 def user_can_bypass_schedule_cell_lock(user: User) -> bool:
-    return (user.role or "").strip().lower() == "admin" or is_super_admin(user)
+    return (user.role or "").strip().lower() == "admin" or is_super_user(user)
 
 
 def foreign_schedule_cell_lock_applies(db: Session, user: User) -> bool:

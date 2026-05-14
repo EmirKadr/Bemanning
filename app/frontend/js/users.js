@@ -11,7 +11,7 @@ function escapeHtml(value) {
 }
 
 function roleLabel(user) {
-  if (user?.is_super_admin) return "Super admin";
+  if (user?.is_super_user) return "Super User";
   const role = user?.role;
   return role === "admin" ? "Administratör" : "Arbetsledare";
 }
@@ -104,7 +104,7 @@ function renderUsers() {
 
 function openModal(user) {
   const isEdit = !!user;
-  const selectedRole = user?.role === "admin" || user?.role === "super_admin" ? "admin" : "leader";
+  const selectedRole = user?.role === "admin" || user?.is_super_user ? "admin" : "leader";
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
   backdrop.innerHTML = `
@@ -236,7 +236,7 @@ function setupImportControls() {
   const importButton = document.getElementById("import-users");
   const fileInput = document.getElementById("user-import-file");
 
-  if (!currentUser?.is_super_admin) return;
+  if (!currentUser?.is_super_user) return;
 
   downloadButton.hidden = false;
   importButton.hidden = false;

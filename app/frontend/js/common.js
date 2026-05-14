@@ -62,10 +62,10 @@ function renderSidebar(user, activePage) {
     body.insertBefore(app, body.firstChild);
   }
 
-  const adminLink = (user?.role === "admin" || user?.role === "super_admin")
+  const adminLink = (user?.role === "admin" || user?.is_super_user)
     ? `<a href="/anvandare.html" class="${activePage === "users" ? "active" : ""}"><span class="icon" aria-hidden="true">👤</span><span>Användare</span></a>`
     : "";
-  const analyticsLink = user?.is_super_admin
+  const analyticsLink = user?.is_super_user
     ? `<a href="/historik.html" class="${activePage === "analytics" ? "active" : ""}"><span class="icon" aria-hidden="true">📊</span><span>Historik</span></a>`
     : "";
 
@@ -148,13 +148,13 @@ async function initPage(activePage, options = {}) {
     window.location.href = "/set-password.html";
     return null;
   }
-  if (options.requireAdmin && user.role !== "admin" && user.role !== "super_admin") {
+  if (options.requireAdmin && user.role !== "admin" && !user.is_super_user) {
     queueToast("Sidan kräver administratörsbehörighet", "error");
     window.location.href = "/index.html";
     return null;
   }
-  if (options.requireSuperAdmin && !user.is_super_admin) {
-    queueToast("Sidan kräver super admin-behörighet", "error");
+  if (options.requireSuperUser && !user.is_super_user) {
+    queueToast("Sidan kräver Super User-behörighet", "error");
     window.location.href = "/index.html";
     return null;
   }
