@@ -394,11 +394,11 @@ table.matrix td.now-hour {
   box-shadow: inset 2px 0 0 var(--accent), inset -2px 0 0 var(--accent);
 }
 table.overview th.today-col {
-  background: var(--accent-soft) !important;
-  color: var(--accent) !important;
+  background: var(--accent-soft);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 table.overview td.today-col {
-  box-shadow: inset 2px 0 0 var(--accent), inset -2px 0 0 var(--accent);
+  background: rgba(79, 70, 229, 0.04);
 }
 
 
