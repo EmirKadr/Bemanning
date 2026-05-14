@@ -293,6 +293,24 @@ button, input, select, textarea { font-family: inherit; color: inherit; }
   cursor: pointer;
 }
 
+.date-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.date-nav input[type="date"] {
+  padding: 6px 8px;
+  font-size: 13px;
+}
+.date-nav-btn {
+  padding: 4px 10px;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.date-nav-btn:hover { color: var(--text); }
+
 
 /* ============================================================
    Inputs & buttons

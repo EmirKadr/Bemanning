@@ -81,6 +81,30 @@ function isoWeek(d = new Date()) {
   return { year: date.getUTCFullYear(), week, weekday: dayNum };
 }
 
+// (ISO year, ISO week, weekday 1..7) -> UTC Date pointing at that day at 00:00.
+function dateFromYWD(year, week, weekday) {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4Weekday = jan4.getUTCDay() || 7;
+  const week1Monday = new Date(jan4);
+  week1Monday.setUTCDate(jan4.getUTCDate() - (jan4Weekday - 1));
+  const result = new Date(week1Monday);
+  result.setUTCDate(week1Monday.getUTCDate() + (week - 1) * 7 + (weekday - 1));
+  return result;
+}
+
+function ymdString(date) {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function dateFromYmd(str) {
+  const [y, m, d] = String(str).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
@@ -1946,9 +1970,19 @@ async function loadSchedule() {
   state.week = now.week;
   state.weekday = now.weekday <= 5 ? now.weekday : 1;
 
-  document.getElementById("yearInput").value = state.year;
-  document.getElementById("weekInput").value = state.week;
-  document.getElementById("daySelect").value = String(state.weekday);
+  const syncDateInputFromState = () => {
+    const dateInput = document.getElementById("dateInput");
+    if (dateInput) dateInput.value = ymdString(dateFromYWD(state.year, state.week, state.weekday));
+  };
+
+  const writeYWDToInputs = () => {
+    document.getElementById("yearInput").value = state.year;
+    document.getElementById("weekInput").value = state.week;
+    document.getElementById("daySelect").value = String(state.weekday);
+    syncDateInputFromState();
+  };
+
+  writeYWDToInputs();
 
   buildHeader();
   await loadSchedule();
@@ -1961,6 +1995,29 @@ async function loadSchedule() {
     state.weekday = Number(document.getElementById("daySelect").value);
     const areaVal = document.getElementById("areaSelect").value;
     state.areaId = areaVal === "" ? null : Number(areaVal);
+    syncDateInputFromState();
+    await loadSchedule();
+  };
+
+  const onDateChange = async () => {
+    const date = dateFromYmd(document.getElementById("dateInput").value);
+    if (!date) return;
+    const { year, week, weekday } = isoWeek(date);
+    state.year = year;
+    state.week = week;
+    state.weekday = weekday;
+    writeYWDToInputs();
+    await loadSchedule();
+  };
+
+  const stepDay = async (delta) => {
+    const date = dateFromYWD(state.year, state.week, state.weekday);
+    date.setUTCDate(date.getUTCDate() + delta);
+    const { year, week, weekday } = isoWeek(date);
+    state.year = year;
+    state.week = week;
+    state.weekday = weekday;
+    writeYWDToInputs();
     await loadSchedule();
   };
 
@@ -1969,6 +2026,9 @@ async function loadSchedule() {
   document.getElementById("daySelect").addEventListener("change", onControlChange);
   document.getElementById("areaSelect").addEventListener("change", onControlChange);
   document.getElementById("reloadBtn").addEventListener("click", onControlChange);
+  document.getElementById("dateInput").addEventListener("change", onDateChange);
+  document.getElementById("prevDayBtn").addEventListener("click", () => stepDay(-1));
+  document.getElementById("nextDayBtn").addEventListener("click", () => stepDay(1));
 
   document.getElementById("clearBtn").addEventListener("click", async () => {
     const undoSnapshots = snapshotAllExplicitHours();
