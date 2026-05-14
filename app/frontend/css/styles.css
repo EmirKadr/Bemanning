@@ -280,7 +280,18 @@ button.danger:hover { background: #fef2f2; border-color: #fecaca; }
   border: 1px solid var(--border);
   border-radius: var(--r);
   box-shadow: var(--shadow-1);
+  /* Göm scrollbar visuellt – scrollning fungerar fortfarande via mushjul/touch/tangentbord */
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* legacy Edge */
 }
+.table-wrap::-webkit-scrollbar { display: none; }  /* Chrome/Edge/Safari */
+
+.matrix-wrap, .overview-wrap {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.matrix-wrap::-webkit-scrollbar,
+.overview-wrap::-webkit-scrollbar { display: none; }
 
 table {
   border-collapse: separate;
