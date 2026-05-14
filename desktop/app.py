@@ -75,7 +75,8 @@ class MainWindow(QMainWindow):
         self.resize(1400, 900)
         self.setMinimumSize(980, 720)
         self._setup_menu()
-        self.statusBar().showMessage("Startar Bemanning…")
+        self.menuBar().hide()
+        self.statusBar().hide()
 
         self._stack = QStackedWidget(self)
         self.setCentralWidget(self._stack)
