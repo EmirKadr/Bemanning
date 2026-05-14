@@ -63,10 +63,10 @@ function renderSidebar(user, activePage) {
   }
 
   const adminLink = (user?.role === "admin" || user?.role === "super_admin")
-    ? `<a href="/anvandare.html" class="${activePage === "users" ? "active" : ""}"><span class="icon">AU</span><span>Användare</span></a>`
+    ? `<a href="/anvandare.html" class="${activePage === "users" ? "active" : ""}"><span class="icon" aria-hidden="true">👤</span><span>Användare</span></a>`
     : "";
   const analyticsLink = user?.is_super_admin
-    ? `<a href="/historik.html" class="${activePage === "analytics" ? "active" : ""}"><span class="icon">HI</span><span>Historik</span></a>`
+    ? `<a href="/historik.html" class="${activePage === "analytics" ? "active" : ""}"><span class="icon" aria-hidden="true">📊</span><span>Historik</span></a>`
     : "";
 
   sidebar.innerHTML = `
@@ -78,10 +78,10 @@ function renderSidebar(user, activePage) {
       </div>
     </div>
     <nav>
-      <a href="/index.html" class="${activePage === "schedule" ? "active" : ""}"><span class="icon">BE</span><span>Bemanning</span></a>
-      <a href="/overblick.html" class="${activePage === "overview" ? "active" : ""}"><span class="icon">OV</span><span>Översikt</span></a>
-      <a href="/personer.html" class="${activePage === "persons" ? "active" : ""}"><span class="icon">PE</span><span>Personer</span></a>
-      <a href="/stallen.html" class="${activePage === "stallen" ? "active" : ""}"><span class="icon">ST</span><span>Ställen</span></a>
+      <a href="/index.html" class="${activePage === "schedule" ? "active" : ""}"><span class="icon" aria-hidden="true">📋</span><span>Bemanning</span></a>
+      <a href="/overblick.html" class="${activePage === "overview" ? "active" : ""}"><span class="icon" aria-hidden="true">📅</span><span>Översikt</span></a>
+      <a href="/personer.html" class="${activePage === "persons" ? "active" : ""}"><span class="icon" aria-hidden="true">👥</span><span>Personer</span></a>
+      <a href="/stallen.html" class="${activePage === "stallen" ? "active" : ""}"><span class="icon" aria-hidden="true">📍</span><span>Ställen</span></a>
       ${analyticsLink}
       ${adminLink}
     </nav>
