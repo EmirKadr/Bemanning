@@ -7,10 +7,19 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@localhost:5432/bemanning"
     SECRET_KEY: str = "dev-only-change-me"
     ENVIRONMENT: str = "development"
+    SUPER_ADMIN_USERNAMES: str = "emikad"
 
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
+
+    @property
+    def super_admin_usernames(self) -> set[str]:
+        return {
+            username.strip().lower()
+            for username in self.SUPER_ADMIN_USERNAMES.split(",")
+            if username.strip()
+        }
 
 
 settings = Settings()

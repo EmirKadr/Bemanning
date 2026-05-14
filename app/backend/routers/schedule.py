@@ -15,6 +15,7 @@ from ..schemas import (
     CellOut,
     CellUpdate,
     PersonOut,
+    RestoreHoursRequest,
     ScheduleOut,
     SplitCellRequest,
     SummaryRow,
@@ -89,6 +90,25 @@ def _segment_signature(cells: list[ScheduleCell]) -> list[tuple[int, int, int]]:
 
 def _expected_signature(segments: list) -> list[tuple[int, int, int]]:
     return sorted((item.minute_start, item.minute_end, item.expected_version) for item in segments)
+
+
+def _validate_restore_segments(item) -> None:
+    ranges: set[tuple[int, int]] = set()
+    for segment in item.segments:
+        _validate_segment(item.hour, segment.minute_start, segment.minute_end)
+        range_key = (segment.minute_start, segment.minute_end)
+        if range_key in ranges:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Duplicerade segment i samma timme.")
+        ranges.add(range_key)
+
+    if not ranges:
+        return
+    if ranges == {FULL_SEGMENT} or ranges == set(HALF_SEGMENTS):
+        return
+    raise HTTPException(
+        status.HTTP_400_BAD_REQUEST,
+        detail="Undo kan bara återställa en hel timme, två halvtimmar eller en tom implicit timme.",
+    )
 
 
 def _conflict_response(*, person_id: int, hour: int, current: list[ScheduleCell]):
@@ -180,23 +200,30 @@ def get_schedule(
             .all()
         )
 
-    scheduled_hours: dict[int, list[int]] = {}
     template_hours_map = get_template_hours_map(db, person_ids, [weekday])
+    home_activity_for = build_home_activity_resolver(db.query(Activity).all(), db.query(Area).all())
+    home_activity_by_person_id = {p.id: home_activity_for(p) for p in persons}
+
+    scheduled_hours: dict[int, list[int]] = {}
+    scheduled_defaults: dict[int, dict[int, int]] = {}
     for p in persons:
         hrs = template_hours_map.get((p.id, weekday))
         if hrs:
-            scheduled_hours[p.id] = sorted(hrs)
-
-    home_activity_for = build_home_activity_resolver(db.query(Activity).all(), db.query(Area).all())
+            sorted_hours = sorted(hrs)
+            scheduled_hours[p.id] = sorted_hours
+            home_activity_id = home_activity_by_person_id.get(p.id)
+            if home_activity_id is not None:
+                scheduled_defaults[p.id] = {hour: home_activity_id for hour in sorted_hours}
 
     return ScheduleOut(
         year=year,
         week=week,
         weekday=weekday,
         area_id=area_id,
-        persons=[person_out_with_home_activity(p, home_activity_for(p)) for p in persons],
+        persons=[person_out_with_home_activity(p, home_activity_by_person_id.get(p.id)) for p in persons],
         cells=[CellOut(**_cell_to_dict(c)) for c in sorted(cells, key=lambda c: (c.person_id, c.hour, c.minute_start))],
         scheduled_hours=scheduled_hours,
+        scheduled_defaults=scheduled_defaults,
     )
 
 
@@ -747,6 +774,132 @@ def bulk_update_cells(
 
         db.commit()
         return {"applied": applied, "conflicts": conflicts}
+    except HTTPException:
+        db.rollback()
+        raise
+
+
+@router.put("/hours/restore")
+def restore_hours(
+    payload: RestoreHoursRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not payload.hours:
+        return {"hours": []}
+    if len(payload.hours) > 200:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="För många timmar (max 200)")
+
+    seen_hours: set[tuple[int, int, int, int, int]] = set()
+    person_ids: set[int] = set()
+    activity_ids: set[int] = set()
+    for item in payload.hours:
+        _validate_segment(item.hour, 0, 60)
+        _validate_restore_segments(item)
+        key = (item.person_id, item.year, item.week, item.weekday, item.hour)
+        if key in seen_hours:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Duplicerade timmar i undo.")
+        seen_hours.add(key)
+        person_ids.add(item.person_id)
+        activity_ids.update(segment.activity_id for segment in item.segments if segment.activity_id is not None)
+
+    existing_person_ids = set(
+        db.execute(select(Person.id).where(Person.id.in_(person_ids))).scalars().all()
+    )
+    missing_person_ids = sorted(person_ids - existing_person_ids)
+    if missing_person_ids:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Person {missing_person_ids[0]} hittades inte")
+
+    if activity_ids:
+        existing_activity_ids = set(
+            db.execute(select(Activity.id).where(Activity.id.in_(activity_ids))).scalars().all()
+        )
+        missing_activity_ids = sorted(activity_ids - existing_activity_ids)
+        if missing_activity_ids:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Aktivitet {missing_activity_ids[0]} hittades inte")
+
+    restored: list[dict] = []
+    try:
+        for item in payload.hours:
+            current = _load_hour_segments(
+                db,
+                year=item.year,
+                week=item.week,
+                weekday=item.weekday,
+                hour=item.hour,
+                person_id=item.person_id,
+                lock=True,
+            )
+            if _segment_signature(current) != _expected_signature(item.expected_segments):
+                db.rollback()
+                return JSONResponse(
+                    status_code=status.HTTP_409_CONFLICT,
+                    content={
+                        "error": "version_conflict",
+                        "conflicts": [
+                            {
+                                "person_id": item.person_id,
+                                "hour": item.hour,
+                                "current": _serialize_segments(current)
+                                or [_empty_segment_dict(item.person_id, item.hour, 0, 60)],
+                            }
+                        ],
+                    },
+                )
+
+            for cell in current:
+                audit_log(
+                    db,
+                    entity_type="schedule_cell",
+                    entity_id=cell.id,
+                    action=f"{payload.action}_delete",
+                    old_value=_cell_to_dict(cell),
+                    new_value=None,
+                    user_id=user.id,
+                )
+                db.delete(cell)
+            if current:
+                db.flush()
+
+            created: list[ScheduleCell] = []
+            for segment in sorted(item.segments, key=lambda s: (s.minute_start, s.minute_end)):
+                cell = ScheduleCell(
+                    year=item.year,
+                    week=item.week,
+                    weekday=item.weekday,
+                    hour=item.hour,
+                    minute_start=segment.minute_start,
+                    minute_end=segment.minute_end,
+                    person_id=item.person_id,
+                    activity_id=segment.activity_id,
+                    empty_override=segment.empty_override,
+                    version=1,
+                    updated_by=user.id,
+                )
+                db.add(cell)
+                created.append(cell)
+
+            if created:
+                db.flush()
+                for cell in created:
+                    audit_log(
+                        db,
+                        entity_type="schedule_cell",
+                        entity_id=cell.id,
+                        action=f"{payload.action}_create",
+                        old_value=None,
+                        new_value=_cell_to_dict(cell),
+                        user_id=user.id,
+                    )
+
+            restored.append({
+                "person_id": item.person_id,
+                "hour": item.hour,
+                "segments": _serialize_segments(created),
+            })
+
+        db.commit()
+        return {"hours": restored}
     except HTTPException:
         db.rollback()
         raise

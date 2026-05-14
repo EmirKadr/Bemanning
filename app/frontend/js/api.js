@@ -1,10 +1,11 @@
-// Tunn fetch-wrapper. Skickar med session-cookie. 401 → /login.html.
+// Tunn fetch-wrapper. Skickar med session-cookie. 401 -> /login.html.
 
 async function request(path, options = {}) {
+  const { headers = {}, ...rest } = options;
   const resp = await fetch(path, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
+    headers: { "Content-Type": "application/json", ...headers },
+    ...rest,
   });
 
   if (resp.status === 401 && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/me")) {
@@ -29,10 +30,12 @@ async function request(path, options = {}) {
 }
 
 const api = {
-  get:    (path)        => request(path),
-  post:   (path, data)  => request(path, { method: "POST", body: JSON.stringify(data) }),
-  put:    (path, data)  => request(path, { method: "PUT",  body: JSON.stringify(data) }),
-  del:    (path)        => request(path, { method: "DELETE" }),
+  get: (path, options = {}) => request(path, options),
+  post: (path, data, options = {}) =>
+    request(path, { ...options, method: "POST", body: JSON.stringify(data) }),
+  put: (path, data, options = {}) =>
+    request(path, { ...options, method: "PUT", body: JSON.stringify(data) }),
+  del: (path, options = {}) => request(path, { ...options, method: "DELETE" }),
 };
 
 window.api = api;

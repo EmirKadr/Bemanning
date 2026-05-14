@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from .config import settings
+from .models import User
+from .schemas import UserAdminOut, UserOut
+
+
+def is_super_admin(user: User) -> bool:
+    role = (user.role or "").strip().lower()
+    if role == "super_admin":
+        return True
+    if role != "admin":
+        return False
+    return user.username.strip().lower() in settings.super_admin_usernames
+
+
+def user_out(user: User) -> UserOut:
+    return UserOut(
+        id=user.id,
+        username=user.username,
+        display_name=user.display_name,
+        role=user.role,
+        is_super_admin=is_super_admin(user),
+    )
+
+
+def user_admin_out(user: User) -> UserAdminOut:
+    return UserAdminOut(
+        id=user.id,
+        username=user.username,
+        display_name=user.display_name,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        is_super_admin=is_super_admin(user),
+    )

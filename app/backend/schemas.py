@@ -118,7 +118,8 @@ class ScheduleOut(BaseModel):
     area_id: int | None
     persons: list[PersonOut]
     cells: list[CellOut]
-    scheduled_hours: dict[int, list[int]] = {}  # person_id → [7,8,9,...]
+    scheduled_hours: dict[int, list[int]] = Field(default_factory=dict)  # person_id → [7,8,9,...]
+    scheduled_defaults: dict[int, dict[int, int]] = Field(default_factory=dict)  # person_id → {hour → activity_id}
 
 
 class CellUpdate(BaseModel):
@@ -151,6 +152,34 @@ class BulkCellRequest(BaseModel):
     action: str = "drag_fill"
 
 
+class RestoreSegment(BaseModel):
+    minute_start: int
+    minute_end: int
+    activity_id: int | None
+    empty_override: bool = False
+
+
+class SegmentVersionRef(BaseModel):
+    minute_start: int
+    minute_end: int
+    expected_version: int
+
+
+class RestoreHourItem(BaseModel):
+    year: int
+    week: int
+    weekday: int
+    hour: int
+    person_id: int
+    expected_segments: list[SegmentVersionRef] = Field(default_factory=list)
+    segments: list[RestoreSegment] = Field(default_factory=list)
+
+
+class RestoreHoursRequest(BaseModel):
+    hours: list[RestoreHourItem]
+    action: str = "undo_restore"
+
+
 class CellUpdateResponse(BaseModel):
     cell: CellOut
 
@@ -167,12 +196,6 @@ class SummaryRow(BaseModel):
     color: str
     hours: float
     persons_equiv: float
-
-
-class SegmentVersionRef(BaseModel):
-    minute_start: int
-    minute_end: int
-    expected_version: int
 
 
 class SplitCellRequest(BaseModel):
@@ -242,6 +265,7 @@ class UserOut(BaseModel):
     username: str
     display_name: str | None
     role: str
+    is_super_admin: bool = False
 
 
 class UserAdminOut(BaseModel):
@@ -252,6 +276,7 @@ class UserAdminOut(BaseModel):
     role: str
     is_active: bool
     created_at: datetime
+    is_super_admin: bool = False
 
 
 class UserCreate(BaseModel):
@@ -302,3 +327,31 @@ class UserUpdate(BaseModel):
             return None
         cleaned = value.strip()
         return cleaned or None
+
+
+class AuditEntryOut(BaseModel):
+    id: int
+    entity_type: str
+    entity_id: int
+    action: str
+    old_value: dict | None = None
+    new_value: dict | None = None
+    user_id: int | None = None
+    username: str | None = None
+    display_name: str | None = None
+    created_at: datetime
+
+
+class AuditSummaryBucket(BaseModel):
+    key: str
+    label: str
+    count: int
+
+
+class AuditSummaryOut(BaseModel):
+    total_events: int
+    events_last_24h: int
+    unique_users: int
+    top_users: list[AuditSummaryBucket]
+    top_actions: list[AuditSummaryBucket]
+    top_entities: list[AuditSummaryBucket]

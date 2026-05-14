@@ -738,6 +738,49 @@ body.dragging-ov select { pointer-events: none; }
   margin-top: 14px;
 }
 
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.analytics-split {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.stat-value {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text);
+}
+
+.stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.log-detail {
+  min-width: 280px;
+  color: var(--text-muted);
+}
+
+.muted-cell {
+  color: var(--text-muted);
+}
+
 .summary-card, .calc-card { min-width: 0; }
 .summary-card { position: relative; }
 .summary-card.loading table {
@@ -1057,6 +1100,8 @@ tr.filter-row input {
   .sidebar nav a { justify-content: center; padding: 9px 0; }
   .sidebar-bottom .who, .sidebar-bottom .logout { display: none; }
   .summary-grid { grid-template-columns: 1fr; }
+  .analytics-grid { grid-template-columns: 1fr; }
+  .analytics-split { grid-template-columns: 1fr; }
   .calc-card-header { align-items: stretch; flex-direction: column; }
   .calc-area-picker { margin-left: 0; }
 }

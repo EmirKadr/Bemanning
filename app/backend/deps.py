@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from .database import SessionLocal
 from .models import User
+from .user_access import is_super_admin
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -26,6 +27,12 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != "admin":
+    if user.role not in {"admin", "super_admin"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin required")
+    return user
+
+
+def require_super_admin(user: User = Depends(get_current_user)) -> User:
+    if not is_super_admin(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super admin required")
     return user

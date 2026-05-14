@@ -36,6 +36,11 @@ const drag = {
   startY: 0,
 };
 
+const loadState = {
+  controller: null,
+  requestSeq: 0,
+};
+
 
 // ---- Date helpers ----
 function isoWeek(d = new Date()) {
@@ -296,7 +301,7 @@ function buildWeekHeader() {
 
 function buildWeekBody() {
   const body = document.getElementById("overviewBody");
-  body.innerHTML = "";
+  const fragment = document.createDocumentFragment();
   const lookup = new Map();
   state.cells.forEach((m) => lookup.set(`${m.person_id}:${m.weekday}`, m));
 
@@ -320,8 +325,10 @@ function buildWeekBody() {
       renderDayCell(td, cell);
       tr.appendChild(td);
     }
-    body.appendChild(tr);
+    fragment.appendChild(tr);
   });
+
+  body.replaceChildren(fragment);
 }
 
 
@@ -340,7 +347,7 @@ function buildMonthHeader() {
 
 function buildMonthBody() {
   const body = document.getElementById("overviewBody");
-  body.innerHTML = "";
+  const fragment = document.createDocumentFragment();
   const lookup = new Map();
   state.cells.forEach((m) => lookup.set(`${m.person_id}:${m.date}`, m));
 
@@ -365,8 +372,10 @@ function buildMonthBody() {
       renderDayCell(td, cell);
       tr.appendChild(td);
     });
-    body.appendChild(tr);
+    fragment.appendChild(tr);
   });
+
+  body.replaceChildren(fragment);
 }
 
 
@@ -639,11 +648,19 @@ async function loadInitial() {
 }
 
 async function load() {
+  const requestSeq = ++loadState.requestSeq;
+  loadState.controller?.abort();
+  const controller = new AbortController();
+  loadState.controller = controller;
+  try {
+
   if (state.view === "week") {
     const data = await api.get(
       `/api/overview?year=${state.year}&week=${state.week}` +
-        (state.areaId ? `&area_id=${state.areaId}` : "")
+        (state.areaId ? `&area_id=${state.areaId}` : ""),
+      { signal: controller.signal }
     );
+    if (controller.signal.aborted || requestSeq !== loadState.requestSeq) return false;
     state.allPersons = data.persons;
     refreshPersons();
     state.cells = data.matrix;
@@ -656,8 +673,10 @@ async function load() {
   } else {
     const data = await api.get(
       `/api/overview/month?year=${state.year}&month=${state.month}` +
-        (state.areaId ? `&area_id=${state.areaId}` : "")
+        (state.areaId ? `&area_id=${state.areaId}` : ""),
+      { signal: controller.signal }
     );
+    if (controller.signal.aborted || requestSeq !== loadState.requestSeq) return false;
     state.allPersons = data.persons;
     refreshPersons();
     state.cells = data.matrix;
@@ -668,6 +687,16 @@ async function load() {
     document.getElementById("sectionTitle").textContent = `Översikt – ${areaName} – ${monthName} ${state.year}`;
     buildMonthHeader();
     buildMonthBody();
+  }
+
+    return true;
+  } catch (err) {
+    if (err?.name === "AbortError") return false;
+    throw err;
+  } finally {
+    if (loadState.controller === controller) {
+      loadState.controller = null;
+    }
   }
 }
 

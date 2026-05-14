@@ -7,6 +7,7 @@ from ..deps import get_db, require_admin
 from ..models import User
 from ..schemas import UserAdminOut, UserCreate, UserUpdate
 from ..security import hash_password
+from ..user_access import user_admin_out
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -19,7 +20,7 @@ def _find_username_conflict(db: Session, username: str, *, exclude_user_id: int 
 
 
 def _active_admin_count(db: Session, *, exclude_user_id: int | None = None) -> int:
-    query = db.query(func.count(User.id)).filter(User.role == "admin", User.is_active.is_(True))
+    query = db.query(func.count(User.id)).filter(User.role.in_(("admin", "super_admin")), User.is_active.is_(True))
     if exclude_user_id is not None:
         query = query.filter(User.id != exclude_user_id)
     return int(query.scalar() or 0)
@@ -44,7 +45,8 @@ def list_users(
     query = db.query(User)
     if not include_inactive:
         query = query.filter(User.is_active.is_(True))
-    return query.order_by(case((User.role == "admin", 0), else_=1), User.username.asc()).all()
+    users = query.order_by(case((User.role.in_(("admin", "super_admin")), 0), else_=1), User.username.asc()).all()
+    return [user_admin_out(user) for user in users]
 
 
 @router.post("", response_model=UserAdminOut, status_code=status.HTTP_201_CREATED)
@@ -52,7 +54,7 @@ def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
-) -> User:
+) -> UserAdminOut:
     if _find_username_conflict(db, payload.username):
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Användarnamnet används redan")
 
@@ -78,7 +80,7 @@ def create_user(
 
     db.commit()
     db.refresh(user)
-    return user
+    return user_admin_out(user)
 
 
 @router.put("/{user_id}", response_model=UserAdminOut)
@@ -87,7 +89,7 @@ def update_user(
     payload: UserUpdate,
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
-) -> User:
+) -> UserAdminOut:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Användare hittades inte")
@@ -123,4 +125,4 @@ def update_user(
 
     db.commit()
     db.refresh(user)
-    return user
+    return user_admin_out(user)

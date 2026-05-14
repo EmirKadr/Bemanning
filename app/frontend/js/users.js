@@ -7,7 +7,9 @@ function escapeHtml(value) {
   );
 }
 
-function roleLabel(role) {
+function roleLabel(user) {
+  if (user?.is_super_admin) return "Super admin";
+  const role = user?.role;
   return role === "admin" ? "Administratör" : "Arbetsledare";
 }
 
@@ -40,7 +42,7 @@ function renderUsers() {
     tr.innerHTML = `
       <td>${escapeHtml(user.username)}${escapeHtml(selfLabel)}</td>
       <td>${escapeHtml(user.display_name || "–")}</td>
-      <td>${escapeHtml(roleLabel(user.role))}</td>
+      <td>${escapeHtml(roleLabel(user))}</td>
       <td>${user.is_active ? "Ja" : "Nej"}</td>
       <td>${escapeHtml(formatDate(user.created_at))}</td>
       <td>

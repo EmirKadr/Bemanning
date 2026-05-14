@@ -1,11 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from ..audit import log as audit_log
 from ..deps import get_current_user, get_db, require_admin
-from ..models import Activity
+from ..models import Activity, User
 from ..schemas import ActivityCreate, ActivityOut, ActivityUpdate
 
 router = APIRouter(prefix="/api/activities", tags=["activities"])
+
+
+def _activity_snapshot(activity: Activity) -> dict:
+    return {
+        "id": activity.id,
+        "code": activity.code,
+        "label": activity.label,
+        "area_id": activity.area_id,
+        "summary_activity_id": activity.summary_activity_id,
+        "color": activity.color,
+        "category": activity.category,
+        "sort_order": activity.sort_order,
+        "is_active": activity.is_active,
+        "required_competency": activity.required_competency,
+    }
 
 
 def _validate_summary_activity(
@@ -55,7 +71,7 @@ def list_activities(
 def create_activity(
     payload: ActivityCreate,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    admin: User = Depends(require_admin),
 ) -> Activity:
     if db.query(Activity).filter_by(code=payload.code).first():
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Aktivitet med samma kod finns redan")
@@ -67,6 +83,16 @@ def create_activity(
     )
     activity = Activity(**data)
     db.add(activity)
+    db.flush()
+    audit_log(
+        db,
+        entity_type="activity",
+        entity_id=activity.id,
+        action="create",
+        old_value=None,
+        new_value=_activity_snapshot(activity),
+        user_id=admin.id,
+    )
     db.commit()
     db.refresh(activity)
     return activity
@@ -77,11 +103,12 @@ def update_activity(
     activity_id: int,
     payload: ActivityUpdate,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    admin: User = Depends(require_admin),
 ) -> Activity:
     activity = db.get(Activity, activity_id)
     if not activity:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Aktivitet hittades inte")
+    before = _activity_snapshot(activity)
     if payload.code is not None:
         existing = db.query(Activity).filter(Activity.code == payload.code, Activity.id != activity_id).first()
         if existing:
@@ -95,6 +122,15 @@ def update_activity(
         )
     for key, value in data.items():
         setattr(activity, key, value)
+    audit_log(
+        db,
+        entity_type="activity",
+        entity_id=activity.id,
+        action="update",
+        old_value=before,
+        new_value=_activity_snapshot(activity),
+        user_id=admin.id,
+    )
     db.commit()
     db.refresh(activity)
     return activity
@@ -104,10 +140,20 @@ def update_activity(
 def delete_activity(
     activity_id: int,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    admin: User = Depends(require_admin),
 ) -> None:
     activity = db.get(Activity, activity_id)
     if not activity:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Aktivitet hittades inte")
+    before = _activity_snapshot(activity)
     activity.is_active = False
+    audit_log(
+        db,
+        entity_type="activity",
+        entity_id=activity.id,
+        action="deactivate",
+        old_value=before,
+        new_value=_activity_snapshot(activity),
+        user_id=admin.id,
+    )
     db.commit()

@@ -22,6 +22,8 @@ const state = {
   cells: new Map(),            // key = `${person_id}:${hour}:${minute_start}` -> segment
   hourCells: new Map(),        // key = `${person_id}:${hour}` -> [segments]
   scheduledHours: {},          // {person_id: Set<hour>}
+  scheduledDefaults: {},       // {person_id: Map<hour, activity_id>}
+  undoStack: [],
   focusedCell: null,
   clipboard: null,
   nameFilter: "",
@@ -51,6 +53,20 @@ const drag = {
   currentCol: -1,
   startX: 0,
   startY: 0,
+};
+
+const summaryState = {
+  controller: null,
+  timer: null,
+  requestSeq: 0,
+  appliedSeq: 0,
+  errorToastAt: 0,
+  calcFrame: 0,
+};
+
+const scheduleLoadState = {
+  controller: null,
+  requestSeq: 0,
 };
 
 
@@ -270,6 +286,121 @@ function getHourTd(personId, hour) {
   );
 }
 
+function snapshotHour(personId, hour) {
+  return {
+    year: state.year,
+    week: state.week,
+    weekday: state.weekday,
+    personId: Number(personId),
+    hour: Number(hour),
+    segments: cloneSegments(segmentsForHour(personId, hour)),
+  };
+}
+
+function snapshotAllExplicitHours() {
+  const snapshots = new Map();
+  state.hourCells.forEach((segments, key) => {
+    if (!segments.length) return;
+    const [personId, hour] = key.split(":").map(Number);
+    snapshots.set(key, snapshotHour(personId, hour));
+  });
+  return snapshots;
+}
+
+function pushScheduleUndo(label, snapshots) {
+  const values = snapshots instanceof Map ? Array.from(snapshots.values()) : snapshots;
+  const normalized = (values || [])
+    .filter(Boolean)
+    .map((snapshot) => ({
+      year: Number(snapshot.year ?? state.year),
+      week: Number(snapshot.week ?? state.week),
+      weekday: Number(snapshot.weekday ?? state.weekday),
+      personId: Number(snapshot.personId),
+      hour: Number(snapshot.hour),
+      segments: cloneSegments(snapshot.segments || []),
+    }));
+
+  if (!normalized.length) return;
+  state.undoStack.push({ label, snapshots: normalized });
+  if (state.undoStack.length > 50) state.undoStack.shift();
+}
+
+function segmentVersionRefs(segments) {
+  return cloneSegments(segments).map((segment) => ({
+    minute_start: segment.minute_start,
+    minute_end: segment.minute_end,
+    expected_version: segment.version,
+  }));
+}
+
+function restoreSegmentPayload(segments) {
+  return cloneSegments(segments).map((segment) => ({
+    minute_start: segment.minute_start,
+    minute_end: segment.minute_end,
+    activity_id: segment.activity_id,
+    empty_override: !!segment.empty_override,
+  }));
+}
+
+function applyRestoredHours(hours) {
+  (hours || []).forEach((item) => {
+    const personId = Number(item.person_id);
+    const hour = Number(item.hour);
+    replaceHourSegments(personId, hour, item.segments || []);
+    const td = getHourTd(personId, hour);
+    if (!td) return;
+    setHourPending(td, false);
+    renderHourCell(td);
+  });
+}
+
+function actionMatchesCurrentDay(action) {
+  return (action?.snapshots || []).every((snapshot) =>
+    snapshot.year === state.year
+    && snapshot.week === state.week
+    && snapshot.weekday === state.weekday
+  );
+}
+
+async function undoLastScheduleAction() {
+  const action = state.undoStack[state.undoStack.length - 1];
+  if (!action) {
+    showToast("Inget att ångra.", "warn");
+    return;
+  }
+  if (!actionMatchesCurrentDay(action)) {
+    showToast("Byt tillbaka till dagen där ändringen gjordes för att ångra.", "warn");
+    return;
+  }
+
+  const hours = action.snapshots.map((snapshot) => ({
+    year: snapshot.year,
+    week: snapshot.week,
+    weekday: snapshot.weekday,
+    hour: snapshot.hour,
+    person_id: snapshot.personId,
+    expected_segments: segmentVersionRefs(segmentsForHour(snapshot.personId, snapshot.hour)),
+    segments: restoreSegmentPayload(snapshot.segments),
+  }));
+
+  action.snapshots.forEach((snapshot) => setHourPending(getHourTd(snapshot.personId, snapshot.hour), true));
+  try {
+    const resp = await api.put("/api/schedule/hours/restore", { action: "undo_restore", hours });
+    state.undoStack.pop();
+    applyRestoredHours(resp.hours);
+    scheduleSummaryRefresh(0);
+    showToast(`Ångrade: ${action.label}`);
+  } catch (e) {
+    action.snapshots.forEach((snapshot) => setHourPending(getHourTd(snapshot.personId, snapshot.hour), false));
+    if (e.status === 409) {
+      showToast("Kunde inte ångra eftersom dagen ändrats. Läser om.", "warn");
+      await loadSchedule();
+    } else {
+      showToast("Kunde inte ångra: " + e.message, "error");
+    }
+  }
+}
+
 function setHourPending(td, pending) {
   if (!td) return;
   td.classList.toggle("pending-save", pending);
@@ -440,6 +571,12 @@ function isScheduledHour(personId, hour) {
   return !!(scheduledSet && scheduledSet.has(hour));
 }
 
+function scheduledDefaultActivityId(personId, hour) {
+  const byHour = state.scheduledDefaults[personId];
+  if (!byHour) return null;
+  return byHour.has(hour) ? byHour.get(hour) : null;
+}
+
 function formatHours(value) {
   const num = Number(value) || 0;
   return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
@@ -522,6 +659,18 @@ function renderCalculator() {
   const select = document.getElementById("calcAreaSelect");
   if (!container || !select) return;
 
+  const active = document.activeElement;
+  let focusState = null;
+  if (active && container.contains(active) && active.matches("input[data-field]")) {
+    const panel = active.closest(".calc-panel");
+    focusState = {
+      areaKey: panel?.dataset.areaKey || "",
+      field: active.dataset.field || "",
+      selectionStart: typeof active.selectionStart === "number" ? active.selectionStart : null,
+      selectionEnd: typeof active.selectionEnd === "number" ? active.selectionEnd : null,
+    };
+  }
+
   const selectedKeys = state.calcSelection === "ALL" ? CALC_AREA_KEYS : [state.calcSelection];
   container.innerHTML = selectedKeys.map((areaKey) => {
     const values = state.calcInputs[areaKey];
@@ -566,6 +715,20 @@ function renderCalculator() {
       updateCalcPanel(panel, areaKey);
     });
   });
+
+  if (focusState?.areaKey && focusState.field) {
+    const nextInput = container.querySelector(
+      `.calc-panel[data-area-key="${focusState.areaKey}"] input[data-field="${focusState.field}"]`
+    );
+    if (nextInput) {
+      nextInput.focus({ preventScroll: true });
+      if (focusState.selectionStart != null && focusState.selectionEnd != null) {
+        try {
+          nextInput.setSelectionRange(focusState.selectionStart, focusState.selectionEnd);
+        } catch (err) {}
+      }
+    }
+  }
 }
 
 function setupCalculator() {
@@ -656,6 +819,8 @@ function buildDisplayLabel(text, className) {
 }
 
 function scheduledActivityIdForHour(personId, hour) {
+  const serverDefault = scheduledDefaultActivityId(personId, hour);
+  if (serverDefault != null) return serverDefault;
   if (!isScheduledHour(personId, hour)) return null;
   const person = personById(personId);
   return homeActivityIdForPerson(person);
@@ -773,11 +938,11 @@ function renderFullHourCell(td, segment, isScheduled) {
   resetRenderedHourState(td);
   td.oncontextmenu = (e) => handleFullHourContextMenu(e, td);
 
-  const person = personById(Number(td.dataset.personId));
+  const personId = Number(td.dataset.personId);
   const hasExplicitSegment = !!segment;
   const explicitActivityId = hasExplicitSegment ? segment.activity_id : null;
   const explicitEmptyOverride = !!segment?.empty_override;
-  const scheduledActivityId = isScheduled ? homeActivityIdForPerson(person) : null;
+  const scheduledActivityId = isScheduled ? scheduledActivityIdForHour(personId, Number(td.dataset.hour)) : null;
   const showScheduledDefault = explicitActivityId == null && !explicitEmptyOverride && scheduledActivityId != null;
 
   if (explicitActivityId != null) {
@@ -841,11 +1006,12 @@ function renderSplitHourCell(td, segments, isScheduled) {
 
   const wrapper = document.createElement("div");
   wrapper.className = "hour-split";
-  const person = personById(Number(td.dataset.personId));
-  const scheduledActivityId = isScheduled ? homeActivityIdForPerson(person) : null;
+  const personId = Number(td.dataset.personId);
+  const hour = Number(td.dataset.hour);
+  const scheduledActivityId = isScheduled ? scheduledActivityIdForHour(personId, hour) : null;
 
   HALF_SEGMENTS.forEach(({ minute_start, minute_end }) => {
-    const segment = currentSegment(Number(td.dataset.personId), Number(td.dataset.hour), minute_start, minute_end);
+    const segment = currentSegment(personId, hour, minute_start, minute_end);
     const part = document.createElement("div");
     part.className = "hour-segment";
     part.dataset.minuteStart = String(minute_start);
@@ -931,7 +1097,7 @@ function renderHourCell(td) {
 
 function buildRows() {
   const body = document.getElementById("scheduleBody");
-  body.innerHTML = "";
+  const fragment = document.createDocumentFragment();
   state.focusedCell = null;
 
   state.persons.forEach((person, rowIndex) => {
@@ -961,14 +1127,77 @@ function buildRows() {
       tr.appendChild(td);
     });
 
-    body.appendChild(tr);
+    fragment.appendChild(tr);
   });
+
+  body.replaceChildren(fragment);
+}
+
+function clearSummaryRefreshTimer() {
+  if (!summaryState.timer) return;
+  clearTimeout(summaryState.timer);
+  summaryState.timer = null;
+}
+
+function setSummaryLoading(loading) {
+  const card = document.querySelector(".summary-card");
+  if (!card) return;
+  card.classList.toggle("loading", loading);
+  card.setAttribute("aria-busy", loading ? "true" : "false");
+}
+
+function cancelSummaryRefresh({ abortInFlight = false } = {}) {
+  clearSummaryRefreshTimer();
+  if (!abortInFlight || !summaryState.controller) return;
+  summaryState.controller.abort();
+  summaryState.controller = null;
+  setSummaryLoading(false);
+}
+
+function scheduleCalculatorRender() {
+  if (summaryState.calcFrame) cancelAnimationFrame(summaryState.calcFrame);
+  summaryState.calcFrame = requestAnimationFrame(() => {
+    summaryState.calcFrame = 0;
+    renderCalculator();
+  });
+}
+
+function renderSummaryRows(rows) {
+  const tbody = document.getElementById("summaryBody");
+  if (!tbody) return;
+
+  const fragment = document.createDocumentFragment();
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="background: ${row.color}; padding: 5px;">${escapeHtml(row.activity_label)}</td>
+      <td>${formatHours(row.hours)}</td>
+      <td>${Number(row.persons_equiv).toFixed(1)}</td>`;
+    fragment.appendChild(tr);
+  });
+  tbody.replaceChildren(fragment);
+}
+
+function notifySummaryRefreshError(message) {
+  const now = Date.now();
+  if (now - summaryState.errorToastAt < 5000) return;
+  summaryState.errorToastAt = now;
+  showToast(message, "warn");
+}
+
+function scheduleSummaryRefresh(delay = 90) {
+  clearSummaryRefreshTimer();
+  summaryState.timer = setTimeout(() => {
+    summaryState.timer = null;
+    void refreshSummary();
+  }, delay);
 }
 
 async function onSegmentChange(td, minuteStart, minuteEnd) {
   const personId = Number(td.dataset.personId);
   const hour = Number(td.dataset.hour);
   const segment = currentSegment(personId, hour, minuteStart, minuteEnd);
+  const undoSnapshot = snapshotHour(personId, hour);
   const selector = td.querySelector(
     `select[data-minute-start="${minuteStart}"][data-minute-end="${minuteEnd}"]`
   );
@@ -990,10 +1219,11 @@ async function onSegmentChange(td, minuteStart, minuteEnd) {
     const others = segmentsForHour(personId, hour).filter(
       (item) => !(item.minute_start === minuteStart && item.minute_end === minuteEnd)
     );
+    pushScheduleUndo("celländring", [undoSnapshot]);
     replaceHourSegments(personId, hour, [...others, updated]);
     renderHourCell(td);
     focusMatchingSegment(td, minuteStart, minuteEnd);
-    refreshSummary();
+    scheduleSummaryRefresh();
   } catch (err) {
     if (err.status === 409) {
       showToast("Cellen ändrades av någon annan – läste in på nytt", "warn");
@@ -1022,6 +1252,7 @@ async function toggleHourSplit(td, mergeMinuteStart = 0) {
   const personId = Number(td.dataset.personId);
   const hour = Number(td.dataset.hour);
   const currentSegments = sortSegments(segmentsForHour(personId, hour));
+  const undoSnapshot = snapshotHour(personId, hour);
 
   try {
     const resp = await api.put("/api/schedule/cell/split", {
@@ -1038,6 +1269,7 @@ async function toggleHourSplit(td, mergeMinuteStart = 0) {
       })),
     });
     const updatedSegments = resp.segments || [];
+    pushScheduleUndo(isSplitHour(updatedSegments) ? "dela timme" : "slå ihop timme", [undoSnapshot]);
     replaceHourSegments(personId, hour, updatedSegments);
     renderHourCell(td);
     if (isSplitHour(updatedSegments)) {
@@ -1047,7 +1279,7 @@ async function toggleHourSplit(td, mergeMinuteStart = 0) {
       focusMatchingSegment(td, 0, 60);
       showToast("Cellen slogs ihop till en hel timme.");
     }
-    refreshSummary();
+    scheduleSummaryRefresh();
   } catch (err) {
     if (err.status === 409) {
       showToast("Cellen ändrades av någon annan – läste in på nytt", "warn");
@@ -1073,6 +1305,7 @@ async function copyFocused(cut = false) {
   if (cut && activityId != null) {
     const { td, personId, hour, minuteStart, minuteEnd } = state.focusedCell;
     const segment = currentSegment(personId, hour, minuteStart, minuteEnd);
+    const undoSnapshot = snapshotHour(personId, hour);
     try {
       const resp = await api.put("/api/schedule/cell", {
         year: state.year,
@@ -1088,10 +1321,11 @@ async function copyFocused(cut = false) {
       const others = segmentsForHour(personId, hour).filter(
         (item) => !(item.minute_start === minuteStart && item.minute_end === minuteEnd)
       );
+      pushScheduleUndo("klipp ut", [undoSnapshot]);
       replaceHourSegments(personId, hour, [...others, resp.cell]);
       renderHourCell(td);
       focusMatchingSegment(td, minuteStart, minuteEnd);
-      refreshSummary();
+      scheduleSummaryRefresh();
       showToast(`Klippt: ${clipboardLabel(activityId)}`);
     } catch (e) {
       if (e.status === 409) {
@@ -1110,6 +1344,7 @@ async function pasteFocused() {
   if (!state.focusedCell || state.clipboard == null) return;
   const { td, personId, hour, minuteStart, minuteEnd } = state.focusedCell;
   const segment = currentSegment(personId, hour, minuteStart, minuteEnd);
+  const undoSnapshot = snapshotHour(personId, hour);
   try {
     const resp = await api.put("/api/schedule/cell", {
       year: state.year,
@@ -1125,10 +1360,11 @@ async function pasteFocused() {
     const others = segmentsForHour(personId, hour).filter(
       (item) => !(item.minute_start === minuteStart && item.minute_end === minuteEnd)
     );
+    pushScheduleUndo("klistra in", [undoSnapshot]);
     replaceHourSegments(personId, hour, [...others, resp.cell]);
     renderHourCell(td);
     focusMatchingSegment(td, minuteStart, minuteEnd);
-    refreshSummary();
+    scheduleSummaryRefresh();
     showToast(`Klistrade in: ${clipboardLabel(state.clipboard.activity_id)}`);
   } catch (e) {
     if (e.status === 409) {
@@ -1143,9 +1379,13 @@ async function pasteFocused() {
 function handleSelectClipboardKeys(e) {
   if (!(e.ctrlKey || e.metaKey)) return;
   const key = e.key.toLowerCase();
-  if (!["c", "x", "v"].includes(key)) return;
+  if (!["c", "x", "v", "z"].includes(key)) return;
   e.preventDefault();
   e.stopPropagation();
+  if (key === "z") {
+    void undoLastScheduleAction();
+    return;
+  }
   if (!state.focusedCell) return;
   if (key === "c") copyFocused(false);
   else if (key === "x") copyFocused(true);
@@ -1156,10 +1396,16 @@ function setupKeyboard() {
   const handler = (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
     const key = e.key.toLowerCase();
-    if (!["c", "x", "v"].includes(key)) return;
+    if (!["c", "x", "v", "z"].includes(key)) return;
 
     const active = document.activeElement;
-    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
+    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) return;
+    if (key === "z") {
+      e.preventDefault();
+      e.stopPropagation();
+      void undoLastScheduleAction();
+      return;
+    }
     if (!state.focusedCell) {
       showToast(`Ctrl+${key.toUpperCase()}: klicka först på en cell`, "warn");
       return;
@@ -1314,8 +1560,9 @@ async function finishDrag() {
 
   try {
     const resp = await api.post("/api/schedule/cells", { cells, atomic: true, action: "drag_fill" });
+    pushScheduleUndo("drag-fyll", snapshots);
     applySegmentsByHourResponse(resp.applied);
-    refreshSummary();
+    scheduleSummaryRefresh(0);
     showToast(`Fyllde ${targetCount} celler`);
   } catch (e) {
     restoreHourSnapshots(snapshots);
@@ -1428,20 +1675,33 @@ async function refreshSummary() {
   const filteredUrl = `/api/schedule/summary?year=${state.year}&week=${state.week}&weekday=${state.weekday}` +
     (state.areaId ? `&area_id=${state.areaId}` : "");
   const allUrl = `/api/schedule/summary?year=${state.year}&week=${state.week}&weekday=${state.weekday}`;
-  const [rows, allRows] = await Promise.all([api.get(filteredUrl), api.get(allUrl)]);
-  state.summaryRows = rows;
-  state.allSummaryRows = allRows;
-  const tbody = document.getElementById("summaryBody");
-  tbody.innerHTML = "";
-  rows.forEach((r) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td style="background: ${r.color}; padding: 5px;">${escapeHtml(r.activity_label)}</td>
-      <td>${formatHours(r.hours)}</td>
-      <td>${Number(r.persons_equiv).toFixed(1)}</td>`;
-    tbody.appendChild(tr);
-  });
-  renderCalculator();
+  const requestSeq = ++summaryState.requestSeq;
+  summaryState.controller?.abort();
+  const controller = new AbortController();
+  summaryState.controller = controller;
+  setSummaryLoading(true);
+
+  try {
+    const [rows, allRows] = await Promise.all([
+      api.get(filteredUrl, { signal: controller.signal }),
+      api.get(allUrl, { signal: controller.signal }),
+    ]);
+    if (controller.signal.aborted || requestSeq < summaryState.appliedSeq) return;
+    summaryState.appliedSeq = requestSeq;
+    state.summaryRows = rows;
+    state.allSummaryRows = allRows;
+    renderSummaryRows(rows);
+    scheduleCalculatorRender();
+  } catch (err) {
+    if (err?.name === "AbortError") return;
+    console.error("Kunde inte uppdatera summeringen", err);
+    notifySummaryRefreshError("Summeringen kunde inte uppdateras just nu.");
+  } finally {
+    if (summaryState.controller === controller) {
+      summaryState.controller = null;
+      setSummaryLoading(false);
+    }
+  }
 }
 
 async function loadAreasAndActivities() {
@@ -1472,24 +1732,49 @@ async function loadAreasAndActivities() {
 }
 
 async function loadSchedule() {
-  const data = await api.get(
-    `/api/schedule?year=${state.year}&week=${state.week}&weekday=${state.weekday}` +
-      (state.areaId ? `&area_id=${state.areaId}` : "")
-  );
-  state.allPersons = data.persons;
-  refreshPersons();
-  setAllSegments(data.cells || []);
-  state.scheduledHours = {};
-  Object.entries(data.scheduled_hours || {}).forEach(([pid, hours]) => {
-    state.scheduledHours[Number(pid)] = new Set(hours);
-  });
+  cancelSummaryRefresh({ abortInFlight: true });
+  const requestSeq = ++scheduleLoadState.requestSeq;
+  scheduleLoadState.controller?.abort();
+  const controller = new AbortController();
+  scheduleLoadState.controller = controller;
 
-  const areaName = state.areaId == null ? "Alla" : (state.areas.find((a) => a.id === state.areaId)?.name || "");
-  document.getElementById("sectionTitle").textContent =
+  try {
+    const data = await api.get(
+      `/api/schedule?year=${state.year}&week=${state.week}&weekday=${state.weekday}` +
+        (state.areaId ? `&area_id=${state.areaId}` : ""),
+      { signal: controller.signal }
+    );
+    if (controller.signal.aborted || requestSeq !== scheduleLoadState.requestSeq) return false;
+
+    state.allPersons = data.persons;
+    refreshPersons();
+    setAllSegments(data.cells || []);
+    state.scheduledHours = {};
+    Object.entries(data.scheduled_hours || {}).forEach(([pid, hours]) => {
+      state.scheduledHours[Number(pid)] = new Set(hours);
+    });
+    state.scheduledDefaults = {};
+    Object.entries(data.scheduled_defaults || {}).forEach(([pid, hours]) => {
+      state.scheduledDefaults[Number(pid)] = new Map(
+        Object.entries(hours || {}).map(([hour, activityId]) => [Number(hour), Number(activityId)])
+      );
+    });
+
+    const areaName = state.areaId == null ? "Alla" : (state.areas.find((a) => a.id === state.areaId)?.name || "");
+    document.getElementById("sectionTitle").textContent =
     `${DAYS[state.weekday]} – ${areaName} – V${state.week}/${state.year}`;
 
-  buildRows();
-  refreshSummary();
+    buildRows();
+    scheduleSummaryRefresh(0);
+    return true;
+  } catch (err) {
+    if (err?.name === "AbortError") return false;
+    throw err;
+  } finally {
+    if (scheduleLoadState.controller === controller) {
+      scheduleLoadState.controller = null;
+    }
+  }
 }
 
 (async () => {
@@ -1526,6 +1811,7 @@ async function loadSchedule() {
   document.getElementById("reloadBtn").addEventListener("click", onControlChange);
 
   document.getElementById("clearBtn").addEventListener("click", async () => {
+    const undoSnapshots = snapshotAllExplicitHours();
     if (!confirm("Rensa hela dagen för det valda området?")) return;
     try {
       const r = await api.post("/api/schedule/clear", {
@@ -1534,6 +1820,7 @@ async function loadSchedule() {
         weekday: state.weekday,
         area_id: state.areaId,
       });
+      if (r.cleared) pushScheduleUndo("rensa dag", undoSnapshots);
       showToast(`Rensade ${r.cleared} celler`);
       await loadSchedule();
     } catch (e) {
@@ -1609,8 +1896,10 @@ function openCopyModal() {
       showToast(`Kopierade ${r.copied} celler`);
       backdrop.remove();
       if (targetMatchesCurrentDay(copyPayload.to_year, copyPayload.to_week, copyPayload.to_weekday)) {
+        const undoSnapshots = snapshotHoursFromCells(r.applied || []);
+        pushScheduleUndo("kopiera dag", undoSnapshots);
         applySegmentsByHourResponse(r.applied);
-        refreshSummary();
+        scheduleSummaryRefresh(0);
       }
     } catch (e) {
       showToast("Fel: " + e.message, "error");

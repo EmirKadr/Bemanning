@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Historik – Bemanning</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <header class="topbar"></header>
+
+  <section class="controls">
+    <label>Period
+      <select id="periodSelect">
+        <option value="24h">Senaste 24 h</option>
+        <option value="7d">Senaste 7 dagarna</option>
+        <option value="30d" selected>Senaste 30 dagarna</option>
+        <option value="all">All historik</option>
+      </select>
+    </label>
+    <label>Användare
+      <select id="userFilter"></select>
+    </label>
+    <label>Typ
+      <select id="entityFilter">
+        <option value="">Alla</option>
+        <option value="schedule_cell">Schema</option>
+        <option value="person">Person</option>
+        <option value="person_schedule_template">Standardschema</option>
+        <option value="activity">Aktivitet</option>
+        <option value="area">Område</option>
+        <option value="user">Användare</option>
+      </select>
+    </label>
+    <label>Åtgärd
+      <input id="actionFilter" placeholder="t.ex. update, clear, drag_fill" />
+    </label>
+    <label>Objekt-id
+      <input id="entityIdFilter" type="number" min="1" />
+    </label>
+    <button id="refreshAuditBtn">Uppdatera</button>
+  </section>
+
+  <main>
+    <div class="section-title">Historik & analytics</div>
+
+    <div class="analytics-grid">
+      <div class="card stat-card">
+        <div class="stat-value" id="totalEvents">0</div>
+        <div class="stat-label">Händelser i urvalet</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-value" id="recentEvents">0</div>
+        <div class="stat-label">Senaste 24 timmarna</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-value" id="uniqueUsers">0</div>
+        <div class="stat-label">Unika användare</div>
+      </div>
+    </div>
+
+    <div class="analytics-split">
+      <div class="card">
+        <h3>Topp användare</h3>
+        <table class="small-table">
+          <thead>
+            <tr><th>Användare</th><th>Händelser</th></tr>
+          </thead>
+          <tbody id="topUsersBody"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Topp åtgärder</h3>
+        <table class="small-table">
+          <thead>
+            <tr><th>Åtgärd</th><th>Händelser</th></tr>
+          </thead>
+          <tbody id="topActionsBody"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Topp typer</h3>
+        <table class="small-table">
+          <thead>
+            <tr><th>Typ</th><th>Händelser</th></tr>
+          </thead>
+          <tbody id="topEntitiesBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tid</th>
+            <th>Användare</th>
+            <th>Typ</th>
+            <th>Åtgärd</th>
+            <th>Objekt</th>
+            <th>Detalj</th>
+          </tr>
+        </thead>
+        <tbody id="auditBody"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/analytics.js"></script>
+</body>
+</html>
