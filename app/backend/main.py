@@ -7,7 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from .config import settings
 from .routers import activities, areas, audit_logs, auth, bulk, overview, person_schedules, persons, public, schedule, users
 
-app = FastAPI(title="Bemanningssystem", version="0.1.0")
+app = FastAPI(title="Bemanningssystem", version="0.1.1")
 
 app.add_middleware(
     SessionMiddleware,
