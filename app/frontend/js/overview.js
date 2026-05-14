@@ -286,10 +286,20 @@ function styleCell(td, cell) {
   sel.addEventListener("change", () => onDayChange(td, sel, cell));
   sel.addEventListener("focus", () => focusDayCell(td));
   sel.addEventListener("mousedown", (e) => {
-    const isFocused = state.focusedCell && state.focusedCell.td === td;
-    if (!isFocused) {
+    // Left-click never opens the dropdown — only focuses the cell.
+    if (e.button === 0) {
       e.preventDefault();
       focusDayCell(td);
+    }
+  });
+  td.addEventListener("contextmenu", (e) => {
+    if (sel.disabled) return;
+    e.preventDefault();
+    focusDayCell(td);
+    try {
+      sel.showPicker();
+    } catch (err) {
+      sel.focus();
     }
   });
   td.appendChild(sel);
