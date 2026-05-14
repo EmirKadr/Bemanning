@@ -320,6 +320,28 @@ thead th {
 tbody tr:hover td { background: #fafbfd; }
 tbody tr:last-child td { border-bottom: none; }
 
+/* Åtgärdskolumn (sista td) – knappar på en rad utan radbryt */
+table.data td:last-child,
+table.data th:last-child {
+  white-space: nowrap;
+  text-align: right;
+  width: 1%;
+}
+table.data td:last-child > button {
+  margin-left: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+table.data td:last-child > button:first-child { margin-left: 0; }
+
+/* Personer-tabellen: smalare Aktiv + Sortering så åtgärdskolumnen får mer plats */
+table#persons-table th:nth-child(4),
+table#persons-table td:nth-child(4),
+table#persons-table th:nth-child(5),
+table#persons-table td:nth-child(5) {
+  width: 90px;
+}
+
 
 /* ============================================================
    Bemanningsmatris
