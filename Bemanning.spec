@@ -4,12 +4,13 @@ from pathlib import Path
 
 
 project_root = Path(SPECPATH)
+app_icon = project_root / "desktop" / "assets" / "app_icon.ico"
 
 a = Analysis(
     ["desktop/main.py"],
     pathex=[str(project_root)],
     binaries=[],
-    datas=[],
+    datas=[(str(app_icon), "desktop/assets")],
     hiddenimports=[
         "PyQt6.QtWebEngineCore",
         "PyQt6.QtWebEngineWidgets",
@@ -40,6 +41,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=str(app_icon),
 )
 
 coll = COLLECT(

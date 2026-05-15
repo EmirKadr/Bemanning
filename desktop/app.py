@@ -78,7 +78,7 @@ def apply_windows_titlebar_blend(hwnd: int) -> None:
     _set_color(_DWMWA_TEXT_COLOR, "#0f172a")
 
 from PyQt6.QtCore import QProcess, Qt, QTimer, QUrl
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
@@ -113,6 +113,18 @@ SILENT_UPDATE_ARGS = [
 ]
 
 
+def _resource_path(*parts: str) -> Path:
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+    return base.joinpath(*parts)
+
+
+def _app_icon() -> QIcon:
+    icon_path = _resource_path("desktop", "assets", "app_icon.ico")
+    if icon_path.exists():
+        return QIcon(str(icon_path))
+    return QIcon()
+
+
 class MainWindow(QMainWindow):
     def __init__(
         self,
@@ -141,6 +153,7 @@ class MainWindow(QMainWindow):
         self._update_progress: Optional[QProgressDialog] = None
 
         self.setWindowTitle(APP_TITLE)
+        self.setWindowIcon(_app_icon())
         self.resize(1400, 900)
         self.setMinimumSize(980, 720)
         self._setup_menu()
@@ -443,6 +456,7 @@ class MainWindow(QMainWindow):
 
 def main() -> int:
     app = QApplication(sys.argv)
+    app.setWindowIcon(_app_icon())
     app.setStyle("Fusion")
     window = MainWindow()
     window.showMaximized()
