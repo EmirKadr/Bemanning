@@ -38,6 +38,18 @@ function initials(name) {
     .map((part) => part[0].toUpperCase()).join("");
 }
 
+function isAdminUser(user) {
+  return user?.role === "admin" || user?.is_super_user;
+}
+
+function isReadOnlyUser(user) {
+  return user?.role === "viewer" && !user?.is_super_user;
+}
+
+function canEditPlanning(user) {
+  return !isReadOnlyUser(user);
+}
+
 function renderSidebar(user, activePage) {
   let sidebar = document.querySelector(".sidebar");
   if (!sidebar) {
@@ -62,11 +74,18 @@ function renderSidebar(user, activePage) {
     body.insertBefore(app, body.firstChild);
   }
 
-  const adminLink = (user?.role === "admin" || user?.is_super_user)
+  const adminLink = isAdminUser(user)
     ? `<a href="/anvandare.html" class="${activePage === "users" ? "active" : ""}"><span class="icon" aria-hidden="true">👤</span><span>Användare</span></a>`
     : "";
   const analyticsLink = user?.is_super_user
     ? `<a href="/historik.html" class="${activePage === "analytics" ? "active" : ""}"><span class="icon" aria-hidden="true">📊</span><span>Historik</span></a>`
+    : "";
+
+  const editorLinks = canEditPlanning(user)
+    ? `
+      <a href="/personer.html" class="${activePage === "persons" ? "active" : ""}"><span class="icon" aria-hidden="true">👥</span><span>Personer</span></a>
+      <a href="/stallen.html" class="${activePage === "stallen" ? "active" : ""}"><span class="icon" aria-hidden="true">📍</span><span>Ställen</span></a>
+    `
     : "";
 
   sidebar.innerHTML = `
@@ -78,8 +97,7 @@ function renderSidebar(user, activePage) {
     <nav>
       <a href="/index.html" class="${activePage === "schedule" ? "active" : ""}"><span class="icon" aria-hidden="true">📋</span><span>Bemanning</span></a>
       <a href="/overblick.html" class="${activePage === "overview" ? "active" : ""}"><span class="icon" aria-hidden="true">📅</span><span>Översikt</span></a>
-      <a href="/personer.html" class="${activePage === "persons" ? "active" : ""}"><span class="icon" aria-hidden="true">👥</span><span>Personer</span></a>
-      <a href="/stallen.html" class="${activePage === "stallen" ? "active" : ""}"><span class="icon" aria-hidden="true">📍</span><span>Ställen</span></a>
+      ${editorLinks}
       ${analyticsLink}
       ${adminLink}
     </nav>
@@ -158,6 +176,11 @@ async function initPage(activePage, options = {}) {
     window.location.href = "/index.html";
     return null;
   }
+  if (options.requireEditor && !canEditPlanning(user)) {
+    queueToast("Sidan kräver redigeringsbehörighet", "error");
+    window.location.href = "/index.html";
+    return null;
+  }
   renderSidebar(user, activePage);
   flushQueuedToast();
   return user;
@@ -196,6 +219,8 @@ function clearSelectedDate() {
 window.showToast = showToast;
 window.initPage = initPage;
 window.queueToast = queueToast;
+window.isReadOnlyUser = isReadOnlyUser;
+window.canEditPlanning = canEditPlanning;
 window.readSelectedDate = readSelectedDate;
 window.writeSelectedDate = writeSelectedDate;
 window.clearSelectedDate = clearSelectedDate;

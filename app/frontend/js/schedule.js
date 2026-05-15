@@ -75,6 +75,29 @@ const scheduleLoadState = {
   requestSeq: 0,
 };
 
+function scheduleIsReadOnly() {
+  if (typeof isReadOnlyUser === "function") return isReadOnlyUser(state.currentUser);
+  return state.currentUser?.role === "viewer" && !state.currentUser?.is_super_user;
+}
+
+function showReadOnlyToast() {
+  showToast("Visningsläge: du kan se bemanningen men inte ändra den.", "warn");
+}
+
+function applyScheduleReadOnlyMode() {
+  const readOnly = scheduleIsReadOnly();
+  document.body.classList.toggle("read-only-mode", readOnly);
+  ["copyBtn", "clearBtn"].forEach((id) => {
+    const button = document.getElementById(id);
+    if (!button) return;
+    button.hidden = readOnly;
+    button.disabled = readOnly;
+  });
+  const tips = document.querySelector(".tips-fab");
+  if (tips) tips.hidden = readOnly;
+  updateUndoRedoButtons();
+}
+
 
 function isoWeek(d = new Date()) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -401,8 +424,9 @@ function pushScheduleUndo(label, snapshots) {
 function updateUndoRedoButtons() {
   const undoBtn = document.getElementById("undoBtn");
   const redoBtn = document.getElementById("redoBtn");
-  if (undoBtn) undoBtn.disabled = state.undoStack.length === 0;
-  if (redoBtn) redoBtn.disabled = state.redoStack.length === 0;
+  const readOnly = scheduleIsReadOnly();
+  if (undoBtn) undoBtn.disabled = readOnly || state.undoStack.length === 0;
+  if (redoBtn) redoBtn.disabled = readOnly || state.redoStack.length === 0;
 }
 
 function segmentVersionRefs(segments) {
@@ -443,6 +467,10 @@ function actionMatchesCurrentDay(action) {
 }
 
 async function applyHistoryAction(action, { historyLabel, oppositeStack, oppositeLabel }) {
+  if (scheduleIsReadOnly()) {
+    showReadOnlyToast();
+    return false;
+  }
   if (!actionMatchesCurrentDay(action)) {
     showToast(`Byt tillbaka till dagen där ändringen gjordes för att ${historyLabel}.`, "warn");
     return false;
@@ -486,6 +514,10 @@ async function applyHistoryAction(action, { historyLabel, oppositeStack, opposit
 }
 
 async function undoLastScheduleAction() {
+  if (scheduleIsReadOnly()) {
+    showReadOnlyToast();
+    return;
+  }
   const action = state.undoStack[state.undoStack.length - 1];
   if (!action) {
     showToast("Inget att ångra.", "warn");
@@ -501,6 +533,10 @@ async function undoLastScheduleAction() {
 }
 
 async function redoLastScheduleAction() {
+  if (scheduleIsReadOnly()) {
+    showReadOnlyToast();
+    return;
+  }
   const action = state.redoStack[state.redoStack.length - 1];
   if (!action) {
     showToast("Inget att göra om.", "warn");
@@ -519,7 +555,7 @@ function setHourPending(td, pending) {
   if (!td) return;
   td.classList.toggle("pending-save", pending);
   td.querySelectorAll("select").forEach((select) => {
-    select.disabled = pending;
+    select.disabled = pending || scheduleIsReadOnly();
   });
 }
 
@@ -1016,6 +1052,11 @@ function openSelectPicker(select) {
 function openFullHourSelect(e, td) {
   e.preventDefault();
   e.stopPropagation();
+  if (scheduleIsReadOnly()) {
+    focusSegment(td, td, 0, 60);
+    showReadOnlyToast();
+    return;
+  }
   if (isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))) {
     showLockedCellToast();
     return;
@@ -1028,6 +1069,11 @@ function openFullHourSelect(e, td) {
 function openSplitSegmentSelect(e, td, part, minuteStart, minuteEnd) {
   e.preventDefault();
   e.stopPropagation();
+  if (scheduleIsReadOnly()) {
+    focusSegment(td, part, minuteStart, minuteEnd);
+    showReadOnlyToast();
+    return;
+  }
   if (isRangeLocked(Number(td.dataset.personId), Number(td.dataset.hour), minuteStart, minuteEnd)) {
     showLockedCellToast();
     return;
@@ -1040,6 +1086,11 @@ function openSplitSegmentSelect(e, td, part, minuteStart, minuteEnd) {
 function toggleFullHourSplitFromEvent(e, td) {
   e.preventDefault();
   e.stopPropagation();
+  if (scheduleIsReadOnly()) {
+    focusSegment(td, td, 0, 60);
+    showReadOnlyToast();
+    return;
+  }
   if (isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))) {
     showLockedCellToast();
     return;
@@ -1051,6 +1102,11 @@ function toggleFullHourSplitFromEvent(e, td) {
 function toggleSplitSegmentFromEvent(e, td, part, minuteStart, minuteEnd) {
   e.preventDefault();
   e.stopPropagation();
+  if (scheduleIsReadOnly()) {
+    focusSegment(td, part, minuteStart, minuteEnd);
+    showReadOnlyToast();
+    return;
+  }
   if (isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))) {
     showLockedCellToast();
     return;
@@ -1102,12 +1158,14 @@ function activityIdForDragSource(td, minuteStart, minuteEnd) {
 }
 
 function armFullHourDrag(td, event) {
+  if (scheduleIsReadOnly()) return;
   if (event.button !== 0) return;
   if (td.dataset.split === "1") return;
   startPendingDrag(td, event, 0, 60);
 }
 
 function armHalfHourDrag(td, minuteStart, minuteEnd, event) {
+  if (scheduleIsReadOnly()) return;
   if (event.button !== 0) return;
   startPendingDrag(td, event, minuteStart, minuteEnd);
 }
@@ -1161,7 +1219,7 @@ function renderFullHourCell(td, segment, isScheduled) {
   select.dataset.minuteStart = "0";
   select.dataset.minuteEnd = "60";
   select.dataset.version = String(segment?.version || 0);
-  select.disabled = locked;
+  select.disabled = locked || scheduleIsReadOnly();
 
   select.addEventListener("change", () => onSegmentChange(td, 0, 60));
   select.addEventListener("focus", () => focusSegment(td, td, 0, 60));
@@ -1251,7 +1309,7 @@ function renderSplitHourCell(td, segments, isScheduled) {
     select.dataset.minuteStart = String(minute_start);
     select.dataset.minuteEnd = String(minute_end);
     select.dataset.version = String(segment.version || 0);
-    select.disabled = locked;
+    select.disabled = locked || scheduleIsReadOnly();
 
     select.addEventListener("change", () => onSegmentChange(td, minute_start, minute_end));
     select.addEventListener("focus", () => focusSegment(td, part, minute_start, minute_end));
@@ -1411,6 +1469,11 @@ function scheduleSummaryRefresh(delay = 90) {
 async function onSegmentChange(td, minuteStart, minuteEnd) {
   const personId = Number(td.dataset.personId);
   const hour = Number(td.dataset.hour);
+  if (scheduleIsReadOnly()) {
+    showReadOnlyToast();
+    renderHourCell(td);
+    return;
+  }
   if (isRangeLocked(personId, hour, minuteStart, minuteEnd)) {
     showLockedCellToast();
     renderHourCell(td);
@@ -1471,6 +1534,10 @@ function focusMatchingSegment(td, minuteStart, minuteEnd) {
 async function toggleHourSplit(td, mergeMinuteStart = 0) {
   const personId = Number(td.dataset.personId);
   const hour = Number(td.dataset.hour);
+  if (scheduleIsReadOnly()) {
+    showReadOnlyToast();
+    return;
+  }
   if (isHourLocked(personId, hour)) {
     showLockedCellToast();
     return;
@@ -1521,6 +1588,10 @@ function clipboardLabel(activityId) {
 
 async function copyFocused(cut = false) {
   if (!state.focusedCell) return;
+  if (cut && scheduleIsReadOnly()) {
+    showReadOnlyToast();
+    return;
+  }
   const activityId = effectiveActivityIdForFocus();
   state.clipboard = { activity_id: activityId };
   state.focusedCell.focusEl.classList.add("clipboard-flash");
@@ -1570,6 +1641,10 @@ async function copyFocused(cut = false) {
 
 async function pasteFocused() {
   if (!state.focusedCell || state.clipboard == null) return;
+  if (scheduleIsReadOnly()) {
+    showReadOnlyToast();
+    return;
+  }
   const { td, personId, hour, minuteStart, minuteEnd } = state.focusedCell;
   if (isRangeLocked(personId, hour, minuteStart, minuteEnd)) {
     showLockedCellToast();
@@ -1614,6 +1689,10 @@ function handleSelectClipboardKeys(e) {
   if (!["c", "x", "v", "z", "y"].includes(key)) return;
   e.preventDefault();
   e.stopPropagation();
+  if (scheduleIsReadOnly() && key !== "c") {
+    showReadOnlyToast();
+    return;
+  }
   if (key === "z") {
     if (e.shiftKey) void redoLastScheduleAction();
     else void undoLastScheduleAction();
@@ -1640,6 +1719,10 @@ function setupKeyboard() {
     if (key === "z") {
       e.preventDefault();
       e.stopPropagation();
+      if (scheduleIsReadOnly()) {
+        showReadOnlyToast();
+        return;
+      }
       if (e.shiftKey) void redoLastScheduleAction();
       else void undoLastScheduleAction();
       return;
@@ -1647,6 +1730,10 @@ function setupKeyboard() {
     if (key === "y") {
       e.preventDefault();
       e.stopPropagation();
+      if (scheduleIsReadOnly()) {
+        showReadOnlyToast();
+        return;
+      }
       void redoLastScheduleAction();
       return;
     }
@@ -1656,6 +1743,10 @@ function setupKeyboard() {
     }
     e.preventDefault();
     e.stopPropagation();
+    if (scheduleIsReadOnly() && key !== "c") {
+      showReadOnlyToast();
+      return;
+    }
     if (key === "c") copyFocused(false);
     else if (key === "x") copyFocused(true);
     else if (key === "v") pasteFocused();
@@ -1727,6 +1818,7 @@ function resetDragState() {
 }
 
 function startPendingDrag(td, event, minuteStart = 0, minuteEnd = 60) {
+  if (scheduleIsReadOnly()) return;
   drag.pending = true;
   drag.sourceTd = td;
   drag.sourceActivityId = activityIdForDragSource(td, minuteStart, minuteEnd);
@@ -1779,6 +1871,11 @@ function targetSegmentsForDragTarget(td, targetRangesByCell, fallbackTargetRange
 
 async function finishDrag() {
   if (!drag.active) return;
+  if (scheduleIsReadOnly()) {
+    resetDragState();
+    showReadOnlyToast();
+    return;
+  }
   const sourceTd = drag.sourceTd;
   const sourceActivityId = drag.sourceActivityId;
   const sourceMinuteStart = drag.sourceMinuteStart;
@@ -1899,6 +1996,7 @@ function setupDrag() {
 
   body.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
+    if (scheduleIsReadOnly()) return;
     if (e.target.closest("select")) return;
     const td = e.target.closest("td[data-hour]");
     if (!td) return;
@@ -2126,6 +2224,7 @@ async function loadSchedule() {
 (async () => {
   state.currentUser = await initPage("schedule");
   if (!state.currentUser) return;
+  applyScheduleReadOnlyMode();
   await loadAreasAndActivities();
 
   const stored = readSelectedDate();
@@ -2215,6 +2314,10 @@ async function loadSchedule() {
   document.getElementById("nextDayBtn").addEventListener("click", () => stepDay(1));
 
   document.getElementById("clearBtn").addEventListener("click", async () => {
+    if (scheduleIsReadOnly()) {
+      showReadOnlyToast();
+      return;
+    }
     const undoSnapshots = snapshotAllExplicitHours();
     if (!confirm("Rensa hela dagen för det valda området?")) return;
     try {
@@ -2232,7 +2335,13 @@ async function loadSchedule() {
     }
   });
 
-  document.getElementById("copyBtn").addEventListener("click", () => openCopyModal());
+  document.getElementById("copyBtn").addEventListener("click", () => {
+    if (scheduleIsReadOnly()) {
+      showReadOnlyToast();
+      return;
+    }
+    openCopyModal();
+  });
   document.getElementById("undoBtn").addEventListener("click", () => undoLastScheduleAction());
   document.getElementById("redoBtn").addEventListener("click", () => redoLastScheduleAction());
   updateUndoRedoButtons();

@@ -42,6 +42,11 @@ ROLE_ALIASES = {
     "arbetsledare": "leader",
     "ledare": "leader",
     "leader": "leader",
+    "visning": "viewer",
+    "visningslage": "viewer",
+    "lasare": "viewer",
+    "läsare": "viewer",
+    "viewer": "viewer",
 }
 
 
@@ -175,7 +180,7 @@ def parse_user_import_excel(content: bytes) -> tuple[list[ImportUserRow], list[U
                 UserImportError(
                     row=row_number,
                     username=username,
-                    error="Roll måste vara admin eller arbetsledare",
+                    error="Roll måste vara admin, arbetsledare eller visning",
                 )
             )
             continue

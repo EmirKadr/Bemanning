@@ -131,7 +131,8 @@ function openModal(act) {
 }
 
 (async () => {
-  currentUser = await initPage("stallen");
+  currentUser = await initPage("stallen", { requireEditor: true });
+  if (!currentUser) return;
   areas = await api.get("/api/areas");
   await load();
   document.getElementById("new-act").addEventListener("click", () => openModal(null));

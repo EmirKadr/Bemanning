@@ -302,7 +302,7 @@ class UserCreate(BaseModel):
     username: str
     password: str | None = Field(default=None, min_length=8, max_length=72)
     display_name: str | None = None
-    role: Literal["admin", "leader"] = "leader"
+    role: Literal["admin", "leader", "viewer"] = "leader"
     is_active: bool = True
 
     @field_validator("username")
@@ -334,7 +334,7 @@ class UserUpdate(BaseModel):
     username: str | None = None
     password: str | None = Field(default=None, min_length=8, max_length=72)
     display_name: str | None = None
-    role: Literal["admin", "leader"] | None = None
+    role: Literal["admin", "leader", "viewer"] | None = None
     is_active: bool | None = None
 
     @field_validator("username")

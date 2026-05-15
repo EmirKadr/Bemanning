@@ -9,7 +9,7 @@ from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
 
 from ..audit import log as audit_log
-from ..deps import get_current_user, get_db
+from ..deps import get_current_user, get_db, require_planning_editor
 from ..home_activity import build_home_activity_resolver, person_out_with_home_activity
 from ..models import Activity, Area, Person, ScheduleCell, User
 from ..schedule_locks import assert_can_modify_schedule_cells, foreign_schedule_cell_lock_applies
@@ -645,7 +645,7 @@ def get_month_overview(
 def set_day(
     payload: OverviewDayRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_planning_editor),
 ) -> dict:
     try:
         if not db.get(Person, payload.person_id):
@@ -685,7 +685,7 @@ def set_day(
 def set_days_bulk(
     payload: OverviewBulkDayRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_planning_editor),
 ) -> dict:
     if not payload.days:
         return {"applied": [], "errors": [], "written": 0, "deleted": 0}

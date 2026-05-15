@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from .database import SessionLocal
 from .models import User
-from .user_access import ADMIN_ROLES, is_super_user, user_needs_password_setup
+from .user_access import ADMIN_ROLES, can_edit_planning, is_super_user, user_needs_password_setup
 
 
 PASSWORD_SETUP_ALLOWED_PATHS = {
@@ -38,6 +38,12 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
 def require_admin(user: User = Depends(get_current_user)) -> User:
     if (user.role or "").strip().lower() not in ADMIN_ROLES:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin required")
+    return user
+
+
+def require_planning_editor(user: User = Depends(get_current_user)) -> User:
+    if not can_edit_planning(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Visningsrollen kan inte ändra bemanningen")
     return user
 
 

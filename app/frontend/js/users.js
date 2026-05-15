@@ -13,7 +13,9 @@ function escapeHtml(value) {
 function roleLabel(user) {
   if (user?.is_super_user) return "Super User";
   const role = user?.role;
-  return role === "admin" ? "Administratör" : "Arbetsledare";
+  if (role === "admin") return "Administratör";
+  if (role === "viewer") return "Visning";
+  return "Arbetsledare";
 }
 
 function passwordStatus(user) {
@@ -104,7 +106,7 @@ function renderUsers() {
 
 function openModal(user) {
   const isEdit = !!user;
-  const selectedRole = user?.role === "admin" || user?.is_super_user ? "admin" : "leader";
+  const selectedRole = user?.is_super_user ? "admin" : (user?.role || "leader");
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
   backdrop.innerHTML = `
@@ -118,6 +120,7 @@ function openModal(user) {
       <select id="m-role">
         <option value="leader" ${selectedRole === "leader" ? "selected" : ""}>Arbetsledare</option>
         <option value="admin" ${selectedRole === "admin" ? "selected" : ""}>Administratör</option>
+        <option value="viewer" ${selectedRole === "viewer" ? "selected" : ""}>Visning</option>
       </select>
       <label>${isEdit ? "Nytt lösenord" : "Lösenord"}</label>
       <input id="m-password" type="password" autocomplete="new-password" />

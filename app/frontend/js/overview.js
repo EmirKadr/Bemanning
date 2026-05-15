@@ -4,6 +4,7 @@ const DAY_NAMES = { 1: "Måndag", 2: "Tisdag", 3: "Onsdag", 4: "Torsdag", 5: "Fr
 const DAY_SHORT = { 1: "Mån", 2: "Tis", 3: "Ons", 4: "Tor", 5: "Fre", 6: "Lör", 7: "Sön" };
 
 const state = {
+  currentUser: null,
   view: "week",        // "week" | "month"
   year: 0,
   week: 0,
@@ -42,6 +43,25 @@ const loadState = {
   controller: null,
   requestSeq: 0,
 };
+
+function overviewIsReadOnly() {
+  if (typeof isReadOnlyUser === "function") return isReadOnlyUser(state.currentUser);
+  return state.currentUser?.role === "viewer" && !state.currentUser?.is_super_user;
+}
+
+function showReadOnlyToast() {
+  showToast("Visningsläge: du kan se översikten men inte ändra den.", "warn");
+}
+
+function applyOverviewReadOnlyMode() {
+  const readOnly = overviewIsReadOnly();
+  document.body.classList.toggle("read-only-mode", readOnly);
+  const note = document.querySelector("main .note");
+  if (note && readOnly) {
+    note.textContent = "Visningsläge: du kan se bemanningen och översikten, men inte ändra.";
+  }
+  updateUndoRedoButtons();
+}
 
 
 // ---- Date helpers ----
@@ -221,7 +241,7 @@ function upsertCellRecordForTd(td, cell) {
 function markDayPending(td, pending) {
   td.classList.toggle("pending-save", pending);
   const sel = td.querySelector("select");
-  if (sel) sel.disabled = pending;
+  if (sel) sel.disabled = pending || overviewIsReadOnly();
 }
 
 function renderDayCell(td, cell) {
@@ -230,7 +250,7 @@ function renderDayCell(td, cell) {
   td.dataset.templateHours = String(normalized.template_hours);
   styleCell(td, normalized);
   const sel = td.querySelector("select");
-  if (sel) sel.disabled = td.classList.contains("pending-save");
+  if (sel) sel.disabled = td.classList.contains("pending-save") || overviewIsReadOnly();
   return normalized;
 }
 
@@ -313,6 +333,9 @@ function styleCell(td, cell) {
   else info.textContent = `Schemalagd (${cell.template_hours}h)`;
   td.appendChild(info);
   if (td.classList.contains("pending-save")) {
+    sel.disabled = true;
+  }
+  if (overviewIsReadOnly()) {
     sel.disabled = true;
   }
 
@@ -498,8 +521,9 @@ function overviewRestoreSegments(segments) {
 function updateUndoRedoButtons() {
   const u = document.getElementById("undoBtn");
   const r = document.getElementById("redoBtn");
-  if (u) u.disabled = state.undoStack.length === 0;
-  if (r) r.disabled = state.redoStack.length === 0;
+  const readOnly = overviewIsReadOnly();
+  if (u) u.disabled = readOnly || state.undoStack.length === 0;
+  if (r) r.disabled = readOnly || state.redoStack.length === 0;
 }
 
 function pushOverviewUndo(label, days) {
@@ -521,6 +545,10 @@ function pushOverviewUndo(label, days) {
 }
 
 async function applyOverviewHistory(action, direction) {
+  if (overviewIsReadOnly()) {
+    showReadOnlyToast();
+    return false;
+  }
   const targetKey = direction === "undo" ? "before_hours" : "after_hours";
   const expectedKey = direction === "undo" ? "after_hours" : "before_hours";
   const hours = [];
@@ -553,6 +581,10 @@ async function applyOverviewHistory(action, direction) {
 }
 
 async function undoLastOverviewAction() {
+  if (overviewIsReadOnly()) {
+    showReadOnlyToast();
+    return;
+  }
   const action = state.undoStack[state.undoStack.length - 1];
   if (!action) { showToast("Inget att ångra.", "warn"); return; }
   const ok = await applyOverviewHistory(action, "undo");
@@ -566,6 +598,10 @@ async function undoLastOverviewAction() {
 }
 
 async function redoLastOverviewAction() {
+  if (overviewIsReadOnly()) {
+    showReadOnlyToast();
+    return;
+  }
   const action = state.redoStack[state.redoStack.length - 1];
   if (!action) { showToast("Inget att göra om.", "warn"); return; }
   const ok = await applyOverviewHistory(action, "redo");
@@ -579,6 +615,11 @@ async function redoLastOverviewAction() {
 }
 
 async function onDayChange(td, sel, cell) {
+  if (overviewIsReadOnly()) {
+    showReadOnlyToast();
+    renderDayCell(td, cellRecordForTd(td));
+    return;
+  }
   const newActivityId = sel.value ? Number(sel.value) : null;
   const previousCell = cellRecordForTd(td);
   if (previousCell.mixed && !confirm("Denna dag har flera olika aktiviteter. Skriv över med samma värde?")) {
@@ -646,6 +687,7 @@ function resetDragState() {
 }
 
 function startPendingDrag(td, event) {
+  if (overviewIsReadOnly()) return;
   drag.pending = true;
   drag.sourceTd = td;
   drag.sourceCell = {
@@ -682,6 +724,7 @@ function setupDrag() {
 
   body.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
+    if (overviewIsReadOnly()) return;
     const td = e.target.closest("td.day");
     if (!td || td.classList.contains("is-off")) return;
     startPendingDrag(td, e);
@@ -702,6 +745,10 @@ function setupDrag() {
   });
 
   document.addEventListener("mouseup", async () => {
+    if (overviewIsReadOnly()) {
+      if (drag.pending || drag.active) resetDragState();
+      return;
+    }
     if (drag.pending && !drag.active) {
       resetDragState();
       return;
@@ -932,7 +979,9 @@ function updateViewVisibility() {
 
 // ---- Init ----
 (async () => {
-  await initPage("overview");
+  state.currentUser = await initPage("overview");
+  if (!state.currentUser) return;
+  applyOverviewReadOnlyMode();
   await loadInitial();
 
   const stored = readSelectedDate();
@@ -985,6 +1034,10 @@ function updateViewVisibility() {
     const active = document.activeElement;
     if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) return;
     e.preventDefault();
+    if (overviewIsReadOnly()) {
+      showReadOnlyToast();
+      return;
+    }
     if (key === "y" || (key === "z" && e.shiftKey)) void redoLastOverviewAction();
     else void undoLastOverviewAction();
   });

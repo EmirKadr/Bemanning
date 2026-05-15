@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..audit import log as audit_log
-from ..deps import get_current_user, get_db
+from ..deps import get_db, require_planning_editor
 from ..models import Person, PersonScheduleTemplate, User
 from ..schemas import TemplateDay, TemplateOut, TemplateUpdate
 from ..template_service import DEFAULT_END, DEFAULT_START, get_all_default_days
@@ -35,7 +35,7 @@ def _validate_day(day: TemplateDay) -> None:
 def get_schedule(
     person_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_planning_editor),
 ) -> TemplateOut:
     if not db.get(Person, person_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Person hittades inte")
@@ -70,7 +70,7 @@ def put_schedule(
     person_id: int,
     payload: TemplateUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_planning_editor),
 ) -> TemplateOut:
     if not db.get(Person, person_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Person hittades inte")

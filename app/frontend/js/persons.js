@@ -498,7 +498,7 @@ function updateRowDisabled(row) {
 
 // ---- Init ----
 (async () => {
-  await initPage("persons");
+  if (!await initPage("persons", { requireEditor: true })) return;
   await loadInitial();
   await loadPersons();
   setupImportControls();

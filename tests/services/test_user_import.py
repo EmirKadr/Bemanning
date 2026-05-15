@@ -34,6 +34,7 @@ def test_parse_user_import_excel_accepts_template_headers_and_swedish_roles():
             ["anv\u00e4ndarnamn", "namn", "roll"],
             ["anna", "Anna Andersson", "arbetsledare"],
             ["bo", "Bo Berg", "administrat\u00f6r"],
+            ["viola", "Viola Visning", "visning"],
         ]
     )
 
@@ -43,6 +44,7 @@ def test_parse_user_import_excel_accepts_template_headers_and_swedish_roles():
     assert [(row.username, row.display_name, row.role) for row in rows] == [
         ("anna", "Anna Andersson", "leader"),
         ("bo", "Bo Berg", "admin"),
+        ("viola", "Viola Visning", "viewer"),
     ]
 
 

@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..audit import log as audit_log
-from ..deps import get_current_user, get_db
+from ..deps import get_current_user, get_db, require_planning_editor
 from ..home_activity import build_home_activity_resolver, person_out_with_home_activity
 from ..models import Activity, Area, Person, ScheduleCell, User
 from ..schedule_locks import assert_can_modify_schedule_cells, foreign_schedule_cell_lock_applies
@@ -233,7 +233,7 @@ def get_schedule(
 def update_cell(
     payload: CellUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_planning_editor),
 ):
     _validate_segment(payload.hour, payload.minute_start, payload.minute_end)
 
@@ -336,7 +336,7 @@ def update_cell(
 def split_cell(
     payload: SplitCellRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_planning_editor),
 ):
     if payload.hour not in HOURS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Timme måste vara {HOURS[0]}-{HOURS[-1]}")
@@ -491,7 +491,7 @@ def split_cell(
 def bulk_update_cells(
     payload: BulkCellRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_planning_editor),
 ):
     if not payload.cells:
         return {"applied": [], "conflicts": []}
@@ -793,7 +793,7 @@ def bulk_update_cells(
 def restore_hours(
     payload: RestoreHoursRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_planning_editor),
 ):
     if not payload.hours:
         return {"hours": []}

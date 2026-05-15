@@ -62,6 +62,20 @@ def test_create_user_with_password_hashes_password(monkeypatch, db_session, admi
     assert saved.must_change_password is False
 
 
+def test_create_viewer_user(monkeypatch, db_session, admin_user):
+    monkeypatch.setattr(users_router.audit, "log", lambda *args, **kwargs: None)
+
+    result = users_router.create_user(
+        UserCreate(username="viola", display_name="Viola Visning", role="viewer"),
+        db_session,
+        admin_user,
+    )
+
+    saved = db_session.query(User).filter_by(username="viola").one()
+    assert result.role == "viewer"
+    assert saved.role == "viewer"
+
+
 def test_passwordless_user_can_log_in_with_empty_password(db_session):
     user = User(
         username="cecilia",

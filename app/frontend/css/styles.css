@@ -654,6 +654,13 @@ table.matrix td select {
   cursor: pointer;
 }
 
+body.read-only-mode select:disabled {
+  opacity: 1;
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  cursor: default;
+}
+
 /* Display-label – visas ovanpå dropdown så implicit standardschema renderas
    med rätt aktivitetstext utan att förlita sig på <select> textrendering */
 table.matrix td.with-display-label {

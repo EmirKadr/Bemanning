@@ -7,7 +7,9 @@ from .schemas import UserAdminOut, UserOut
 
 SUPER_USER_ROLE = "super_user"
 LEGACY_SUPER_USER_ROLE = "super" + "_admin"
+VIEWER_ROLE = "viewer"
 ADMIN_ROLES = {"admin", SUPER_USER_ROLE, LEGACY_SUPER_USER_ROLE}
+EDITOR_ROLES = {"leader", *ADMIN_ROLES}
 
 
 def is_super_user(user: User) -> bool:
@@ -21,6 +23,14 @@ def is_super_user(user: User) -> bool:
 
 def user_needs_password_setup(user: User) -> bool:
     return user.password_hash is None or bool(user.must_change_password)
+
+
+def is_viewer(user: User) -> bool:
+    return (user.role or "").strip().lower() == VIEWER_ROLE
+
+
+def can_edit_planning(user: User) -> bool:
+    return (user.role or "").strip().lower() in EDITOR_ROLES
 
 
 def user_out(user: User) -> UserOut:
