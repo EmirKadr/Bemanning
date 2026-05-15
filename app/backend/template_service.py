@@ -25,21 +25,28 @@ def _hours_with_lunch_removed(start: int, end: int) -> set[int]:
     return hours
 
 
+def _default_hours_for_weekday(weekday: int) -> set[int] | None:
+    if weekday <= 5:
+        return _hours_with_lunch_removed(DEFAULT_START, DEFAULT_END)
+    return None
+
+
 def get_template_hours(db: Session, person_id: int, weekday: int) -> set[int] | None:
     """Returnera set av timmar (6..23) som personen ska bemannas på den dagen.
 
     None = ledig.
-    Om ingen rad finns: default 07..15 minus lunch på 12.
+    Om personen saknar egen mall: vardagar default 07..15 minus lunch, helg ledig.
+    Om personen har en egen mall men saknar rad för dagen: ledig.
     """
-    row = db.execute(
+    rows = db.execute(
         select(PersonScheduleTemplate).where(
-            PersonScheduleTemplate.person_id == person_id,
-            PersonScheduleTemplate.weekday == weekday,
+            PersonScheduleTemplate.person_id == person_id
         )
-    ).scalar_one_or_none()
+    ).scalars().all()
+    row = next((item for item in rows if int(item.weekday) == int(weekday)), None)
 
     if row is None:
-        return _hours_with_lunch_removed(DEFAULT_START, DEFAULT_END)
+        return None if rows else _default_hours_for_weekday(weekday)
     if row.is_off:
         return None
     return _hours_with_lunch_removed(row.start_hour, row.end_hour)
@@ -75,12 +82,15 @@ def get_template_hours_map(
         else:
             template_map[key] = _hours_with_lunch_removed(row.start_hour, row.end_hour)
 
+    person_ids_with_custom_template = {int(row.person_id) for row in rows}
     for person_id in unique_person_ids:
         for weekday in unique_weekdays:
-            template_map.setdefault(
-                (person_id, weekday),
-                _hours_with_lunch_removed(DEFAULT_START, DEFAULT_END),
-            )
+            if (person_id, weekday) in template_map:
+                continue
+            if person_id in person_ids_with_custom_template:
+                template_map[(person_id, weekday)] = None
+            else:
+                template_map[(person_id, weekday)] = _default_hours_for_weekday(weekday)
 
     return template_map
 
