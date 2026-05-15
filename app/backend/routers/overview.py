@@ -112,6 +112,70 @@ def _sorted_segments(cells: list[ScheduleCell]) -> list[ScheduleCell]:
     return sorted(cells, key=lambda cell: (cell.minute_start, cell.minute_end))
 
 
+def _segment_snapshot(cell: ScheduleCell) -> dict:
+    return {
+        "minute_start": cell.minute_start,
+        "minute_end": cell.minute_end,
+        "activity_id": cell.activity_id,
+        "empty_override": cell.empty_override,
+        "version": cell.version,
+    }
+
+
+def _hour_snapshot(
+    *,
+    payload: OverviewDayRequest,
+    hour: int,
+    cells: list[ScheduleCell],
+) -> dict:
+    return {
+        "person_id": payload.person_id,
+        "year": payload.year,
+        "week": payload.week,
+        "weekday": payload.weekday,
+        "hour": hour,
+        "segments": [_segment_snapshot(cell) for cell in _sorted_segments(cells)],
+    }
+
+
+def _day_hour_snapshots(
+    *,
+    payload: OverviewDayRequest,
+    template_hours: set[int],
+    cells_by_hour: dict[int, list[ScheduleCell]],
+) -> list[dict]:
+    return [
+        _hour_snapshot(
+            payload=payload,
+            hour=hour,
+            cells=cells_by_hour.get(hour, []),
+        )
+        for hour in sorted(template_hours)
+    ]
+
+
+def _load_day_cells_by_hour(
+    db: Session,
+    payload: OverviewDayRequest,
+    template_hours: set[int],
+) -> dict[int, list[ScheduleCell]]:
+    if not template_hours:
+        return {}
+    rows = db.execute(
+        select(ScheduleCell).where(
+            ScheduleCell.year == payload.year,
+            ScheduleCell.week == payload.week,
+            ScheduleCell.weekday == payload.weekday,
+            ScheduleCell.person_id == payload.person_id,
+            ScheduleCell.hour.in_(sorted(template_hours)),
+        )
+    ).scalars().all()
+    cells_by_hour: dict[int, list[ScheduleCell]] = defaultdict(list)
+    for cell in rows:
+        cells_by_hour[cell.hour].append(cell)
+    return cells_by_hour
+
+
 def _day_cell_payload(
     payload: OverviewDayRequest,
     template_hours: set[int] | None,
@@ -164,7 +228,8 @@ def _apply_day_impl(
             ),
         )
     if not template_hours:
-        return {"written": 0, "deleted": 0, "cell": _day_cell_payload(payload, template_hours, written=0, deleted=0)}
+        cell = _day_cell_payload(payload, template_hours, written=0, deleted=0)
+        return {"written": 0, "deleted": 0, "cell": cell, "before_hours": [], "after_hours": []}
 
     existing = db.execute(
         select(ScheduleCell).where(
@@ -179,6 +244,11 @@ def _apply_day_impl(
     for cell in existing:
         existing_by_hour[cell.hour].append(cell)
     assert_can_modify_schedule_cells(existing, user, owner_lock_enabled)
+    before_hours = _day_hour_snapshots(
+        payload=payload,
+        template_hours=template_hours,
+        cells_by_hour=existing_by_hour,
+    )
 
     written = 0
     deleted = 0
@@ -368,10 +438,19 @@ def _apply_day_impl(
         )
         written += 1
 
+    db.flush()
+    after_hours = _day_hour_snapshots(
+        payload=payload,
+        template_hours=template_hours,
+        cells_by_hour=_load_day_cells_by_hour(db, payload, template_hours),
+    )
+
     return {
         "written": written,
         "deleted": deleted,
         "cell": _day_cell_payload(payload, template_hours, written=written, deleted=deleted),
+        "before_hours": before_hours,
+        "after_hours": after_hours,
     }
 
 
@@ -656,7 +735,11 @@ def set_days_bulk(
                     template_hours=template_hours,
                     owner_lock_enabled=owner_lock_enabled,
                 )
-                applied.append(result["cell"])
+                applied.append({
+                    **result["cell"],
+                    "before_hours": result["before_hours"],
+                    "after_hours": result["after_hours"],
+                })
                 total_written += result["written"]
                 total_deleted += result["deleted"]
                 continue
@@ -670,7 +753,11 @@ def set_days_bulk(
                         template_hours=template_hours,
                         owner_lock_enabled=owner_lock_enabled,
                     )
-                applied.append(result["cell"])
+                applied.append({
+                    **result["cell"],
+                    "before_hours": result["before_hours"],
+                    "after_hours": result["after_hours"],
+                })
                 total_written += result["written"]
                 total_deleted += result["deleted"]
             except HTTPException as exc:

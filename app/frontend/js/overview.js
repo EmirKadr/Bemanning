@@ -439,6 +439,62 @@ async function postBulkDays(days, atomic = false) {
   return api.post("/api/overview/days/bulk", { days, atomic });
 }
 
+function cloneOverviewSegment(segment) {
+  return {
+    minute_start: Number(segment.minute_start),
+    minute_end: Number(segment.minute_end),
+    activity_id: segment.activity_id == null ? null : Number(segment.activity_id),
+    empty_override: !!segment.empty_override,
+    version: Number(segment.version) || 0,
+  };
+}
+
+function cloneOverviewHourSnapshot(snapshot) {
+  return {
+    person_id: Number(snapshot.person_id),
+    year: Number(snapshot.year),
+    week: Number(snapshot.week),
+    weekday: Number(snapshot.weekday),
+    hour: Number(snapshot.hour),
+    segments: (snapshot.segments || [])
+      .map((segment) => cloneOverviewSegment(segment))
+      .sort((a, b) => a.minute_start - b.minute_start || a.minute_end - b.minute_end),
+  };
+}
+
+function cloneOverviewHourSnapshots(snapshots) {
+  return (snapshots || []).map((snapshot) => cloneOverviewHourSnapshot(snapshot));
+}
+
+function overviewSnapshotSignature(snapshots) {
+  return JSON.stringify(cloneOverviewHourSnapshots(snapshots).map((snapshot) => ({
+    hour: snapshot.hour,
+    segments: snapshot.segments.map((segment) => ({
+      minute_start: segment.minute_start,
+      minute_end: segment.minute_end,
+      activity_id: segment.activity_id,
+      empty_override: segment.empty_override,
+    })),
+  })));
+}
+
+function overviewSegmentVersionRefs(segments) {
+  return (segments || []).map((segment) => ({
+    minute_start: segment.minute_start,
+    minute_end: segment.minute_end,
+    expected_version: segment.version,
+  }));
+}
+
+function overviewRestoreSegments(segments) {
+  return (segments || []).map((segment) => ({
+    minute_start: segment.minute_start,
+    minute_end: segment.minute_end,
+    activity_id: segment.activity_id,
+    empty_override: segment.empty_override,
+  }));
+}
+
 function updateUndoRedoButtons() {
   const u = document.getElementById("undoBtn");
   const r = document.getElementById("redoBtn");
@@ -447,7 +503,16 @@ function updateUndoRedoButtons() {
 }
 
 function pushOverviewUndo(label, days) {
-  const filtered = days.filter((d) => d.before_activity_id !== d.after_activity_id);
+  const filtered = days
+    .map((day) => ({
+      person_id: Number(day.person_id),
+      year: Number(day.year),
+      week: Number(day.week),
+      weekday: Number(day.weekday),
+      before_hours: cloneOverviewHourSnapshots(day.before_hours),
+      after_hours: cloneOverviewHourSnapshots(day.after_hours),
+    }))
+    .filter((day) => overviewSnapshotSignature(day.before_hours) !== overviewSnapshotSignature(day.after_hours));
   if (!filtered.length) return;
   state.undoStack.push({ label, days: filtered });
   if (state.undoStack.length > 50) state.undoStack.shift();
@@ -456,19 +521,29 @@ function pushOverviewUndo(label, days) {
 }
 
 async function applyOverviewHistory(action, direction) {
-  const days = action.days.map((d) => ({
-    person_id: d.person_id,
-    year: d.year,
-    week: d.week,
-    weekday: d.weekday,
-    activity_id: direction === "undo" ? d.before_activity_id : d.after_activity_id,
-  }));
-  try {
-    const resp = await postBulkDays(days, false);
-    (resp.applied || []).forEach((result) => {
-      const td = findDayTd(result.person_id, result.year, result.week, result.weekday);
-      if (td) renderDayCell(td, result);
+  const targetKey = direction === "undo" ? "before_hours" : "after_hours";
+  const expectedKey = direction === "undo" ? "after_hours" : "before_hours";
+  const hours = [];
+  action.days.forEach((day) => {
+    const expectedByHour = new Map((day[expectedKey] || []).map((snapshot) => [snapshot.hour, snapshot]));
+    (day[targetKey] || []).forEach((snapshot) => {
+      const expected = expectedByHour.get(snapshot.hour);
+      hours.push({
+        year: snapshot.year,
+        week: snapshot.week,
+        weekday: snapshot.weekday,
+        hour: snapshot.hour,
+        person_id: snapshot.person_id,
+        expected_segments: overviewSegmentVersionRefs(expected?.segments || []),
+        segments: overviewRestoreSegments(snapshot.segments),
+      });
     });
+  });
+
+  if (!hours.length) return true;
+  try {
+    await api.put("/api/schedule/hours/restore", { action: "overview_undo_restore", hours });
+    await load();
     return true;
   } catch (e) {
     const detail = e.body?.detail || e.message;
@@ -528,8 +603,8 @@ async function onDayChange(td, sel, cell) {
       year: Number(td.dataset.year),
       week: Number(td.dataset.week),
       weekday: Number(td.dataset.weekday),
-      before_activity_id: previousCell.activity_id ?? null,
-      after_activity_id: newActivityId,
+      before_hours: resp.before_hours || [],
+      after_hours: resp.after_hours || [],
     }]);
     showToast(`Bemannade ${resp.written} h, tog bort ${resp.deleted} h`);
   } catch (e) {
@@ -699,15 +774,13 @@ function setupDrag() {
 
       const errorCount = resp.errors?.length || 0;
       const undoDays = (resp.applied || []).map((result) => {
-        const key = dayRequestKey(result.person_id, result.year, result.week, result.weekday);
-        const before = snapshots.get(key);
         return {
           person_id: result.person_id,
           year: result.year,
           week: result.week,
           weekday: result.weekday,
-          before_activity_id: before?.activity_id ?? null,
-          after_activity_id: sourceActivityId ?? null,
+          before_hours: result.before_hours || [],
+          after_hours: result.after_hours || [],
         };
       });
       if (undoDays.length) pushOverviewUndo("drag-bemanning", undoDays);
