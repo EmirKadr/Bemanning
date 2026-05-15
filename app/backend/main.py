@@ -20,7 +20,7 @@ from .routers import (
     users,
 )
 
-app = FastAPI(title="Bemanningssystem", version="0.1.1")
+app = FastAPI(title="Bemanningssystem", version="0.1.2")
 
 app.add_middleware(
     SessionMiddleware,
