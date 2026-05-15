@@ -1782,6 +1782,7 @@ async function finishDrag() {
   const sourceTd = drag.sourceTd;
   const sourceActivityId = drag.sourceActivityId;
   const sourceMinuteStart = drag.sourceMinuteStart;
+  const sourceMinuteEnd = drag.sourceMinuteEnd;
   const targets = Array.from(document.querySelectorAll("#scheduleBody td.drag-target"));
   const targetRangesByCell = new Map(drag.targetRangesByCell);
   const fallbackTargetRange = {
@@ -1789,16 +1790,17 @@ async function finishDrag() {
     minute_end: drag.currentTargetMinuteEnd,
   };
   const targetCount = targets.filter((td) => td !== sourceTd).length;
+  const sourceIsSplit = sourceTd?.dataset.split === "1";
   const isAreaCopy = targetCount > 1;
   resetDragState();
 
-  if (targets.length === 0 || (targets.length === 1 && targets[0] === sourceTd)) return;
+  if (targets.length === 0 || (targets.length === 1 && targets[0] === sourceTd && !sourceIsSplit)) return;
 
   const editableTargets = targets.filter((td) =>
-    td !== sourceTd && !isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))
+    (td !== sourceTd || sourceIsSplit) && !isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))
   );
   const lockedTargetCount = targets.filter((td) =>
-    td !== sourceTd && isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))
+    (td !== sourceTd || sourceIsSplit) && isHourLocked(Number(td.dataset.personId), Number(td.dataset.hour))
   ).length;
   if (!editableTargets.length) {
     if (lockedTargetCount) showLockedCellToast();
@@ -1824,25 +1826,29 @@ async function finishDrag() {
         isAreaCopy,
       );
 
-      return targetSegments.map(({ minute_start, minute_end }) => {
-        const matching = segments.find(
-          (segment) => segment.minute_start === minute_start && segment.minute_end === minute_end
-        );
-        const expectedVersion = matching
-          ? Number(matching.version) || 0
-          : (fullSegment ? Number(fullSegment.version) || 0 : 0);
-        return {
-          year: state.year,
-          week: state.week,
-          weekday: state.weekday,
-          hour,
-          minute_start,
-          minute_end,
-          person_id: personId,
-          activity_id: sourceActivityId,
-          expected_version: expectedVersion,
-        };
-      });
+      return targetSegments
+        .filter(({ minute_start, minute_end }) =>
+          td !== sourceTd || minute_start !== sourceMinuteStart || minute_end !== sourceMinuteEnd
+        )
+        .map(({ minute_start, minute_end }) => {
+          const matching = segments.find(
+            (segment) => segment.minute_start === minute_start && segment.minute_end === minute_end
+          );
+          const expectedVersion = matching
+            ? Number(matching.version) || 0
+            : (fullSegment ? Number(fullSegment.version) || 0 : 0);
+          return {
+            year: state.year,
+            week: state.week,
+            weekday: state.weekday,
+            hour,
+            minute_start,
+            minute_end,
+            person_id: personId,
+            activity_id: sourceActivityId,
+            expected_version: expectedVersion,
+          };
+        });
     });
 
   if (cells.length === 0) return;
@@ -1874,8 +1880,8 @@ async function finishDrag() {
     scheduleSummaryRefresh(0);
     showToast(
       lockedTargetCount
-        ? `Fyllde ${editableTargets.length} celler, hoppade över ${lockedTargetCount} låsta`
-        : `Fyllde ${targetCount} celler`
+        ? `Fyllde ${cells.length} celler eller halvor, hoppade över ${lockedTargetCount} låsta`
+        : `Fyllde ${cells.length} celler eller halvor`
     );
   } catch (e) {
     restoreHourSnapshots(snapshots);
