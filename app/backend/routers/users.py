@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from .. import audit
 from ..deps import get_db, require_admin, require_super_user
-from ..models import User
+from ..models import Area, User
 from ..schemas import UserAdminOut, UserCreate, UserImportError, UserImportResult, UserUpdate
 from ..security import hash_password
 from ..user_access import ADMIN_ROLES, user_admin_out
@@ -34,6 +34,11 @@ HEADER_ALIASES = {
     "displayname": "display_name",
     "roll": "role",
     "role": "role",
+    "avdelning": "area",
+    "omrade": "area",
+    "område": "area",
+    "area": "area",
+    "department": "area",
 }
 
 ROLE_ALIASES = {
@@ -56,6 +61,7 @@ class ImportUserRow:
     username: str
     display_name: str | None
     role: str
+    area_name: str | None = None
 
 
 def _find_username_conflict(db: Session, username: str, *, exclude_user_id: int | None = None) -> User | None:
@@ -78,6 +84,7 @@ def _user_snapshot(user: User) -> dict:
         "username": user.username,
         "display_name": user.display_name,
         "role": user.role,
+        "area_id": user.area_id,
         "is_active": user.is_active,
         "must_change_password": bool(user.must_change_password or user.password_hash is None),
     }
@@ -120,14 +127,32 @@ def _normalize_role(value: str) -> str | None:
     return ROLE_ALIASES.get(_compact_key(value))
 
 
+def _area_lookup(db: Session) -> dict[str, Area]:
+    lookup: dict[str, Area] = {}
+    for area in db.query(Area).all():
+        for value in (area.code, area.name):
+            key = _compact_key(value)
+            if key:
+                lookup[key] = area
+    return lookup
+
+
+def _validate_area_id(db: Session, area_id: int | None) -> None:
+    if area_id is None:
+        return
+    if not db.get(Area, area_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Avdelning hittades inte")
+
+
 def build_user_import_template_excel() -> bytes:
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Användare"
-    sheet.append(["användarnamn", "namn", "roll"])
+    sheet.append(["användarnamn", "namn", "roll", "avdelning"])
     sheet.column_dimensions["A"].width = 24
     sheet.column_dimensions["B"].width = 28
     sheet.column_dimensions["C"].width = 18
+    sheet.column_dimensions["D"].width = 22
     sheet.freeze_panes = "A2"
 
     stream = io.BytesIO()
@@ -163,6 +188,7 @@ def parse_user_import_excel(content: bytes) -> tuple[list[ImportUserRow], list[U
         username = values["username"]
         display_name = values["display_name"] or None
         role_value = values["role"]
+        area_name = values.get("area") or None
 
         if not username:
             errors.append(UserImportError(row=row_number, error="Användarnamn saknas"))
@@ -185,7 +211,13 @@ def parse_user_import_excel(content: bytes) -> tuple[list[ImportUserRow], list[U
             )
             continue
 
-        rows.append(ImportUserRow(row_number=row_number, username=username, display_name=display_name, role=role))
+        rows.append(ImportUserRow(
+            row_number=row_number,
+            username=username,
+            display_name=display_name,
+            role=role,
+            area_name=area_name,
+        ))
 
     return rows, errors
 
@@ -225,6 +257,7 @@ async def import_users(
     rows, errors = parse_user_import_excel(content)
     seen: set[str] = set()
     created = 0
+    areas_by_key = _area_lookup(db)
 
     for row in rows:
         username_key = row.username.lower()
@@ -236,12 +269,20 @@ async def import_users(
         if _find_username_conflict(db, row.username):
             errors.append(UserImportError(row=row.row_number, username=row.username, error="Användarnamnet används redan"))
             continue
+        area_id = None
+        if row.area_name:
+            area = areas_by_key.get(_compact_key(row.area_name))
+            if not area:
+                errors.append(UserImportError(row=row.row_number, username=row.username, error="Avdelning hittades inte"))
+                continue
+            area_id = area.id
 
         user = User(
             username=row.username,
             password_hash=None,
             display_name=row.display_name,
             role=row.role,
+            area_id=area_id,
             is_active=True,
             must_change_password=True,
         )
@@ -271,12 +312,14 @@ def create_user(
 ) -> UserAdminOut:
     if _find_username_conflict(db, payload.username):
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Användarnamnet används redan")
+    _validate_area_id(db, payload.area_id)
 
     user = User(
         username=payload.username,
         password_hash=hash_password(payload.password) if payload.password else None,
         display_name=payload.display_name,
         role=payload.role,
+        area_id=payload.area_id,
         is_active=payload.is_active,
         must_change_password=payload.password is None,
     )
@@ -311,6 +354,8 @@ def update_user(
 
     if payload.username is not None and _find_username_conflict(db, payload.username, exclude_user_id=user_id):
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Användarnamnet används redan")
+    if payload.area_id is not None:
+        _validate_area_id(db, payload.area_id)
 
     new_role = payload.role if payload.role is not None else user.role
     new_is_active = payload.is_active if payload.is_active is not None else user.is_active

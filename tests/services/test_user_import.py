@@ -21,30 +21,31 @@ def test_build_user_import_template_excel_has_expected_headers():
     workbook = load_workbook(io.BytesIO(build_user_import_template_excel()))
     sheet = workbook.active
 
-    assert [sheet["A1"].value, sheet["B1"].value, sheet["C1"].value] == [
+    assert [sheet["A1"].value, sheet["B1"].value, sheet["C1"].value, sheet["D1"].value] == [
         "anv\u00e4ndarnamn",
         "namn",
         "roll",
+        "avdelning",
     ]
 
 
 def test_parse_user_import_excel_accepts_template_headers_and_swedish_roles():
     content = workbook_bytes(
         [
-            ["anv\u00e4ndarnamn", "namn", "roll"],
-            ["anna", "Anna Andersson", "arbetsledare"],
-            ["bo", "Bo Berg", "administrat\u00f6r"],
-            ["viola", "Viola Visning", "visning"],
+            ["anv\u00e4ndarnamn", "namn", "roll", "avdelning"],
+            ["anna", "Anna Andersson", "arbetsledare", ""],
+            ["bo", "Bo Berg", "administrat\u00f6r", "GG"],
+            ["viola", "Viola Visning", "visning", "Mestergruppen"],
         ]
     )
 
     rows, errors = parse_user_import_excel(content)
 
     assert errors == []
-    assert [(row.username, row.display_name, row.role) for row in rows] == [
-        ("anna", "Anna Andersson", "leader"),
-        ("bo", "Bo Berg", "admin"),
-        ("viola", "Viola Visning", "viewer"),
+    assert [(row.username, row.display_name, row.role, row.area_name) for row in rows] == [
+        ("anna", "Anna Andersson", "leader", None),
+        ("bo", "Bo Berg", "admin", "GG"),
+        ("viola", "Viola Visning", "viewer", "Mestergruppen"),
     ]
 
 

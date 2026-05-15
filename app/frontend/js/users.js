@@ -1,5 +1,6 @@
 let currentUser = null;
 let users = [];
+let areas = [];
 let appSettings = {
   lock_foreign_schedule_cells: false,
 };
@@ -16,6 +17,12 @@ function roleLabel(user) {
   if (role === "admin") return "Administratör";
   if (role === "viewer") return "Visning";
   return "Arbetsledare";
+}
+
+function areaName(areaId) {
+  if (areaId == null) return "-";
+  const area = areas.find((item) => Number(item.id) === Number(areaId));
+  return area ? area.name : `Avdelning #${areaId}`;
 }
 
 function passwordStatus(user) {
@@ -46,6 +53,10 @@ async function loadSettings() {
   document.getElementById("lock-foreign-schedule-cells").checked = !!appSettings.lock_foreign_schedule_cells;
 }
 
+async function loadAreas() {
+  areas = await api.get("/api/areas?include_inactive=true");
+}
+
 function setupSettingsControls() {
   const checkbox = document.getElementById("lock-foreign-schedule-cells");
   checkbox.addEventListener("change", async () => {
@@ -74,6 +85,7 @@ function renderUsers() {
       <td>${escapeHtml(user.username)}${escapeHtml(selfLabel)}</td>
       <td>${escapeHtml(user.display_name || "-")}</td>
       <td>${escapeHtml(roleLabel(user))}</td>
+      <td>${escapeHtml(areaName(user.area_id))}</td>
       <td>${user.is_active ? "Ja" : "Nej"}</td>
       <td>${escapeHtml(passwordStatus(user))}</td>
       <td>${escapeHtml(formatDate(user.created_at))}</td>
@@ -122,6 +134,11 @@ function openModal(user) {
         <option value="admin" ${selectedRole === "admin" ? "selected" : ""}>Administratör</option>
         <option value="viewer" ${selectedRole === "viewer" ? "selected" : ""}>Visning</option>
       </select>
+      <label>Avdelning</label>
+      <select id="m-area">
+        <option value="">Ingen förinställning</option>
+        ${areas.map((area) => `<option value="${area.id}" ${Number(user?.area_id) === Number(area.id) ? "selected" : ""}>${escapeHtml(area.name)}</option>`).join("")}
+      </select>
       <label>${isEdit ? "Nytt lösenord" : "Lösenord"}</label>
       <input id="m-password" type="password" autocomplete="new-password" />
       <p class="note">${isEdit ? "Lämna lösenord tomt om det inte ska ändras." : "Lämna tomt om användaren ska skapa sitt lösenord vid första inloggningen. Annars minst 8 tecken."}</p>
@@ -140,6 +157,7 @@ function openModal(user) {
       username: document.getElementById("m-username").value.trim(),
       display_name: document.getElementById("m-display-name").value.trim() || null,
       role: document.getElementById("m-role").value,
+      area_id: document.getElementById("m-area").value ? Number(document.getElementById("m-area").value) : null,
       is_active: document.getElementById("m-active").checked,
     };
 
@@ -263,6 +281,7 @@ function setupImportControls() {
   setupImportControls();
   setupSettingsControls();
   await loadSettings();
+  await loadAreas();
   await loadUsers();
   document.getElementById("new-user").addEventListener("click", () => openModal(null));
   document.getElementById("show-inactive").addEventListener("change", loadUsers);

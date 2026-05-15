@@ -39,6 +39,7 @@ def user_out(user: User) -> UserOut:
         username=user.username,
         display_name=user.display_name,
         role=user.role,
+        area_id=user.area_id,
         must_change_password=user_needs_password_setup(user),
         is_super_user=is_super_user(user),
     )
@@ -50,6 +51,7 @@ def user_admin_out(user: User) -> UserAdminOut:
         username=user.username,
         display_name=user.display_name,
         role=user.role,
+        area_id=user.area_id,
         is_active=user.is_active,
         must_change_password=user_needs_password_setup(user),
         created_at=user.created_at,

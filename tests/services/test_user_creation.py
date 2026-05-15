@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.backend.models import User
+from app.backend.models import Area, User
 from app.backend.routers import auth as auth_router
 from app.backend.routers import users as users_router
 from app.backend.schemas import LoginRequest, UserCreate
@@ -15,6 +15,7 @@ from app.backend.security import verify_password
 @pytest.fixture
 def db_session():
     engine = create_engine("sqlite+pysqlite:///:memory:")
+    Area.__table__.create(engine)
     User.__table__.create(engine)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     session = SessionLocal()
@@ -23,6 +24,7 @@ def db_session():
     finally:
         session.close()
         User.__table__.drop(engine)
+        Area.__table__.drop(engine)
         engine.dispose()
 
 
@@ -74,6 +76,24 @@ def test_create_viewer_user(monkeypatch, db_session, admin_user):
     saved = db_session.query(User).filter_by(username="viola").one()
     assert result.role == "viewer"
     assert saved.role == "viewer"
+
+
+def test_create_user_with_default_area(monkeypatch, db_session, admin_user):
+    monkeypatch.setattr(users_router.audit, "log", lambda *args, **kwargs: None)
+    area = Area(code="MG", name="Mestergruppen", sort_order=1, is_active=True)
+    db_session.add(area)
+    db_session.commit()
+    db_session.refresh(area)
+
+    result = users_router.create_user(
+        UserCreate(username="maria", display_name="Maria MG", role="leader", area_id=area.id),
+        db_session,
+        admin_user,
+    )
+
+    saved = db_session.query(User).filter_by(username="maria").one()
+    assert result.area_id == area.id
+    assert saved.area_id == area.id
 
 
 def test_passwordless_user_can_log_in_with_empty_password(db_session):

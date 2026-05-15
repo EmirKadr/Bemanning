@@ -23,6 +23,7 @@ const state = {
   sortAsc: true,
   undoStack: [],
   redoStack: [],
+  selectedDateParts: null,
 };
 
 const drag = {
@@ -63,6 +64,14 @@ function applyOverviewReadOnlyMode() {
   updateUndoRedoButtons();
 }
 
+function preferredAreaIdForCurrentUser() {
+  const userAreaId = Number(state.currentUser?.area_id);
+  if (Number.isInteger(userAreaId) && state.areas.some((area) => Number(area.id) === userAreaId)) {
+    return userAreaId;
+  }
+  return state.areas.length > 0 ? Number(state.areas[0].id) : null;
+}
+
 
 // ---- Date helpers ----
 function isoWeek(d = new Date()) {
@@ -93,8 +102,40 @@ function todayWeekdayIndex() {
   return new Date().getDay() || 7;
 }
 
+function datePartsFromDate(date) {
+  return [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()];
+}
+
+function dateFromParts(parts) {
+  if (!Array.isArray(parts) || parts.length !== 3) return null;
+  const [year, month, day] = parts.map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function storedDateForCurrentPeriod() {
+  const storedDate = dateFromParts(state.selectedDateParts);
+  if (!storedDate) return null;
+  if (state.view === "month") {
+    return storedDate.getUTCFullYear() === state.year && storedDate.getUTCMonth() + 1 === state.month
+      ? storedDate
+      : null;
+  }
+  const storedWeek = isoWeek(storedDate);
+  return storedWeek.year === state.year && storedWeek.week === state.week ? storedDate : null;
+}
+
+function writeOverviewSelectedDate(date) {
+  state.selectedDateParts = datePartsFromDate(date);
+  writeSelectedDate(state.selectedDateParts[0], state.selectedDateParts[1], state.selectedDateParts[2]);
+}
+
 function persistOverviewState() {
-  let date;
+  let date = storedDateForCurrentPeriod();
+  if (date) {
+    writeOverviewSelectedDate(date);
+    return;
+  }
   if (state.view === "month") {
     const now = new Date();
     const isCurrentMonth = state.year === now.getFullYear() && state.month === now.getMonth() + 1;
@@ -103,7 +144,7 @@ function persistOverviewState() {
     const monday = isoWeekToMonday(state.year, state.week);
     date = monday;
   }
-  writeSelectedDate(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+  writeOverviewSelectedDate(date);
 }
 
 function escapeHtml(s) {
@@ -895,7 +936,7 @@ async function loadInitial() {
     opt.value = a.id; opt.textContent = a.name;
     sel.appendChild(opt);
   });
-  if (areas.length > 0) state.areaId = areas[0].id;
+  state.areaId = preferredAreaIdForCurrentUser();
   sel.value = state.areaId == null ? "" : String(state.areaId);
 }
 
@@ -986,23 +1027,25 @@ function updateViewVisibility() {
 
   const stored = readSelectedDate();
   if (stored) {
+    state.selectedDateParts = stored;
     const [y, m, d] = stored;
     const wk = isoWeek(new Date(Date.UTC(y, m - 1, d)));
     state.year = wk.year;
     state.week = wk.week;
     state.month = m;
   } else {
-    const now = isoWeek();
+    const nowDate = new Date();
+    state.selectedDateParts = [nowDate.getFullYear(), nowDate.getMonth() + 1, nowDate.getDate()];
+    const now = isoWeek(nowDate);
     state.year = now.year;
     state.week = now.week;
-    state.month = new Date().getMonth() + 1;
+    state.month = nowDate.getMonth() + 1;
   }
 
   document.getElementById("yearInput").value = state.year;
   document.getElementById("weekInput").value = state.week;
   document.getElementById("monthSelect").value = String(state.month);
   updateViewVisibility();
-  persistOverviewState();
 
   await load();
   setupDrag();

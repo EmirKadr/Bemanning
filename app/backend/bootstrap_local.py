@@ -10,13 +10,26 @@ render.yaml — this module is local-dev only.
 """
 from __future__ import annotations
 
+from sqlalchemy import inspect
+
 from .database import Base, engine
 from . import models  # noqa: F401  -- register models on Base.metadata
 from .seed import run as seed_run
 
 
+def _sync_lightweight_sqlite_columns() -> None:
+    inspector = inspect(engine)
+    if not inspector.has_table("users"):
+        return
+    user_columns = {column["name"] for column in inspector.get_columns("users")}
+    with engine.begin() as connection:
+        if "area_id" not in user_columns:
+            connection.exec_driver_sql("ALTER TABLE users ADD COLUMN area_id INTEGER REFERENCES areas(id)")
+
+
 def main() -> None:
     Base.metadata.create_all(engine)
+    _sync_lightweight_sqlite_columns()
     seed_run()
 
 

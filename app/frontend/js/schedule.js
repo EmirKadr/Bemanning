@@ -35,6 +35,7 @@ const state = {
   allSummaryRows: [],
   lockForeignScheduleCells: false,
   calcSelection: "",
+  calcSelectionManual: false,
   calcInputs: {
     GG: { rows: "", time: "", goal: "" },
     MG: { rows: "", time: "", goal: "" },
@@ -96,6 +97,14 @@ function applyScheduleReadOnlyMode() {
   const tips = document.querySelector(".tips-fab");
   if (tips) tips.hidden = readOnly;
   updateUndoRedoButtons();
+}
+
+function preferredAreaIdForCurrentUser() {
+  const userAreaId = Number(state.currentUser?.area_id);
+  if (Number.isInteger(userAreaId) && state.areas.some((area) => Number(area.id) === userAreaId)) {
+    return userAreaId;
+  }
+  return state.areas.length > 0 ? Number(state.areas[0].id) : null;
 }
 
 
@@ -899,11 +908,21 @@ function setupCalculator() {
   if (select.dataset.bound !== "1") {
     select.addEventListener("change", (e) => {
       state.calcSelection = e.target.value;
+      state.calcSelectionManual = true;
       renderCalculator();
     });
     select.dataset.bound = "1";
   }
 
+  renderCalculator();
+}
+
+function syncCalculatorWithSelectedArea() {
+  if (state.calcSelectionManual) return;
+  const currentAreaCode = areaCodeById(state.areaId);
+  state.calcSelection = CALC_AREA_KEYS.includes(currentAreaCode) ? currentAreaCode : "ALL";
+  const select = document.getElementById("calcAreaSelect");
+  if (select) select.value = state.calcSelection;
   renderCalculator();
 }
 
@@ -2168,7 +2187,7 @@ async function loadAreasAndActivities() {
     opt.textContent = a.name;
     sel.appendChild(opt);
   });
-  if (areas.length > 0) state.areaId = areas[0].id;
+  state.areaId = preferredAreaIdForCurrentUser();
   sel.value = state.areaId == null ? "" : String(state.areaId);
   setupCalculator();
 }
@@ -2238,7 +2257,7 @@ async function loadSchedule() {
     const now = isoWeek();
     state.year = now.year;
     state.week = now.week;
-    state.weekday = now.weekday <= 5 ? now.weekday : 1;
+    state.weekday = now.weekday;
   }
 
   const persistState = () => {
@@ -2277,6 +2296,7 @@ async function loadSchedule() {
     state.weekday = Number(document.getElementById("daySelect").value);
     const areaVal = document.getElementById("areaSelect").value;
     state.areaId = areaVal === "" ? null : Number(areaVal);
+    syncCalculatorWithSelectedArea();
     syncDateInputFromState();
     persistState();
     refreshCurrentHourHighlight();

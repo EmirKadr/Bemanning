@@ -282,6 +282,7 @@ class UserOut(BaseModel):
     username: str
     display_name: str | None
     role: str
+    area_id: int | None = None
     must_change_password: bool = False
     is_super_user: bool = False
 
@@ -292,6 +293,7 @@ class UserAdminOut(BaseModel):
     username: str
     display_name: str | None
     role: str
+    area_id: int | None = None
     is_active: bool
     must_change_password: bool = False
     created_at: datetime
@@ -303,6 +305,7 @@ class UserCreate(BaseModel):
     password: str | None = Field(default=None, min_length=8, max_length=72)
     display_name: str | None = None
     role: Literal["admin", "leader", "viewer"] = "leader"
+    area_id: int | None = None
     is_active: bool = True
 
     @field_validator("username")
@@ -335,6 +338,7 @@ class UserUpdate(BaseModel):
     password: str | None = Field(default=None, min_length=8, max_length=72)
     display_name: str | None = None
     role: Literal["admin", "leader", "viewer"] | None = None
+    area_id: int | None = None
     is_active: bool | None = None
 
     @field_validator("username")
