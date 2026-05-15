@@ -57,6 +57,17 @@ Vid varje andring som paverkar produktbeteende ska agenten:
 - uppdatera tester och dokumentation nar det ar relevant
 - tydligt saga till om full paritet inte hanns med eller om nagot blockerar den
 
+## Testregel for agenter
+
+Varje gang en agent bygger nytt, andrar befintligt beteende eller lagger till ett
+nytt arbetsflode ska agenten ocksa se till att det finns relevanta tester for
+det nya. Befintliga tester ska uppdateras nar de gamla antagandena inte langre
+stammer med hur appen fungerar.
+
+Agenten ska inte lamna ett nytt beteende utan teststod om det gar att testa
+rimligt med befintlig teststack. Om nagot inte gar att automatisera ska agenten
+skriva tydligt vad som testats manuellt och varfor automatiskt test saknas.
+
 ## Beslutsregel
 
 Om en uppgift verkar bara namna `app/` eller bara `desktop/`, men andringen

@@ -26,10 +26,14 @@ WEB_WORKFLOW_STEPS = (
     "login_admin",
     "create_user",
     "edit_user",
+    "toggle_user_setting",
+    "toggle_user_active",
     "create_activity",
     "edit_activity",
+    "deactivate_activity",
     "create_person",
     "edit_person_inline",
+    "edit_person_fields_inline",
     "edit_person_week_template",
     "edit_schedule_cell",
     "split_schedule_cell",
@@ -129,10 +133,14 @@ class InteractiveRun:
 
         self.create_user()
         self.edit_user()
+        self.toggle_user_setting()
+        self.toggle_user_active()
         self.create_activity()
         self.edit_activity()
+        self.deactivate_activity()
         self.create_person()
         self.edit_person_inline()
+        self.edit_person_fields_inline()
         self.edit_person_week_template()
         self.edit_schedule()
         self.exercise_overview()
@@ -168,6 +176,28 @@ class InteractiveRun:
         self.record("edit_user", screenshot=modal)
         self.record("edit_user_saved", screenshot=self.screenshot("05-user-edited"))
 
+    def toggle_user_setting(self) -> None:
+        checkbox = self.page.locator("#lock-foreign-schedule-cells")
+        initial = checkbox.is_checked()
+        checkbox.set_checked(not initial)
+        self.page.wait_for_timeout(500)
+        checkbox.set_checked(initial)
+        self.page.wait_for_timeout(500)
+        self.record("toggle_user_setting", screenshot=self.screenshot("06-user-setting-toggled"))
+
+    def toggle_user_active(self) -> None:
+        row = self.page.locator("#users-body tr", has_text=self.agent_user)
+        row.locator("button[data-toggle]").click()
+        self.page.wait_for_timeout(700)
+        show_inactive = self.page.locator("#show-inactive")
+        if not show_inactive.is_checked():
+            show_inactive.check()
+        self.wait_for_text(self.agent_user)
+        row = self.page.locator("#users-body tr", has_text=self.agent_user)
+        row.locator("button[data-toggle]").click()
+        self.page.wait_for_timeout(700)
+        self.record("toggle_user_active", screenshot=self.screenshot("07-user-active-toggled"))
+
     def create_activity(self) -> None:
         self.goto("/stallen.html", "#acts-body")
         self.page.click("#new-act")
@@ -195,6 +225,16 @@ class InteractiveRun:
         self.record("edit_activity", screenshot=modal)
         self.record("edit_activity_saved", screenshot=self.screenshot("09-activity-edited"))
 
+    def deactivate_activity(self) -> None:
+        row = self.page.locator("#acts-body tr", has_text=self.agent_activity_updated)
+        row.locator("button[data-delete]").click()
+        self.page.wait_for_timeout(700)
+        show_inactive = self.page.locator("#show-inactive")
+        if not show_inactive.is_checked():
+            show_inactive.check()
+        self.wait_for_text(self.agent_activity_updated)
+        self.record("deactivate_activity", screenshot=self.screenshot("10-activity-deactivated"))
+
     def create_person(self) -> None:
         self.goto("/personer.html", "#persons-body")
         self.page.click("#new-person")
@@ -217,6 +257,38 @@ class InteractiveRun:
         self.page.keyboard.press("Enter")
         self.wait_for_text(self.agent_person_updated)
         self.record("edit_person_inline", screenshot=self.screenshot("12-person-inline-edited"))
+
+    def edit_person_fields_inline(self) -> None:
+        row = self.page.locator("#persons-body tr", has_text=self.agent_person_updated)
+        row.locator("td").nth(1).click()
+        self.page.wait_for_selector("#persons-body select.inline-input", timeout=15000)
+        self.page.locator("#persons-body select.inline-input").select_option(label="Autostore")
+        self.page.wait_for_timeout(700)
+
+        row = self.page.locator("#persons-body tr", has_text=self.agent_person_updated)
+        row.locator("td").nth(1).click()
+        self.page.wait_for_selector("#persons-body select.inline-input", timeout=15000)
+        self.page.locator("#persons-body select.inline-input").select_option(label="Mestergruppen")
+        self.page.wait_for_timeout(700)
+
+        row = self.page.locator("#persons-body tr", has_text=self.agent_person_updated)
+        row.locator("td").nth(4).click()
+        self.page.wait_for_selector("#persons-body input.inline-input", timeout=15000)
+        self.page.fill("#persons-body input.inline-input", "996")
+        self.page.keyboard.press("Enter")
+        self.page.wait_for_timeout(700)
+
+        row = self.page.locator("#persons-body tr", has_text=self.agent_person_updated)
+        row.locator("td").nth(3).click()
+        self.page.wait_for_timeout(700)
+        show_inactive = self.page.locator("#show-inactive")
+        if not show_inactive.is_checked():
+            show_inactive.check()
+        self.wait_for_text(self.agent_person_updated)
+        row = self.page.locator("#persons-body tr", has_text=self.agent_person_updated)
+        row.locator("td").nth(3).click()
+        self.page.wait_for_timeout(700)
+        self.record("edit_person_fields_inline", screenshot=self.screenshot("13-person-fields-inline-edited"))
 
     def edit_person_week_template(self) -> None:
         row = self.page.locator("#persons-body tr", has_text=self.agent_person_updated)

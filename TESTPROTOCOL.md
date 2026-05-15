@@ -128,8 +128,11 @@ Det testar bland annat:
 
 - Logga in som admin.
 - Skapa och redigera anvandare, inklusive roll och avdelning.
+- Andra installningscheckbox och aktivera/inaktivera anvandare.
 - Skapa och redigera stalle/aktivitet.
+- Inaktivera stalle/aktivitet och verifiera att inaktiva kan visas.
 - Skapa person, redigera namn inline och andra veckomall.
+- Redigera personens omrade, sortering och aktiv-status inline.
 - Andra bemanningscell, dela halvcell och kopiera/klistra in cell.
 - Kopiera dag, rensa dag, angra och gor om.
 - Andra i Oversikt och byta till manadsvy.

@@ -1,4 +1,6 @@
+import inspect
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -50,10 +52,14 @@ def test_interactive_e2e_covers_mutating_workflows():
     assert {
         "create_user",
         "edit_user",
+        "toggle_user_setting",
+        "toggle_user_active",
         "create_activity",
         "edit_activity",
+        "deactivate_activity",
         "create_person",
         "edit_person_inline",
+        "edit_person_fields_inline",
         "edit_person_week_template",
         "edit_schedule_cell",
         "split_schedule_cell",
@@ -68,12 +74,42 @@ def test_interactive_e2e_covers_mutating_workflows():
     }.issubset(set(interactive_e2e.WEB_WORKFLOW_STEPS))
 
 
+def test_interactive_e2e_records_every_expected_workflow_step():
+    source = inspect.getsource(interactive_e2e.InteractiveRun)
+    recorded = set(re.findall(r"self\.record\(\"([^\"]+)\"", source))
+
+    assert set(interactive_e2e.WEB_WORKFLOW_STEPS).issubset(recorded)
+
+
 def test_desktop_app_probe_has_safe_and_real_modes():
     args = desktop_app_probe.parse_args(["--real-webengine"])
 
     assert args.real_webengine is True
     assert hasattr(desktop_app_probe, "run_shell_probe")
     assert hasattr(desktop_app_probe, "run_real_webengine_probe")
+
+
+def test_visual_smoke_has_handler_for_every_state_action():
+    source = inspect.getsource(visual_smoke._apply_state)
+    handled_actions = set(re.findall(r"state\.action == \"([^\"]+)\"", source))
+    configured_actions = {state.action for state in visual_smoke.STATES}
+
+    assert configured_actions <= handled_actions
+
+
+def test_testprotocol_documents_agent_test_tools():
+    protocol = (ROOT / "TESTPROTOCOL.md").read_text(encoding="utf-8")
+
+    for command in (
+        "python -m pytest",
+        "python desktop\\main.py --smoke-test",
+        "python -m tools.visual_smoke",
+        "python -m tools.interactive_e2e",
+        "python -m tools.desktop_shell_screens",
+        "python -m tools.desktop_app_probe",
+        "cmd /c build_windows.bat",
+    ):
+        assert command in protocol
 
 
 def test_visual_smoke_outputs_have_unique_names():
