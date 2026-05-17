@@ -56,6 +56,7 @@ def _person_snapshot(person: Person) -> dict:
         "home_activity_id": person.home_activity_id,
         "competencies": person.competencies,
         "comment": person.comment,
+        "has_fixed_schedule": person.has_fixed_schedule,
         "is_active": person.is_active,
         "sort_order": person.sort_order,
     }

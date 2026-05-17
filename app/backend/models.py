@@ -61,6 +61,7 @@ class Person(Base):
     home_activity_id: Mapped[int | None] = mapped_column(ForeignKey("activities.id"))
     competencies: Mapped[list] = mapped_column(JsonField, nullable=False, default=list)
     comment: Mapped[str | None] = mapped_column(Text)
+    has_fixed_schedule: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

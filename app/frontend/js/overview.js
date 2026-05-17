@@ -328,10 +328,14 @@ function styleCell(td, cell) {
   const person = personById(Number(td.dataset.personId));
   const baseActivityId = cell.template_hours > 0 ? (person?.home_activity_id || null) : null;
 
-  const isOff = cell.template_hours === 0;
+  const hasFixedSchedule = person?.has_fixed_schedule !== false;
+  const isOff = hasFixedSchedule && cell.template_hours === 0;
   if (isOff) {
     td.classList.add("is-off");
     td.textContent = "Ledig";
+    return;
+  }
+  if (!hasFixedSchedule && cell.template_hours === 0 && !cell.activity_id) {
     return;
   }
 

@@ -249,22 +249,22 @@ def seed_visual_data() -> None:
         for person in people:
             _set_template(db, person, admin)
 
-        if iso.weekday <= 5:
-            plans = [
-                (people[0], gg_plock, gg_vm),
-                (people[1], gg_vm, gg_op),
-                (people[2], gg_op, gg_plock),
-                (people[3], mg_vm, mg_stod),
-                (people[4], mg_stod, mg_vm),
-                (people[5], as_plock, as_plock),
-            ]
+        plans = [
+            (people[0], gg_plock, gg_vm),
+            (people[1], gg_vm, gg_op),
+            (people[2], gg_op, gg_plock),
+            (people[3], mg_vm, mg_stod),
+            (people[4], mg_stod, mg_vm),
+            (people[5], as_plock, as_plock),
+        ]
+        for weekday in range(1, 6):
             for person, morning, afternoon in plans:
                 for hour in (7, 8, 9, 11):
                     _upsert_cell(
                         db,
                         year=iso.year,
                         week=iso.week,
-                        weekday=iso.weekday,
+                        weekday=weekday,
                         hour=hour,
                         minute_start=0,
                         minute_end=60,
@@ -277,7 +277,7 @@ def seed_visual_data() -> None:
                         db,
                         year=iso.year,
                         week=iso.week,
-                        weekday=iso.weekday,
+                        weekday=weekday,
                         hour=hour,
                         minute_start=0,
                         minute_end=60,
@@ -289,7 +289,7 @@ def seed_visual_data() -> None:
                 db,
                 year=iso.year,
                 week=iso.week,
-                weekday=iso.weekday,
+                weekday=weekday,
                 hour=10,
                 person=people[0],
                 first_activity=gg_plock,

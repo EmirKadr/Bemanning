@@ -132,6 +132,7 @@ Det testar bland annat:
 - Skapa och redigera stalle/aktivitet.
 - Inaktivera stalle/aktivitet och verifiera att inaktiva kan visas.
 - Skapa person, redigera namn inline och andra veckomall.
+- Vaxla person mellan fast schemamall och timmis utan att rakna timmis som ledig.
 - Redigera personens omrade, sortering och aktiv-status inline.
 - Andra bemanningscell, dela halvcell och kopiera/klistra in cell.
 - Kopiera dag, rensa dag, angra och gor om.

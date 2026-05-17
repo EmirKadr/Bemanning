@@ -35,6 +35,7 @@ WEB_WORKFLOW_STEPS = (
     "edit_person_inline",
     "edit_person_fields_inline",
     "edit_person_week_template",
+    "edit_person_hourly_schedule",
     "edit_schedule_cell",
     "split_schedule_cell",
     "copy_paste_schedule_cell",
@@ -303,6 +304,23 @@ class InteractiveRun:
         self.page.click("#sch-save")
         self.page.wait_for_selector(".modal-backdrop", state="detached", timeout=15000)
         self.record("edit_person_week_template", screenshot=modal)
+
+        row = self.page.locator("#persons-body tr", has_text=self.agent_person_updated)
+        row.locator("button[data-schedule]").click()
+        self.page.wait_for_selector("#sch-hourly", timeout=15000)
+        self.page.check("#sch-hourly")
+        hourly_modal = self.screenshot("14-week-template-hourly")
+        self.page.click("#sch-save")
+        self.page.wait_for_selector(".modal-backdrop", state="detached", timeout=15000)
+        self.record("edit_person_hourly_schedule", screenshot=hourly_modal)
+
+        row = self.page.locator("#persons-body tr", has_text=self.agent_person_updated)
+        row.locator("button[data-schedule]").click()
+        self.page.wait_for_selector("#sch-hourly", timeout=15000)
+        self.page.uncheck("#sch-hourly")
+        self.page.click("#sch-default")
+        self.page.click("#sch-save")
+        self.page.wait_for_selector(".modal-backdrop", state="detached", timeout=15000)
 
     def schedule_row(self):
         return self.page.locator("#scheduleBody tr", has_text=self.agent_person_updated)

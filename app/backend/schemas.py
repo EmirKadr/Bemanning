@@ -74,6 +74,7 @@ class PersonOut(BaseModel):
     home_activity_id: int | None = None
     competencies: list[str] = Field(default_factory=list)
     comment: str | None
+    has_fixed_schedule: bool = True
     is_active: bool
     sort_order: int
 
@@ -84,6 +85,7 @@ class PersonCreate(BaseModel):
     home_activity_id: int | None = None
     competencies: list[str] = Field(default_factory=list)
     comment: str | None = None
+    has_fixed_schedule: bool = True
     is_active: bool = True
     sort_order: int = 0
 
@@ -94,6 +96,7 @@ class PersonUpdate(BaseModel):
     home_activity_id: int | None = None
     competencies: list[str] | None = None
     comment: str | None = None
+    has_fixed_schedule: bool | None = None
     is_active: bool | None = None
     sort_order: int | None = None
 
@@ -269,11 +272,13 @@ class TemplateDay(BaseModel):
 
 class TemplateOut(BaseModel):
     person_id: int
+    has_fixed_schedule: bool = True
     days: list[TemplateDay]
 
 
 class TemplateUpdate(BaseModel):
-    days: list[TemplateDay]
+    has_fixed_schedule: bool | None = None
+    days: list[TemplateDay] = Field(default_factory=list)
 
 
 class UserOut(BaseModel):

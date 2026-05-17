@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import PersonScheduleTemplate
+from .models import Person, PersonScheduleTemplate
 
 DEFAULT_START = 7
 DEFAULT_END = 16          # exklusiv → timslots 7..15
@@ -38,6 +38,10 @@ def get_template_hours(db: Session, person_id: int, weekday: int) -> set[int] | 
     Om personen saknar egen mall: vardagar default 07..15 minus lunch, helg ledig.
     Om personen har en egen mall men saknar rad för dagen: ledig.
     """
+    person = db.get(Person, person_id)
+    if person is not None and not person.has_fixed_schedule:
+        return None
+
     rows = db.execute(
         select(PersonScheduleTemplate).where(
             PersonScheduleTemplate.person_id == person_id
@@ -70,13 +74,23 @@ def get_template_hours_map(
     rows = db.execute(
         select(PersonScheduleTemplate).where(
             PersonScheduleTemplate.person_id.in_(unique_person_ids),
-            PersonScheduleTemplate.weekday.in_(unique_weekdays),
         )
     ).scalars().all()
+    fixed_schedule_by_person = {
+        int(person_id): bool(has_fixed_schedule)
+        for person_id, has_fixed_schedule in db.execute(
+            select(Person.id, Person.has_fixed_schedule).where(Person.id.in_(unique_person_ids))
+        ).all()
+    }
 
     template_map: dict[tuple[int, int], set[int] | None] = {}
     for row in rows:
+        if int(row.weekday) not in unique_weekdays:
+            continue
         key = (int(row.person_id), int(row.weekday))
+        if fixed_schedule_by_person.get(int(row.person_id), True) is False:
+            template_map[key] = None
+            continue
         if row.is_off:
             template_map[key] = None
         else:
@@ -86,6 +100,9 @@ def get_template_hours_map(
     for person_id in unique_person_ids:
         for weekday in unique_weekdays:
             if (person_id, weekday) in template_map:
+                continue
+            if fixed_schedule_by_person.get(person_id, True) is False:
+                template_map[(person_id, weekday)] = None
                 continue
             if person_id in person_ids_with_custom_template:
                 template_map[(person_id, weekday)] = None

@@ -61,6 +61,7 @@ def test_interactive_e2e_covers_mutating_workflows():
         "edit_person_inline",
         "edit_person_fields_inline",
         "edit_person_week_template",
+        "edit_person_hourly_schedule",
         "edit_schedule_cell",
         "split_schedule_cell",
         "copy_paste_schedule_cell",

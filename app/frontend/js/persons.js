@@ -418,6 +418,7 @@ async function openScheduleModal(person) {
     .map((h) => `<option value="${h}">${String(h).padStart(2, "0")}:00</option>`).join("");
   const hoursToOpts = Array.from({ length: 18 }, (_, i) => 7 + i)
     .map((h) => `<option value="${h}">${String(h).padStart(2, "0")}:00</option>`).join("");
+  const isHourlyWorker = !template.has_fixed_schedule;
 
   const rowFor = (d) => `
     <tr data-weekday="${d.weekday}">
@@ -433,13 +434,18 @@ async function openScheduleModal(person) {
     <div class="modal" style="min-width: 480px;">
       <h2>Veckomall för ${escapeHtml(person.name)}</h2>
       <p class="note">Mallen används av Översikt + visar huvudställe som bas i bemanningen.</p>
+      <label class="modal-checkbox">
+        <input id="sch-hourly" type="checkbox" ${isHourlyWorker ? "checked" : ""} />
+        Timmis - ingen fast schemamall
+      </label>
+      <p class="note">När detta är valt har personen ingen fast schemamall. Det räknas inte som ledig tid.</p>
       <table style="margin-top: 12px;">
         <tbody id="sch-body">
           ${template.days.map(rowFor).join("")}
         </tbody>
       </table>
       <div class="actions">
-        <button id="sch-default">Återställ alla till 07-16</button>
+        <button id="sch-default">Standard 07-16</button>
         <button id="sch-cancel">Avbryt</button>
         <button id="sch-save" class="primary">Spara</button>
       </div>
@@ -452,45 +458,65 @@ async function openScheduleModal(person) {
     row.querySelector(".m-to").value = String(d.end_hour ?? 16);
     updateRowDisabled(row);
   });
+  updateScheduleModalDisabled(backdrop);
 
   backdrop.querySelectorAll(".m-off").forEach((cb) =>
-    cb.addEventListener("change", (e) => updateRowDisabled(e.target.closest("tr")))
+    cb.addEventListener("change", (e) => {
+      updateRowDisabled(e.target.closest("tr"));
+    })
   );
 
+  document.getElementById("sch-hourly").addEventListener("change", () => updateScheduleModalDisabled(backdrop));
+
   document.getElementById("sch-default").addEventListener("click", () => {
+    document.getElementById("sch-hourly").checked = false;
     backdrop.querySelectorAll("tr[data-weekday]").forEach((row) => {
-      row.querySelector(".m-off").checked = false;
+      const weekday = Number(row.dataset.weekday);
+      row.querySelector(".m-off").checked = weekday >= 6;
       row.querySelector(".m-from").value = "7";
       row.querySelector(".m-to").value = "16";
       updateRowDisabled(row);
     });
+    updateScheduleModalDisabled(backdrop);
   });
 
   document.getElementById("sch-cancel").addEventListener("click", () => backdrop.remove());
   document.getElementById("sch-save").addEventListener("click", async () => {
+    const hasFixedSchedule = !document.getElementById("sch-hourly").checked;
     const days = [];
-    for (const row of backdrop.querySelectorAll("tr[data-weekday]")) {
-      const wd = Number(row.dataset.weekday);
-      const isOff = row.querySelector(".m-off").checked;
-      if (isOff) { days.push({ weekday: wd, is_off: true, start_hour: null, end_hour: null }); continue; }
-      const sh = Number(row.querySelector(".m-from").value);
-      const eh = Number(row.querySelector(".m-to").value);
-      if (sh >= eh) {
-        showToast(`${DAY_LABELS[wd]}: Från måste vara mindre än Till`, "error");
-        return;
+    if (hasFixedSchedule) {
+      for (const row of backdrop.querySelectorAll("tr[data-weekday]")) {
+        const wd = Number(row.dataset.weekday);
+        const isOff = row.querySelector(".m-off").checked;
+        if (isOff) { days.push({ weekday: wd, is_off: true, start_hour: null, end_hour: null }); continue; }
+        const sh = Number(row.querySelector(".m-from").value);
+        const eh = Number(row.querySelector(".m-to").value);
+        if (sh >= eh) {
+          showToast(`${DAY_LABELS[wd]}: Från måste vara mindre än Till`, "error");
+          return;
+        }
+        days.push({ weekday: wd, is_off: false, start_hour: sh, end_hour: eh });
       }
-      days.push({ weekday: wd, is_off: false, start_hour: sh, end_hour: eh });
     }
     try {
-      await api.put(`/api/persons/${person.id}/schedule`, { days });
+      await api.put(`/api/persons/${person.id}/schedule`, { has_fixed_schedule: hasFixedSchedule, days });
       backdrop.remove();
       showToast("Schema sparat");
     } catch (e) { showToast(e.message, "error"); }
   });
 }
 
+function updateScheduleModalDisabled(backdrop) {
+  const hourly = document.getElementById("sch-hourly").checked;
+  backdrop.querySelectorAll("tr[data-weekday]").forEach((row) => {
+    const offCheckbox = row.querySelector(".m-off");
+    offCheckbox.disabled = hourly;
+    updateRowDisabled(row);
+  });
+}
+
 function updateRowDisabled(row) {
-  const off = row.querySelector(".m-off").checked;
+  const off = document.getElementById("sch-hourly")?.checked || row.querySelector(".m-off").checked;
   row.querySelector(".m-from").disabled = off;
   row.querySelector(".m-to").disabled = off;
 }
