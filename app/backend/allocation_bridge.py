@@ -60,6 +60,10 @@ def _load_modules() -> tuple[ModuleType, ModuleType]:
             _LOAD_ERROR = f"Lagerverktygens backend hittades inte: {tools_dir}"
             raise AllocationBridgeUnavailable(_LOAD_ERROR)
 
+        tools_parent = str(tools_dir.parent)
+        if tools_parent not in sys.path:
+            sys.path.insert(0, tools_parent)
+
         try:
             _ENGINE_MODULE = importlib.import_module("warehouse_tools.engine")
             _FLOWS_MODULE = importlib.import_module("warehouse_tools.flows")

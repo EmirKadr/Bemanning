@@ -1,3 +1,6 @@
+import subprocess
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -8,6 +11,7 @@ from app.backend.routers import allocation as allocation_router
 
 
 pd = pytest.importorskip("pandas")
+ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture(autouse=True)
@@ -50,6 +54,28 @@ def test_allocation_bridge_uses_vendored_warehouse_tools_by_default():
     assert bridge.warehouse_tools_dir().name == "warehouse_tools"
     assert bridge.allokering_backend_dir() == bridge.warehouse_tools_dir()
     assert (bridge.warehouse_tools_dir() / "vendor" / "allokering12.1.py").is_file()
+
+
+def test_allocation_bridge_imports_warehouse_tools_when_started_from_app_root():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from backend import allocation_bridge as bridge; "
+                "engine, flows = bridge.require_available(); "
+                "print(engine.APP_VERSION, len(flows.FLOW_BY_ID))"
+            ),
+        ],
+        cwd=ROOT / "app",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "12.1.5" in result.stdout
 
 
 def test_run_flow_handler_serializes_tables_and_keeps_session(monkeypatch):
