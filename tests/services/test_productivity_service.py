@@ -1,10 +1,51 @@
 from pathlib import Path
 
-from app.backend.productivity_service import build_productivity_report
+from app.backend.productivity_service import (
+    build_productivity_file_status,
+    build_productivity_report,
+    classify_productivity_file,
+    save_productivity_file,
+)
 
 
 def write(path: Path, content: str) -> None:
     path.write_text(content.strip() + "\n", encoding="utf-8")
+
+
+def test_productivity_file_status_shows_only_required_user_uploads(tmp_path):
+    write(
+        tmp_path / "v_ask_kpi_target-20260518080915.csv",
+        "Bolag\tLager\tFlödesnamn\tProcessnamn\tBeskrivning\tRader\tKollin\tPallar",
+    )
+
+    status = build_productivity_file_status(tmp_path)
+
+    assert status["ready"] is False
+    assert set(status["files"]) == {"pick", "trans", "pallet"}
+    assert status["missing"] == ["pick", "trans", "pallet"]
+
+    for filename, content in (
+        ("renamed_pick.csv", "Zon\tPlockat\tAnvändare\tÄndrad\tVikt\tBolag\nA\t1\tUSER\t2026-05-18 08:00:00\t1\tGG"),
+        ("renamed_trans.csv", "Pallid\tFrån\tTill\tAntal\tTimestamp\n1\tA\tB\t1\t2026-05-18 08:00:00"),
+        ("renamed_pallet.csv", "Plockpallsnr.\tPalltyp\tPallplacering\tTransnr.\tVikt\n1\t1\tM1\t1\t1"),
+    ):
+        source = tmp_path / filename
+        write(source, content)
+        sample = source.read_bytes()[:4096]
+        file_type = classify_productivity_file(filename, sample)
+        save_productivity_file(source_path=source, filename=filename, file_type=file_type, reference_dir=tmp_path)
+
+    status = build_productivity_file_status(tmp_path)
+
+    assert status["ready"] is True
+    assert status["missing"] == []
+    assert all(item["uploaded"] for item in status["files"].values())
+
+
+def test_productivity_file_detection_accepts_hidden_kpi_target():
+    sample = "Bolag\tLager\tFlödesnamn\tProcessnamn\tBeskrivning\tRader\tKollin\n".encode()
+
+    assert classify_productivity_file("nytt-mal.csv", sample) == "kpi"
 
 
 def test_productivity_report_groups_pick_trans_and_pallet_logs(tmp_path):

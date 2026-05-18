@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import csv
+import os
+import re
+import shutil
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -22,6 +25,8 @@ class SourceFileSpec:
     key: str
     label: str
     prefix: str
+    required: bool = True
+    visible: bool = True
 
 
 @dataclass(frozen=True)
@@ -41,8 +46,18 @@ SOURCE_SPECS = (
     SourceFileSpec("pick", "Plocklogg", "v_ask_pick_log_full"),
     SourceFileSpec("trans", "Translogg", "v_ask_trans_log"),
     SourceFileSpec("pallet", "Palllastningslogg", "v_ask_palletloading_log"),
-    SourceFileSpec("kpi", "KPI-Mål", "v_ask_kpi_target"),
+    SourceFileSpec("kpi", "KPI-Mål", "v_ask_kpi_target", required=True, visible=False),
 )
+
+SOURCE_SPEC_BY_KEY = {spec.key: spec for spec in SOURCE_SPECS}
+VISIBLE_SOURCE_SPECS = tuple(spec for spec in SOURCE_SPECS if spec.visible)
+
+HEADER_HINTS = {
+    "pick": {"Zon", "Plockat", "Användare", "Ändrad", "Bolag"},
+    "trans": {"Pallid", "Från", "Till", "Antal", "Timestamp"},
+    "pallet": {"Plockpallsnr.", "Palltyp", "Pallplacering", "Transnr.", "Vikt"},
+    "kpi": {"Flödesnamn", "Processnamn", "Beskrivning", "Rader", "Kollin"},
+}
 
 GROUPS = (
     {"id": "gg", "title": "Granngården"},
@@ -58,10 +73,13 @@ def _repo_root() -> Path:
 
 
 def default_reference_dir() -> Path:
+    configured_data_dir = (settings.PRODUCTIVITY_DATA_DIR or "").strip()
+    if configured_data_dir:
+        return Path(configured_data_dir)
     configured = (settings.PRODUCTIVITY_REFERENCE_DIR or "").strip()
     if configured:
         return Path(configured)
-    return _repo_root() / "referens"
+    return _repo_root() / "data"
 
 
 def _latest_file(reference_dir: Path, prefix: str) -> Path:
@@ -77,8 +95,15 @@ def _latest_file(reference_dir: Path, prefix: str) -> Path:
 
 def find_source_files(reference_dir: Path) -> dict[str, Path]:
     if not reference_dir.exists():
-        raise ProductivitySourceError(f"Referensmappen finns inte: {reference_dir}")
+        raise ProductivitySourceError(f"Produktivitetsmappen finns inte: {reference_dir}")
     return {spec.key: _latest_file(reference_dir, spec.prefix) for spec in SOURCE_SPECS}
+
+
+def _try_find_file(reference_dir: Path, prefix: str) -> Path | None:
+    try:
+        return _latest_file(reference_dir, prefix)
+    except ProductivitySourceError:
+        return None
 
 
 def _detect_dialect(sample: str) -> csv.Dialect:
@@ -97,6 +122,144 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
         handle.seek(0)
         dialect = _detect_dialect(sample)
         return list(csv.DictReader(handle, dialect=dialect))
+
+
+def _decode_sample(sample: bytes) -> str:
+    for encoding in ("utf-8-sig", "cp1252", "latin1"):
+        try:
+            return sample.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return sample.decode("utf-8", errors="replace")
+
+
+def _headers_from_sample(sample: bytes) -> set[str]:
+    text = _decode_sample(sample)
+    first_line = next((line for line in text.splitlines() if line.strip()), "")
+    if not first_line:
+        return set()
+    dialect = _detect_dialect(first_line)
+    return {value.strip().strip('"') for value in next(csv.reader([first_line], dialect=dialect), [])}
+
+
+def classify_productivity_file(filename: str | None, sample: bytes = b"") -> str | None:
+    name = Path(filename or "").name.lower()
+    for spec in SOURCE_SPECS:
+        if name.startswith(spec.prefix.lower()):
+            return spec.key
+
+    headers = _headers_from_sample(sample)
+    if not headers:
+        return None
+    normalized = {header.lower() for header in headers}
+    for key, hints in HEADER_HINTS.items():
+        if {hint.lower() for hint in hints}.issubset(normalized):
+            return key
+    return None
+
+
+def _safe_upload_name(filename: str | None, spec: SourceFileSpec) -> str:
+    original = Path(filename or "").name
+    suffix = Path(original).suffix.lower()
+    if suffix != ".csv":
+        suffix = ".csv"
+    stem = Path(original).stem or spec.prefix
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", stem).strip("._-") or spec.prefix
+    if not safe.lower().startswith(spec.prefix.lower()):
+        safe = f"{spec.prefix}-{safe}"
+    return f"{safe[:120]}{suffix}"
+
+
+def _remove_existing_files(reference_dir: Path, spec: SourceFileSpec) -> None:
+    for path in reference_dir.glob(f"{spec.prefix}*.csv"):
+        if path.is_file():
+            path.unlink()
+
+
+def save_productivity_file(
+    *,
+    source_path: Path,
+    filename: str | None,
+    file_type: str,
+    reference_dir: Path | str | None = None,
+) -> dict[str, Any]:
+    spec = SOURCE_SPEC_BY_KEY[file_type]
+    target_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_path = target_dir / _safe_upload_name(filename, spec)
+    tmp_path = target_path.with_name(f".{target_path.name}.{os.getpid()}.tmp")
+    shutil.copyfile(source_path, tmp_path)
+    _remove_existing_files(target_dir, spec)
+    tmp_path.replace(target_path)
+    clear_productivity_cache()
+    return _file_status_payload(spec, target_path)
+
+
+def clear_productivity_file(file_type: str, reference_dir: Path | str | None = None) -> None:
+    spec = SOURCE_SPEC_BY_KEY.get(file_type)
+    if spec is None or not spec.visible:
+        raise ProductivitySourceError("Okänd produktivitetsfil")
+    target_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
+    _remove_existing_files(target_dir, spec)
+    clear_productivity_cache()
+
+
+def _format_size(size: int) -> str:
+    if size >= 1024 * 1024:
+        return f"{size / (1024 * 1024):.1f} MB"
+    if size >= 1024:
+        return f"{size / 1024:.1f} kB"
+    return f"{size} B"
+
+
+def _file_status_payload(spec: SourceFileSpec, path: Path | None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "key": spec.key,
+        "label": spec.label,
+        "required": spec.required,
+        "visible": spec.visible,
+        "uploaded": path is not None,
+        "name": None,
+        "modified_at": None,
+        "size": None,
+        "size_label": None,
+    }
+    if path is None:
+        return payload
+    stat = path.stat()
+    modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).astimezone()
+    payload.update(
+        {
+            "name": path.name,
+            "modified_at": modified.isoformat(timespec="seconds"),
+            "size": stat.st_size,
+            "size_label": _format_size(stat.st_size),
+        }
+    )
+    return payload
+
+
+def build_productivity_file_status(reference_dir: Path | str | None = None) -> dict[str, Any]:
+    target_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
+    files = {
+        spec.key: _file_status_payload(
+            spec,
+            _try_find_file(target_dir, spec.prefix) if target_dir.exists() else None,
+        )
+        for spec in SOURCE_SPECS
+    }
+    visible_files = {key: value for key, value in files.items() if value["visible"]}
+    missing = [
+        item["key"]
+        for item in visible_files.values()
+        if item["required"] and not item["uploaded"]
+    ]
+    kpi_loaded = bool(files["kpi"]["uploaded"])
+    return {
+        "ready": not missing and kpi_loaded,
+        "missing": missing,
+        "files": visible_files,
+    }
 
 
 def _get(row: dict[str, str], *names: str) -> str:
@@ -492,11 +655,13 @@ def _bucketed_rows(
     return rows
 
 
-def _source_payload(path: Path, label: str, rows: int) -> dict[str, Any]:
+def _source_payload(spec: SourceFileSpec, path: Path, rows: int) -> dict[str, Any]:
     stat = path.stat()
     modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).astimezone()
     return {
-        "label": label,
+        "key": spec.key,
+        "label": spec.label,
+        "visible": spec.visible,
         "name": path.name,
         "path": str(path),
         "rows": rows,
@@ -514,6 +679,10 @@ def _cache_key(files: dict[str, Path], report_date: date | None) -> tuple[tuple[
 
 
 _REPORT_CACHE: dict[tuple[tuple[str, str, int, int] | tuple[str, str], ...], dict[str, Any]] = {}
+
+
+def clear_productivity_cache() -> None:
+    _REPORT_CACHE.clear()
 
 
 def build_productivity_report(
@@ -632,7 +801,7 @@ def build_productivity_report(
         "available_dates": [item.isoformat() for item in dates],
         "hours": list(HOURS),
         "sources": {
-            spec.key: _source_payload(files[spec.key], spec.label, raw_counts[spec.key])
+            spec.key: _source_payload(spec, files[spec.key], raw_counts[spec.key])
             for spec in SOURCE_SPECS
         },
         "summary": {

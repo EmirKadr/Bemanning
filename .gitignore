@@ -2,6 +2,11 @@
 demo/
 referens/
 
+# Uppladdade produktivitetsloggar
+data/v_ask_pick_log_full*.csv
+data/v_ask_trans_log*.csv
+data/v_ask_palletloading_log*.csv
+
 # Python
 __pycache__/
 *.py[cod]

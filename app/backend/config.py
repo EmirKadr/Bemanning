@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     SUPER_USER_USERNAMES: str = "emikad"
     EXCEL_API_TOKEN: str = ""
     PRODUCTIVITY_REFERENCE_DIR: str = ""
+    PRODUCTIVITY_DATA_DIR: str = ""
 
     @property
     def is_production(self) -> bool:

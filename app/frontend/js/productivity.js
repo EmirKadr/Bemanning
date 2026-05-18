@@ -1,4 +1,5 @@
 let productivityReport = null;
+let productivityFileStatus = null;
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) =>
@@ -85,7 +86,7 @@ function renderSummary(report) {
 }
 
 function renderSources(report) {
-  const sources = Object.values(report.sources || {});
+  const sources = Object.values(report.sources || {}).filter((source) => source.visible !== false);
   document.getElementById("productivitySources").innerHTML = sources.map((source) => `
     <div class="productivity-source">
       <span>${escapeHtml(source.label)}</span>
@@ -93,6 +94,56 @@ function renderSources(report) {
       <small>${formatNumber(source.rows)} rader</small>
     </div>
   `).join("");
+}
+
+function renderFileStatus(status) {
+  productivityFileStatus = status;
+  const files = Object.values(status.files || {});
+  const filled = files.filter((file) => file.uploaded).length;
+  const required = files.filter((file) => file.required).length;
+  document.getElementById("productivityUploadCount").textContent = `${filled}/${required} uppladdade`;
+
+  document.getElementById("productivityFileSlots").innerHTML = files.map((file) => `
+    <div class="productivity-file-slot ${file.uploaded ? "is-uploaded" : ""}">
+      <div>
+        <div class="productivity-file-label">${escapeHtml(file.label)}${file.required ? '<span class="req">*</span>' : ""}</div>
+        <div class="productivity-file-name">
+          ${file.uploaded ? escapeHtml(file.name) : '<span class="muted">Ingen fil vald</span>'}
+        </div>
+        ${file.uploaded ? `<div class="productivity-file-meta">${escapeHtml(file.size_label || "")}</div>` : ""}
+      </div>
+      <div class="productivity-file-actions">
+        <span class="status-pill ${file.uploaded ? "ok" : "none"}">${file.uploaded ? "Uppladdad" : "Ej fil"}</span>
+        <button type="button" class="btn-sm productivity-slot-upload" data-file-key="${escapeHtml(file.key)}">Välj</button>
+        <button type="button" class="btn-sm danger productivity-slot-clear" data-file-key="${escapeHtml(file.key)}" ${file.uploaded ? "" : "disabled"}>×</button>
+      </div>
+    </div>
+  `).join("");
+
+  document.querySelectorAll(".productivity-slot-upload").forEach((button) => {
+    button.addEventListener("click", () => document.getElementById("productivityUploadInput").click());
+  });
+  document.querySelectorAll(".productivity-slot-clear").forEach((button) => {
+    button.addEventListener("click", () => clearProductivityFile(button.dataset.fileKey));
+  });
+
+  const uploadStatus = document.getElementById("productivityUploadStatus");
+  uploadStatus.textContent = status.ready
+    ? "Alla produktivitetsunderlag är uppladdade."
+    : "Produktivitet kan räknas när de markerade filerna är uppladdade.";
+}
+
+function clearReportContent() {
+  productivityReport = null;
+  document.getElementById("productivitySummary").innerHTML = "";
+  document.getElementById("productivitySources").innerHTML = "";
+  document.getElementById("productivityContent").innerHTML = "";
+}
+
+async function loadProductivityFileStatus() {
+  const status = await api.get("/api/productivity/files");
+  renderFileStatus(status);
+  return status;
 }
 
 function renderGroupFilter(report) {
@@ -196,8 +247,15 @@ function renderContent() {
 async function loadProductivity() {
   const status = document.getElementById("productivityStatus");
   const dateInput = document.getElementById("productivityDate");
-  status.textContent = "Läser produktivitet...";
+  status.textContent = "Kontrollerar underlag...";
   try {
+    const fileStatus = await loadProductivityFileStatus();
+    if (!fileStatus.ready) {
+      clearReportContent();
+      status.textContent = "Saknar produktivitetsunderlag.";
+      return;
+    }
+    status.textContent = "Läser produktivitet...";
     const params = new URLSearchParams();
     if (dateInput.value) params.set("date", dateInput.value);
     const suffix = params.toString() ? `?${params.toString()}` : "";
@@ -223,13 +281,88 @@ async function loadProductivity() {
   }
 }
 
+async function uploadProductivityFiles(files) {
+  const incoming = Array.from(files || []);
+  if (!incoming.length) return;
+
+  const uploadStatus = document.getElementById("productivityUploadStatus");
+  uploadStatus.textContent = "Laddar upp filer...";
+  const form = new FormData();
+  incoming.forEach((file) => form.append("files", file));
+  try {
+    const result = await api.postForm("/api/productivity/files", form);
+    renderFileStatus(result.status);
+    const visibleSaved = (result.saved || []).filter((file) => file.visible !== false).length;
+    const hiddenSaved = (result.saved || []).filter((file) => file.visible === false).length;
+    const parts = [];
+    if (visibleSaved) parts.push(`${visibleSaved} fil(er) uppladdade`);
+    if (hiddenSaved) parts.push("KPI-mål uppdaterat i bakgrunden");
+    if (result.unknown?.length) parts.push(`Okänd filtyp: ${result.unknown.join(", ")}`);
+    const message = parts.join(". ") || "Ingen fil uppdaterades.";
+    uploadStatus.textContent = message;
+    await loadProductivity();
+    document.getElementById("productivityUploadStatus").textContent = message;
+  } catch (error) {
+    uploadStatus.textContent = error.message || "Kunde inte ladda upp filer.";
+    showToast(uploadStatus.textContent, "error", 7000);
+  }
+}
+
+async function clearProductivityFile(fileKey) {
+  if (!fileKey) return;
+  try {
+    const status = await api.del(`/api/productivity/files/${encodeURIComponent(fileKey)}`);
+    renderFileStatus(status);
+    clearReportContent();
+    document.getElementById("productivityStatus").textContent = "Saknar produktivitetsunderlag.";
+  } catch (error) {
+    showToast(error.message || "Kunde inte rensa filen.", "error", 7000);
+  }
+}
+
+function setupUploadDropzone() {
+  const panel = document.getElementById("productivityUploadPanel");
+  let dragDepth = 0;
+
+  panel.addEventListener("dragenter", (event) => {
+    if (!Array.from(event.dataTransfer?.types || []).includes("Files")) return;
+    event.preventDefault();
+    dragDepth += 1;
+    panel.classList.add("is-dragging");
+  });
+  panel.addEventListener("dragover", (event) => {
+    if (!Array.from(event.dataTransfer?.types || []).includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  });
+  panel.addEventListener("dragleave", () => {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) panel.classList.remove("is-dragging");
+  });
+  panel.addEventListener("drop", (event) => {
+    if (!Array.from(event.dataTransfer?.types || []).includes("Files")) return;
+    event.preventDefault();
+    dragDepth = 0;
+    panel.classList.remove("is-dragging");
+    uploadProductivityFiles(event.dataTransfer.files);
+  });
+}
+
 (async () => {
   const user = await initPage("productivity", { requireSuperUser: true });
   if (!user) return;
 
   document.getElementById("refreshProductivityBtn").addEventListener("click", loadProductivity);
+  document.getElementById("productivityUploadBtn").addEventListener("click", () => {
+    document.getElementById("productivityUploadInput").click();
+  });
+  document.getElementById("productivityUploadInput").addEventListener("change", (event) => {
+    uploadProductivityFiles(event.target.files);
+    event.target.value = "";
+  });
   document.getElementById("productivityDate").addEventListener("change", loadProductivity);
   document.getElementById("productivityGroupFilter").addEventListener("change", renderContent);
   document.getElementById("productivitySearch").addEventListener("input", renderContent);
+  setupUploadDropzone();
   await loadProductivity();
 })();
