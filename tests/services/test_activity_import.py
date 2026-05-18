@@ -63,10 +63,10 @@ def test_build_activity_import_template_excel_has_expected_headers():
     sheet = workbook.active
 
     assert [sheet["A1"].value, sheet["B1"].value, sheet["C1"].value, sheet["D1"].value, sheet["E1"].value] == [
-        "etikett",
-        "område",
-        "summeras som",
-        "sortering",
+        "etikett (obligatorisk)",
+        "område (frivillig)",
+        "summeras som (frivillig)",
+        "sortering (frivillig)",
         None,
     ]
 
@@ -154,10 +154,10 @@ def test_downloaded_activity_template_imports_mixed_optional_summary_and_sorting
     workbook = load_workbook(io.BytesIO(response.body))
     sheet = workbook.active
     assert [sheet.cell(1, column).value for column in range(1, 5)] == [
-        "etikett",
-        "område",
-        "summeras som",
-        "sortering",
+        "etikett (obligatorisk)",
+        "område (frivillig)",
+        "summeras som (frivillig)",
+        "sortering (frivillig)",
     ]
 
     sheet.append(["Test utan frivilligt", "GG", None, None])

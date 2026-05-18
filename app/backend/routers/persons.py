@@ -68,6 +68,14 @@ def _compact_key(value: str | None) -> str:
     return "".join(ch for ch in without_marks.strip().lower() if ch.isalnum())
 
 
+def _header_key(value: str | None) -> str:
+    key = _compact_key(value)
+    for marker in ("obligatorisk", "frivillig", "required", "optional"):
+        if key.endswith(marker):
+            return key[: -len(marker)]
+    return key
+
+
 def _cell_text(value: object) -> str:
     if value is None:
         return ""
@@ -82,7 +90,7 @@ def _header_mapping(headers: tuple[object, ...] | list[object] | None) -> dict[i
 
     mapping: dict[int, str] = {}
     for index, field in enumerate(headers):
-        canonical = HEADER_ALIASES.get(_compact_key(_cell_text(field)))
+        canonical = HEADER_ALIASES.get(_header_key(_cell_text(field)))
         if canonical:
             mapping[index] = canonical
 
@@ -107,7 +115,7 @@ def build_person_import_template_excel() -> bytes:
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Personer"
-    sheet.append(["namn", "hemområde", "huvudställe", "sortering"])
+    sheet.append(["namn (obligatorisk)", "hemområde (frivillig)", "huvudställe (frivillig)", "sortering (frivillig)"])
     sheet.column_dimensions["A"].width = 28
     sheet.column_dimensions["B"].width = 24
     sheet.column_dimensions["C"].width = 28

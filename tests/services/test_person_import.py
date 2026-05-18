@@ -22,10 +22,10 @@ def test_build_person_import_template_excel_has_expected_headers():
     sheet = workbook.active
 
     assert [sheet["A1"].value, sheet["B1"].value, sheet["C1"].value, sheet["D1"].value] == [
-        "namn",
-        "hemomr\u00e5de",
-        "huvudst\u00e4lle",
-        "sortering",
+        "namn (obligatorisk)",
+        "hemomr\u00e5de (frivillig)",
+        "huvudst\u00e4lle (frivillig)",
+        "sortering (frivillig)",
     ]
 
 
@@ -51,7 +51,7 @@ def test_parse_person_import_excel_accepts_optional_fields():
     rows, errors = parse_person_import_excel(
         workbook_bytes(
             [
-                ["namn", "hemomr\u00e5de", "huvudst\u00e4lle", "sortering"],
+                ["namn (obligatorisk)", "hemomr\u00e5de (frivillig)", "huvudst\u00e4lle (frivillig)", "sortering (frivillig)"],
                 ["Bo Berg", "GG", "GG VM", 12],
             ]
         )
