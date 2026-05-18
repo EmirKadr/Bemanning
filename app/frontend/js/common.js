@@ -9,7 +9,7 @@ const AREA_FOCUS_OPTIONS = [
   { value: "GG", label: "GG", title: "Granngården" },
   { value: "AS", label: "AS", title: "Autostore" },
   { value: "EH", label: "EH", title: "E-Handel" },
-  { value: "ALLT", label: "ALLT", title: "Alla områden" },
+  { value: "ALLT", label: "&infin;", title: "Alla områden" },
 ];
 const AREA_FOCUS_FALLBACK_NAMES = {
   MG: "Mestergruppen",

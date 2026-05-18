@@ -278,7 +278,15 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
 }
 .sidebar nav a:hover { background: var(--bg-2); color: var(--text); text-decoration: none; }
 .sidebar nav a.active { background: var(--accent-soft); color: var(--accent); }
-.sidebar nav a .icon { font-size: 16px; line-height: 1; width: 18px; flex: 0 0 18px; text-align: center; }
+.sidebar nav a .icon {
+  font-size: 16px;
+  line-height: 1;
+  width: 18px;
+  flex: 0 0 18px;
+  text-align: center;
+  color: var(--text-muted);
+  filter: grayscale(1) saturate(0);
+}
 .sidebar nav a > span:not(.icon) {
   max-width: 150px;
   overflow: hidden;
@@ -304,7 +312,7 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   background: var(--surface);
-  color: var(--text);
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
@@ -329,7 +337,7 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   border-radius: var(--r-sm);
   background: var(--surface);
   border: 1px solid transparent;
-  color: var(--text);
+  color: var(--text-muted);
   display: grid;
   place-items: center;
   box-shadow: none;
@@ -350,7 +358,7 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
 .database-toggle.active {
   background: var(--accent-soft);
   border-color: var(--accent-soft);
-  color: var(--accent);
+  color: var(--text-muted);
 }
 .database-toggle .upload-notice {
   position: absolute;
@@ -382,12 +390,6 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
 }
 .database-toggle.uploading .upload-arrow {
   animation: uploadArrowRise .72s linear infinite;
-}
-.theme-toggle[aria-pressed="false"] {
-  color: #0f172a;
-}
-:root[data-theme="dark"] .theme-toggle[aria-pressed="true"] {
-  color: #f8fafc;
 }
 @keyframes uploadArrowRise {
   0% { opacity: 0; transform: translateY(10px); }
