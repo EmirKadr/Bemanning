@@ -31,6 +31,10 @@ class OpenAllocationExcelRequest(BaseModel):
 _MODULE_LOCK = threading.Lock()
 _ENGINE_MODULE: ModuleType | None = None
 _FLOWS_MODULE: ModuleType | None = None
+_CATALOG_MODULE: ModuleType | None = None
+_DETECT_MODULE: ModuleType | None = None
+_NATIVE_FLOWS_MODULE: ModuleType | None = None
+_NATIVE_TABLES_MODULE: ModuleType | None = None
 _LOAD_ERROR: str | None = None
 SESSIONS: dict[str, dict] = {}
 
@@ -49,20 +53,54 @@ def allokering_backend_dir() -> Path:
     return warehouse_tools_dir()
 
 
+def _ensure_tools_importable() -> None:
+    tools_dir = warehouse_tools_dir()
+    if not tools_dir.exists():
+        raise AllocationBridgeUnavailable(f"Lagerverktygens backend hittades inte: {tools_dir}")
+    tools_parent = str(tools_dir.parent)
+    if tools_parent not in sys.path:
+        sys.path.insert(0, tools_parent)
+
+
+def _load_light_module(module_name: str, cache_name: str) -> ModuleType:
+    global _CATALOG_MODULE, _DETECT_MODULE, _NATIVE_FLOWS_MODULE, _NATIVE_TABLES_MODULE
+    with _MODULE_LOCK:
+        cached = globals()[cache_name]
+        if cached is not None:
+            return cached
+        _ensure_tools_importable()
+        module = importlib.import_module(module_name)
+        globals()[cache_name] = module
+        return module
+
+
+def _catalog() -> ModuleType:
+    return _load_light_module("warehouse_tools.catalog", "_CATALOG_MODULE")
+
+
+def _detect() -> ModuleType:
+    return _load_light_module("warehouse_tools.detect", "_DETECT_MODULE")
+
+
+def _native_flows() -> ModuleType:
+    return _load_light_module("warehouse_tools.native_flows", "_NATIVE_FLOWS_MODULE")
+
+
+def _native_tables() -> ModuleType:
+    return _load_light_module("warehouse_tools.native_tables", "_NATIVE_TABLES_MODULE")
+
+
 def _load_modules() -> tuple[ModuleType, ModuleType]:
     global _ENGINE_MODULE, _FLOWS_MODULE, _LOAD_ERROR
     with _MODULE_LOCK:
         if _ENGINE_MODULE is not None and _FLOWS_MODULE is not None:
             return _ENGINE_MODULE, _FLOWS_MODULE
 
-        tools_dir = warehouse_tools_dir()
-        if not tools_dir.exists():
-            _LOAD_ERROR = f"Lagerverktygens backend hittades inte: {tools_dir}"
-            raise AllocationBridgeUnavailable(_LOAD_ERROR)
-
-        tools_parent = str(tools_dir.parent)
-        if tools_parent not in sys.path:
-            sys.path.insert(0, tools_parent)
+        try:
+            _ensure_tools_importable()
+        except AllocationBridgeUnavailable as exc:
+            _LOAD_ERROR = str(exc)
+            raise
 
         try:
             _ENGINE_MODULE = importlib.import_module("warehouse_tools.engine")
@@ -97,6 +135,18 @@ def unavailable_detail() -> dict:
     }
 
 
+def public_registry() -> list[dict]:
+    return _catalog().public_registry()
+
+
+def public_pool() -> list[dict]:
+    return _catalog().public_pool()
+
+
+def detect_file_type(path: str | Path) -> str | None:
+    return _detect().detect_file_type(path)
+
+
 def require_available() -> tuple[ModuleType, ModuleType]:
     try:
         return _load_modules()
@@ -122,7 +172,24 @@ def _cell(value: object) -> str:
     return "" if text.lower() in ("nan", "nat", "none") else text
 
 
+def _is_simple_table(value: object) -> bool:
+    try:
+        return bool(_native_tables().is_simple_table(value))
+    except Exception:
+        return False
+
+
 def df_to_table(df, preview_limit: int = 1000) -> dict:
+    if _is_simple_table(df):
+        columns = [str(column) for column in df.columns]
+        rows = [[_cell(value) for value in row] for row in df.preview_rows(preview_limit)]
+        return {
+            "columns": columns,
+            "rows": rows,
+            "row_count": int(len(df)),
+            "truncated": len(df) > preview_limit,
+        }
+
     try:
         import pandas as pd  # type: ignore
     except Exception as exc:  # noqa: BLE001
@@ -189,6 +256,25 @@ def open_df_in_excel_without_header(df, label: str) -> str:
     return path
 
 
+def open_simple_table_in_excel_without_header(table, label: str) -> str:
+    try:
+        from openpyxl import Workbook
+    except Exception as exc:  # noqa: BLE001
+        raise AllocationBridgeUnavailable("Openpyxl saknas for Excel-export.") from exc
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_{label}.xlsx")
+    path = tmp.name
+    tmp.close()
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = str(label)[:31] or "Sheet1"
+    for row in table.rows:
+        sheet.append([_cell(value) for value in row])
+    workbook.save(path)
+    open_path(path)
+    return path
+
+
 async def form_to_flow_payload(form) -> tuple[dict[str, Path], dict[str, str], list[Path]]:
     files: dict[str, Path] = {}
     params: dict[str, str] = {}
@@ -205,8 +291,12 @@ async def form_to_flow_payload(form) -> tuple[dict[str, Path], dict[str, str], l
 
 
 def run_flow_handler(flow_id: str, files: dict, params: dict) -> dict:
-    _engine_module, flows_module = require_available()
-    flow = flows_module.FLOW_BY_ID.get(flow_id)
+    flow = _native_flows().FLOW_BY_ID.get(flow_id)
+    if flow is None:
+        if flow_id not in _catalog().FLOW_BY_ID:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Okänt flöde: {flow_id}")
+        _engine_module, flows_module = require_available()
+        flow = flows_module.FLOW_BY_ID.get(flow_id)
     if flow is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Okänt flöde: {flow_id}")
     try:
@@ -240,39 +330,47 @@ def run_flow_handler(flow_id: str, files: dict, params: dict) -> dict:
 
 
 def open_excel_result(req: OpenAllocationExcelRequest) -> dict:
-    engine_module, _flows_module = require_available()
     session = SESSIONS.get(req.session_id)
     if session is None or req.key not in session["tables"]:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Resultatet hittades inte (kör flödet igen).")
     label = session["labels"].get(req.key, req.key)
-    if session.get("flow_id") == "split-values":
-        path = open_df_in_excel_without_header(session["tables"][req.key], label=label)
+    table = session["tables"][req.key]
+    if _is_simple_table(table):
+        path = open_simple_table_in_excel_without_header(table, label=label)
+    elif session.get("flow_id") == "split-values":
+        path = open_df_in_excel_without_header(table, label=label)
     else:
-        path = engine_module.open_df_in_excel({label: session["tables"][req.key]}, label=label)
+        engine_module, _flows_module = require_available()
+        path = engine_module.open_df_in_excel({label: table}, label=label)
     return {"opened": True, "path": path}
 
 
 def table_column_text(session_id: str, key: str, column_index: int) -> dict:
-    require_available()
     session = SESSIONS.get(session_id)
     if session is None or key not in session["tables"]:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Resultatet hittades inte.")
-    df = session["tables"][key]
-    if column_index < 0 or column_index >= len(df.columns):
+    table = session["tables"][key]
+    if column_index < 0 or column_index >= len(table.columns):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Kolumnen hittades inte.")
-    values = [_cell(value) for value in df.iloc[:, column_index].tolist()]
+    if _is_simple_table(table):
+        values = [_cell(value) for value in table.column_values(column_index)]
+    else:
+        values = [_cell(value) for value in table.iloc[:, column_index].tolist()]
     while values and values[-1] == "":
         values.pop()
     return {"text": "\n".join(values)}
 
 
 def download_result(session_id: str, key: str):
-    require_available()
     session = SESSIONS.get(session_id)
     if session is None or key not in session["tables"]:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Resultatet hittades inte.")
     label = session["labels"].get(key, key)
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
-    session["tables"][key].to_csv(tmp.name, index=False, encoding="utf-8-sig")
+    table = session["tables"][key]
+    if _is_simple_table(table):
+        table.write_csv(tmp.name)
+    else:
+        table.to_csv(tmp.name, index=False, encoding="utf-8-sig")
     tmp.close()
     return FileResponse(tmp.name, filename=f"{label}.csv", media_type="text/csv")

@@ -11,7 +11,6 @@ from app.backend import allocation_bridge as bridge
 from app.backend.routers import allocation as allocation_router
 
 
-pd = pytest.importorskip("pandas")
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -38,6 +37,7 @@ def route_user(role: str):
 
 
 def test_df_to_table_serializes_preview_without_nan_values():
+    pd = pytest.importorskip("pandas")
     df = pd.DataFrame(
         {
             "Artikel": ["A100", None],
@@ -83,6 +83,48 @@ def test_allocation_bridge_imports_warehouse_tools_when_started_from_app_root():
     assert "12.1.5" in result.stdout
 
 
+def test_allocation_catalog_loads_without_pandas_when_started_from_app_root():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import builtins\n"
+                "real_import = builtins.__import__\n"
+                "def guard(name, *args, **kwargs):\n"
+                "    if name == 'pandas' or name.startswith('pandas.'):\n"
+                "        raise ModuleNotFoundError(\"No module named 'pandas'\")\n"
+                "    return real_import(name, *args, **kwargs)\n"
+                "builtins.__import__ = guard\n"
+                "from backend import allocation_bridge as bridge\n"
+                "print(len(bridge.public_registry()), len(bridge.public_pool()))\n"
+            ),
+        ],
+        cwd=ROOT / "app",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().split() == ["14", "10"]
+
+
+def test_native_detector_recognizes_wms_csv_without_pandas(tmp_path):
+    pick_log = tmp_path / "v_ask_pick_log_full-test.csv"
+    pick_log.write_text("Pallid;Artikelnr;Plockat;Ordernr;Datum\nP1;A1;1;O1;2026-05-18\n", encoding="utf-8")
+
+    assert bridge.detect_file_type(pick_log) == "wms_pick"
+
+
+def test_native_detector_uses_ask_filename_hints_without_reading_headers(tmp_path):
+    orders = tmp_path / "v_ask_customer_order_details_all-20260518075529.csv"
+    orders.write_text("helt;okand;header\n1;2;3\n", encoding="utf-8")
+
+    assert bridge.detect_file_type(orders) == "orders"
+
+
 def test_allocation_bridge_imports_without_tkinter_on_headless_server():
     env = dict(**os.environ, WAREHOUSE_TOOLS_FORCE_HEADLESS_TK="1")
     result = subprocess.run(
@@ -108,6 +150,7 @@ def test_allocation_bridge_imports_without_tkinter_on_headless_server():
 
 
 def test_run_flow_handler_serializes_tables_and_keeps_session(monkeypatch):
+    pd = pytest.importorskip("pandas")
     df = pd.DataFrame({"Artikel": ["A100", ""], "Antal": [1, 2]})
     flows = SimpleNamespace(
         FLOW_BY_ID={
@@ -122,6 +165,7 @@ def test_run_flow_handler_serializes_tables_and_keeps_session(monkeypatch):
         }
     )
     fake_available(monkeypatch, flows_module=flows)
+    monkeypatch.setattr(bridge, "_catalog", lambda: SimpleNamespace(FLOW_BY_ID={"demo": {}}))
 
     result = bridge.run_flow_handler("demo", {"orders": object()}, {"limit": "10"})
 
@@ -136,6 +180,24 @@ def test_run_flow_handler_serializes_tables_and_keeps_session(monkeypatch):
     assert bridge.table_column_text(result["session_id"], "main", 0) == {"text": "A100"}
 
 
+def test_run_split_values_uses_native_flow_without_legacy_runtime(monkeypatch):
+    def fail_available():
+        raise AssertionError("legacy allocation runtime should not load for split-values")
+
+    monkeypatch.setattr(bridge, "require_available", fail_available)
+
+    result = bridge.run_flow_handler("split-values", {}, {"values": "A\nB\nC\nD\nE", "chunk_size": "2"})
+
+    assert result["summary"] == {"Antal värden": 5, "Antal kolumner": 3, "Per kolumn": 2}
+    assert result["tables"][0]["table"] == {
+        "columns": ["Kolumn 1", "Kolumn 2", "Kolumn 3"],
+        "rows": [["A", "C", "E"], ["B", "D", ""]],
+        "row_count": 2,
+        "truncated": False,
+    }
+    assert bridge.table_column_text(result["session_id"], "report", 1) == {"text": "C\nD"}
+
+
 def test_run_flow_handler_returns_404_for_unknown_flow(monkeypatch):
     fake_available(monkeypatch)
 
@@ -146,28 +208,24 @@ def test_run_flow_handler_returns_404_for_unknown_flow(monkeypatch):
 
 
 def test_allocation_router_exposes_flow_registry_and_pool(monkeypatch):
-    flows = SimpleNamespace(
-        FLOW_BY_ID={},
-        public_registry=lambda: [{"id": "allocering", "label": "Allokering"}],
-        public_pool=lambda: [{"key": "orders", "label": "Bestallningslinjer"}],
-    )
-    fake_available(monkeypatch, flows_module=flows)
+    monkeypatch.setattr(bridge, "public_registry", lambda: [{"id": "allocering", "label": "Allokering"}])
+    monkeypatch.setattr(bridge, "public_pool", lambda: [{"key": "orders", "label": "Bestallningslinjer"}])
 
     assert allocation_router.list_flows(user=route_user("super_user")) == {"flows": [{"id": "allocering", "label": "Allokering"}]}
     assert allocation_router.list_pool(user=route_user("super_user")) == {"pool": [{"key": "orders", "label": "Bestallningslinjer"}]}
 
 
 def test_allocation_router_limits_lager_and_artikelplacering_to_self_service_flows(monkeypatch):
-    flows = SimpleNamespace(
-        FLOW_BY_ID={},
-        public_registry=lambda: [
+    monkeypatch.setattr(
+        bridge,
+        "public_registry",
+        lambda: [
             {"id": "allocate", "label": "Allokering"},
             {"id": "eftersok", "label": "Eftersok"},
             {"id": "split-values", "label": "Dela varden"},
         ],
-        public_pool=lambda: [{"key": "orders", "label": "Bestallningslinjer"}],
     )
-    fake_available(monkeypatch, flows_module=flows)
+    monkeypatch.setattr(bridge, "public_pool", lambda: [{"key": "orders", "label": "Bestallningslinjer"}])
 
     for role in ("warehouse_clerk", "article_placer"):
         user = route_user(role)
@@ -184,7 +242,7 @@ def test_allocation_health_reports_unavailable_without_crashing(monkeypatch):
     def fail():
         raise RuntimeError("saknas")
 
-    monkeypatch.setattr(bridge, "require_available", fail)
+    monkeypatch.setattr(bridge, "public_registry", fail)
     monkeypatch.setattr(
         bridge,
         "unavailable_detail",

@@ -29,22 +29,21 @@ def _assert_flow_allowed(flow_id: str, user: User) -> None:
 @router.get("/health")
 def health(_user: User = Depends(require_allocation_tools_user)) -> dict:
     try:
-        engine_module, _flows_module = bridge.require_available()
+        bridge.public_registry()
     except Exception:
         return bridge.unavailable_detail()
     return {
         "available": True,
         "status": "ok",
-        "version": getattr(engine_module, "APP_VERSION", ""),
-        "title": getattr(engine_module, "APP_TITLE", "Allokering"),
+        "version": "inhouse",
+        "title": "Lagerverktyg",
         "backend_dir": str(bridge.warehouse_tools_dir()),
     }
 
 
 @router.get("/flows")
 def list_flows(user: User = Depends(require_allocation_tools_user)) -> dict:
-    _engine_module, flows_module = bridge.require_available()
-    flows = flows_module.public_registry()
+    flows = bridge.public_registry()
     if not can_use_allocation_process(user):
         flows = [flow for flow in flows if flow.get("id") in SELF_SERVICE_FLOW_IDS]
     return {"flows": flows}
@@ -52,10 +51,9 @@ def list_flows(user: User = Depends(require_allocation_tools_user)) -> dict:
 
 @router.get("/pool")
 def list_pool(user: User = Depends(require_allocation_tools_user)) -> dict:
-    _engine_module, flows_module = bridge.require_available()
     if not can_use_allocation_process(user):
         return {"pool": []}
-    return {"pool": flows_module.public_pool()}
+    return {"pool": bridge.public_pool()}
 
 
 @router.post("/detect")
@@ -63,10 +61,9 @@ async def detect(
     file: UploadFile = File(...),
     _user: User = Depends(require_allocation_tools_user),
 ) -> dict:
-    engine_module, _flows_module = bridge.require_available()
     path = await bridge.save_upload(file)
     try:
-        file_type = engine_module.detect_file_type(str(path))
+        file_type = bridge.detect_file_type(path)
     except Exception:
         file_type = None
     finally:
