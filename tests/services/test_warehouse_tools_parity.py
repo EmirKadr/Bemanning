@@ -164,6 +164,9 @@ def test_vendored_warehouse_registry_matches_old_allokering_app():
     assert set(new_flows.FLOW_BY_ID) == set(legacy_flows.FLOW_BY_ID)
 
 
+@pytest.mark.filterwarnings(
+    "ignore:Workbook contains no default style, apply openpyxl's default:UserWarning:openpyxl.styles.stylesheet"
+)
 @pytest.mark.parametrize("flow_id", PARITY_FLOW_IDS)
 def test_vendored_warehouse_flows_match_old_allokering_app(flow_id: str):
     legacy_flows = _load_legacy_flows()
