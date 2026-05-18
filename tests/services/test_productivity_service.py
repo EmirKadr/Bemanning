@@ -155,11 +155,23 @@ MG\tJKP\tOUTBOUND\tEcom_pack\tE - Handel pack\t0\t0\t2
     )
 
     report = build_productivity_report(tmp_path)
+    groups = {group["id"]: group for group in report["groups"]}
     sections = {
         section["id"]: section
         for group in report["groups"]
         for section in group["sections"]
     }
+    section_groups = {
+        section["id"]: group["id"]
+        for group in report["groups"]
+        for section in group["sections"]
+    }
+
+    assert {"gg", "as", "eh", "mg"} <= set(groups)
+    assert section_groups["as_store_pick"] == "as"
+    assert section_groups["gg_decanting"] == "as"
+    assert section_groups["gg_ecom_pack"] == "eh"
+    assert section_groups["mg_ecom_pick"] == "eh"
 
     gg_pick = sections["gg_pick_ab"]
     assert gg_pick["total_rows"] == 2

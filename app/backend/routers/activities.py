@@ -1,22 +1,237 @@
+import io
 import re
 import unicodedata
+from dataclasses import dataclass
+from zipfile import BadZipFile
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import Response
+from openpyxl import Workbook, load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..audit import log as audit_log
 from ..deps import get_current_user, get_db, require_admin
 from ..models import Activity, Area, User
-from ..schemas import ActivityCreate, ActivityOut, ActivityUpdate
+from ..schemas import ActivityCreate, ActivityImportError, ActivityImportResult, ActivityOut, ActivityUpdate
 from ..user_access import is_super_user
 
 router = APIRouter(prefix="/api/activities", tags=["activities"])
+
+EXCEL_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+MAX_IMPORT_BYTES = 5 * 1024 * 1024
+
+HEADER_ALIASES = {
+    "etikett": "label",
+    "aktivitet": "label",
+    "stalle": "label",
+    "ställe": "label",
+    "namn": "label",
+    "label": "label",
+    "name": "label",
+    "activity": "label",
+    "omrade": "area",
+    "område": "area",
+    "avdelning": "area",
+    "area": "area",
+    "department": "area",
+    "summerassom": "summary_activity",
+    "summerasom": "summary_activity",
+    "sammanstallning": "summary_activity",
+    "sammanställning": "summary_activity",
+    "huvudstalle": "summary_activity",
+    "huvudställe": "summary_activity",
+    "summary": "summary_activity",
+    "summaryactivity": "summary_activity",
+    "kategori": "category",
+    "category": "category",
+    "farg": "color",
+    "färg": "color",
+    "color": "color",
+    "colour": "color",
+    "sortering": "sort_order",
+    "sort": "sort_order",
+    "sortorder": "sort_order",
+}
+
+CATEGORY_ALIASES = {
+    "": "work",
+    "arbete": "work",
+    "arbetsstalle": "work",
+    "arbetsställe": "work",
+    "work": "work",
+    "franvaro": "absence",
+    "frånvaro": "absence",
+    "absence": "absence",
+    "ledig": "absence",
+    "ledigt": "absence",
+}
+
+
+@dataclass(frozen=True)
+class ImportActivityRow:
+    row_number: int
+    label: str
+    area: str | None
+    summary_activity: str | None
+    category: str
+    color: str
+    sort_order: int | None
 
 
 def _code_part(value: str | None) -> str:
     normalized = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode("ascii")
     normalized = re.sub(r"[^A-Za-z0-9]+", "_", normalized).strip("_")
     return normalized.upper()
+
+
+def _compact_key(value: str | None) -> str:
+    normalized = unicodedata.normalize("NFKD", value or "")
+    without_marks = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return "".join(ch for ch in without_marks.strip().lower() if ch.isalnum())
+
+
+def _cell_text(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def _header_mapping(headers: tuple[object, ...] | list[object] | None) -> dict[int, str]:
+    if not headers:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Excel-filen saknar rubrikrad")
+
+    mapping: dict[int, str] = {}
+    for index, field in enumerate(headers):
+        canonical = HEADER_ALIASES.get(_compact_key(_cell_text(field)))
+        if canonical:
+            mapping[index] = canonical
+
+    if "label" not in set(mapping.values()):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Excel-filen måste ha kolumnen etikett")
+    return mapping
+
+
+def _parse_sort_order(value: str, *, row_number: int, label: str) -> tuple[int | None, ActivityImportError | None]:
+    if not value:
+        return None, None
+    try:
+        parsed = float(value.replace(",", "."))
+    except ValueError:
+        return None, ActivityImportError(row=row_number, label=label or None, error="Sortering måste vara ett tal")
+    if not parsed.is_integer():
+        return None, ActivityImportError(row=row_number, label=label or None, error="Sortering måste vara ett heltal")
+    return int(parsed), None
+
+
+def _parse_category(value: str, *, row_number: int, label: str) -> tuple[str, ActivityImportError | None]:
+    category = CATEGORY_ALIASES.get(_compact_key(value))
+    if category is None:
+        return "work", ActivityImportError(
+            row=row_number,
+            label=label or None,
+            error="Kategori måste vara arbete eller frånvaro",
+        )
+    return category, None
+
+
+def _parse_color(value: str, *, row_number: int, label: str) -> tuple[str, ActivityImportError | None]:
+    if not value:
+        return "#ffffff", None
+    color = value.strip()
+    if re.fullmatch(r"[0-9A-Fa-f]{6}", color):
+        color = f"#{color}"
+    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", color):
+        return "#ffffff", ActivityImportError(
+            row=row_number,
+            label=label or None,
+            error="Färg måste vara hex, till exempel #ffffff",
+        )
+    return color.lower(), None
+
+
+def build_activity_import_template_excel() -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Ställen"
+    sheet.append(["etikett", "område", "summeras som", "kategori", "färg", "sortering"])
+    sheet.column_dimensions["A"].width = 28
+    sheet.column_dimensions["B"].width = 24
+    sheet.column_dimensions["C"].width = 28
+    sheet.column_dimensions["D"].width = 16
+    sheet.column_dimensions["E"].width = 14
+    sheet.column_dimensions["F"].width = 14
+    sheet.freeze_panes = "A2"
+
+    stream = io.BytesIO()
+    workbook.save(stream)
+    return stream.getvalue()
+
+
+def parse_activity_import_excel(content: bytes) -> tuple[list[ImportActivityRow], list[ActivityImportError]]:
+    try:
+        workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except (BadZipFile, InvalidFileException, OSError):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Excel-filen kunde inte läsas")
+
+    sheet = workbook.worksheets[0]
+    rows_iter = sheet.iter_rows(values_only=True)
+    try:
+        headers = next(rows_iter)
+    except StopIteration:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Excel-filen saknar rubrikrad")
+
+    mapping = _header_mapping(headers)
+    rows: list[ImportActivityRow] = []
+    errors: list[ActivityImportError] = []
+
+    for row_number, raw_row in enumerate(rows_iter, start=2):
+        values = {
+            canonical: _cell_text(raw_row[index] if index < len(raw_row) else None)
+            for index, canonical in mapping.items()
+        }
+        if not any(values.values()):
+            continue
+
+        label = values.get("label", "").strip()
+        if not label:
+            errors.append(ActivityImportError(row=row_number, error="Etikett saknas"))
+            continue
+        if len(label) > 60:
+            errors.append(ActivityImportError(row=row_number, label=label, error="Etikett får vara max 60 tecken"))
+            continue
+
+        category, category_error = _parse_category(values.get("category", ""), row_number=row_number, label=label)
+        if category_error is not None:
+            errors.append(category_error)
+            continue
+
+        color, color_error = _parse_color(values.get("color", ""), row_number=row_number, label=label)
+        if color_error is not None:
+            errors.append(color_error)
+            continue
+
+        sort_order, sort_error = _parse_sort_order(values.get("sort_order", ""), row_number=row_number, label=label)
+        if sort_error is not None:
+            errors.append(sort_error)
+            continue
+
+        rows.append(
+            ImportActivityRow(
+                row_number=row_number,
+                label=label,
+                area=values.get("area") or None,
+                summary_activity=values.get("summary_activity") or None,
+                category=category,
+                color=color,
+                sort_order=sort_order,
+            )
+        )
+
+    return rows, errors
 
 
 def _activity_code_base(label: str, area: Area | None) -> str:
@@ -69,6 +284,25 @@ def _activity_snapshot(activity: Activity) -> dict:
     }
 
 
+def _lookup_map(rows, *attrs: str) -> dict[str, object]:
+    lookup: dict[str, object] = {}
+    for row in rows:
+        for attr in attrs:
+            value = getattr(row, attr, None)
+            key = _compact_key(str(value) if value is not None else "")
+            if key:
+                lookup.setdefault(key, row)
+    return lookup
+
+
+def _existing_activity_labels(db: Session) -> set[str]:
+    return {_compact_key(label) for (label,) in db.query(Activity.label).all()}
+
+
+def _next_sort_order(db: Session) -> int:
+    return int(db.query(func.max(Activity.sort_order)).scalar() or 0) + 1
+
+
 def _validate_summary_activity(
     db: Session,
     *,
@@ -110,6 +344,102 @@ def list_activities(
     if not include_inactive:
         q = q.filter(Activity.is_active.is_(True))
     return q.order_by(Activity.sort_order, Activity.label).all()
+
+
+@router.get("/import-template")
+def download_import_template(_admin: User = Depends(require_admin)) -> Response:
+    return Response(
+        content=build_activity_import_template_excel(),
+        media_type=EXCEL_MEDIA_TYPE,
+        headers={"Content-Disposition": 'attachment; filename="stallen-importmall.xlsx"'},
+    )
+
+
+@router.post("/import", response_model=ActivityImportResult)
+async def import_activities(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> ActivityImportResult:
+    content = await file.read()
+    if len(content) > MAX_IMPORT_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Excel-filen är för stor")
+
+    rows, errors = parse_activity_import_excel(content)
+    area_lookup = _lookup_map(db.query(Area).all(), "code", "name")
+    activity_lookup = _lookup_map(db.query(Activity).all(), "code", "label")
+    existing_labels = _existing_activity_labels(db)
+    seen_labels: set[str] = set()
+    next_sort = _next_sort_order(db)
+    created = 0
+
+    for row in rows:
+        label_key = _compact_key(row.label)
+        if label_key in seen_labels:
+            errors.append(ActivityImportError(row=row.row_number, label=row.label, error="Dubblett i Excel-filen"))
+            continue
+        seen_labels.add(label_key)
+
+        if label_key in existing_labels:
+            errors.append(ActivityImportError(row=row.row_number, label=row.label, error="Stället finns redan"))
+            continue
+
+        area = None
+        if row.area:
+            area = area_lookup.get(_compact_key(row.area))
+            if area is None:
+                errors.append(ActivityImportError(row=row.row_number, label=row.label, error="Område hittades inte"))
+                continue
+
+        summary_activity_id = None
+        if row.summary_activity:
+            summary_activity = activity_lookup.get(_compact_key(row.summary_activity))
+            if summary_activity is None:
+                errors.append(
+                    ActivityImportError(row=row.row_number, label=row.label, error="Summeringsställe hittades inte")
+                )
+                continue
+            summary_activity_id = _validate_summary_activity(
+                db,
+                activity_id=None,
+                summary_activity_id=summary_activity.id,
+            )
+
+        sort_order = row.sort_order if row.sort_order is not None else next_sort
+        if row.sort_order is None:
+            next_sort += 1
+
+        code = _unique_activity_code(db, _activity_code_base(row.label, area))
+        activity = Activity(
+            code=code,
+            label=row.label,
+            area_id=area.id if area is not None else None,
+            summary_activity_id=summary_activity_id,
+            color=row.color,
+            category=row.category,
+            sort_order=sort_order,
+            is_active=True,
+            required_competency=None,
+        )
+        db.add(activity)
+        db.flush()
+
+        audit_log(
+            db,
+            entity_type="activity",
+            entity_id=activity.id,
+            action="import_create",
+            old_value=None,
+            new_value=_activity_snapshot(activity),
+            user_id=admin.id,
+        )
+        existing_labels.add(label_key)
+        activity_lookup.setdefault(label_key, activity)
+        activity_lookup.setdefault(_compact_key(activity.code), activity)
+        created += 1
+
+    db.commit()
+    return ActivityImportResult(created=created, skipped=len(errors), errors=errors)
 
 
 @router.post("", response_model=ActivityOut, status_code=status.HTTP_201_CREATED)

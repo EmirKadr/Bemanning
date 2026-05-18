@@ -228,6 +228,7 @@ def seed_visual_data() -> None:
         admin.must_change_password = False
 
         _ensure_user(db, username="visual_leader", display_name="Visual Arbetsledare", role="leader", area=gg)
+        _ensure_user(db, username="visual_staffing", display_name="Visual Bemanningsansvarig", role="staffing_manager", area=gg)
         _ensure_user(db, username="visual_viewer", display_name="Visual Visning", role="viewer", area=mg)
         _ensure_user(db, username="visual_lager", display_name="Visual Lagerkontorist", role="warehouse_clerk", area=None)
 

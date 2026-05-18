@@ -12,6 +12,7 @@ python -m tools.bemanning_cli routes --format markdown
 python -m tools.bemanning_cli --base-url http://127.0.0.1:8000 auth login --username admin --password admin123
 python -m tools.bemanning_cli call schedule.get --query year=2026 --query week=21 --query weekday=1
 python -m tools.bemanning_cli call persons.import --file file=personer.xlsx
+python -m tools.bemanning_cli call activities.import --file file=stallen.xlsx
 python -m tools.bemanning_cli api GET /api/health
 ```
 
@@ -19,7 +20,8 @@ python -m tools.bemanning_cli api GET /api/health
 om en ny väg ännu inte fått ett namn i CLI:t.
 
 Användar-API:t är bakåtkompatibelt med `role`, men nya klienter kan skicka
-`roles`, t.ex. `{"username":"anna","roles":["viewer","leader"]}` eller
+`roles`, t.ex. `{"username":"anna","roles":["viewer","leader"]}`,
+`{"username":"petra","roles":["staffing_manager"]}` för Bemanningsansvarig,
 `{"username":"lina","roles":["warehouse_clerk"]}` för Lagerkontorist och
 `{"username":"arvid","roles":["article_placer"]}` för Artikelplacerare.
 
@@ -30,19 +32,21 @@ Användar-API:t är bakåtkompatibelt med `role`, men nya klienter kan skicka
 | `auth.logout` | `POST` | `/api/auth/logout` | Logga ut |
 | `auth.me` | `GET` | `/api/auth/me` | Aktuell användare |
 | `auth.set_password` | `POST` | `/api/auth/set-password` | Sätt första lösenord |
-| `allocation.health` | `GET` | `/api/allokering/health` | Allokering health |
-| `allocation.flows` | `GET` | `/api/allokering/flows` | Lista Allokering-flöden |
-| `allocation.pool` | `GET` | `/api/allokering/pool` | Lista Allokering-uppladdningsslots |
-| `allocation.detect` | `POST` | `/api/allokering/detect` | Identifiera Allokering-fil |
+| `allocation.health` | `GET` | `/api/allokering/health` | Lagerverktyg health |
+| `allocation.flows` | `GET` | `/api/allokering/flows` | Lista lagerverktygsflöden |
+| `allocation.pool` | `GET` | `/api/allokering/pool` | Lista lagerverktygens uppladdningsslots |
+| `allocation.detect` | `POST` | `/api/allokering/detect` | Identifiera lagerverktygsfil |
 | `allocation.observations_update` | `POST` | `/api/allokering/observations/update` | Uppdatera observations från buffert |
-| `allocation.run_flow` | `POST` | `/api/allokering/flow/{flow_id}` | Kör Allokering-flöde |
-| `allocation.open_excel` | `POST` | `/api/allokering/open-excel` | Öppna Allokering-resultat i Excel |
+| `allocation.run_flow` | `POST` | `/api/allokering/flow/{flow_id}` | Kör lagerverktygsflöde |
+| `allocation.open_excel` | `POST` | `/api/allokering/open-excel` | Öppna lagerverktygsresultat i Excel |
 | `allocation.table_column` | `GET` | `/api/allokering/table-column/{session_id}/{key}/{column_index}` | Hämta resultatkolumn |
 | `allocation.download` | `GET` | `/api/allokering/download/{session_id}/{key}` | Ladda ner Allokering-resultat |
 | `areas.list` | `GET` | `/api/areas` | Lista områden |
 | `areas.create` | `POST` | `/api/areas` | Skapa område |
 | `areas.update` | `PUT` | `/api/areas/{area_id}` | Uppdatera område |
 | `activities.list` | `GET` | `/api/activities` | Lista aktiviteter |
+| `activities.import_template` | `GET` | `/api/activities/import-template` | Hämta importmall för ställen |
+| `activities.import` | `POST` | `/api/activities/import` | Importera ställen |
 | `activities.create` | `POST` | `/api/activities` | Skapa aktivitet |
 | `activities.update` | `PUT` | `/api/activities/{activity_id}` | Uppdatera aktivitet |
 | `activities.delete` | `DELETE` | `/api/activities/{activity_id}` | Inaktivera aktivitet |

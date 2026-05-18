@@ -8,11 +8,12 @@ from .schemas import UserAdminOut, UserOut
 SUPER_USER_ROLE = "super_user"
 LEGACY_SUPER_USER_ROLE = "super" + "_admin"
 VIEWER_ROLE = "viewer"
+STAFFING_MANAGER_ROLE = "staffing_manager"
 WAREHOUSE_CLERK_ROLE = "warehouse_clerk"
 ARTICLE_PLACER_ROLE = "article_placer"
 ADMIN_ROLES = {"admin", SUPER_USER_ROLE, LEGACY_SUPER_USER_ROLE}
-EDITOR_ROLES = {"leader", *ADMIN_ROLES}
-BASE_ROLES = {"admin", "leader", VIEWER_ROLE, WAREHOUSE_CLERK_ROLE, ARTICLE_PLACER_ROLE}
+EDITOR_ROLES = {"leader", STAFFING_MANAGER_ROLE, *ADMIN_ROLES}
+BASE_ROLES = {"admin", "leader", STAFFING_MANAGER_ROLE, VIEWER_ROLE, WAREHOUSE_CLERK_ROLE, ARTICLE_PLACER_ROLE}
 
 
 def user_roles(user: User) -> list[str]:
@@ -26,7 +27,7 @@ def user_roles(user: User) -> list[str]:
 
 
 def primary_role(roles: list[str]) -> str:
-    for candidate in ("admin", "leader", WAREHOUSE_CLERK_ROLE, ARTICLE_PLACER_ROLE, VIEWER_ROLE):
+    for candidate in ("admin", STAFFING_MANAGER_ROLE, "leader", WAREHOUSE_CLERK_ROLE, ARTICLE_PLACER_ROLE, VIEWER_ROLE):
         if candidate in roles:
             return candidate
     return roles[0] if roles else "leader"

@@ -49,6 +49,14 @@ ROLE_ALIASES = {
     "arbetsledare": "leader",
     "ledare": "leader",
     "leader": "leader",
+    "bemanningsansvarig": "staffing_manager",
+    "bemanningsanvarig": "staffing_manager",
+    "staffingmanager": "staffing_manager",
+    "staffing_manager": "staffing_manager",
+    "produktionsledare": "staffing_manager",
+    "produktion": "staffing_manager",
+    "productionleader": "staffing_manager",
+    "production_leader": "staffing_manager",
     "lagerkontorist": "warehouse_clerk",
     "lager": "warehouse_clerk",
     "warehouseclerk": "warehouse_clerk",
@@ -231,7 +239,7 @@ def parse_user_import_excel(content: bytes) -> tuple[list[ImportUserRow], list[U
                 UserImportError(
                     row=row_number,
                     username=username,
-                    error="Roll måste vara admin, arbetsledare, lagerkontorist, artikelplacerare eller visning. Flera roller kan separeras med komma.",
+                    error="Roll måste vara admin, arbetsledare, bemanningsansvarig, lagerkontorist, artikelplacerare eller visning. Flera roller kan separeras med komma.",
                 )
             )
             continue

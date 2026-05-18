@@ -27,7 +27,10 @@ function canSeeCodes() {
 async function load() {
   activities = await api.get("/api/activities?include_inactive=true");
   const includeInactive = document.getElementById("show-inactive").checked;
-  const acts = includeInactive ? activities : activities.filter((a) => a.is_active);
+  const acts = [...(includeInactive ? activities : activities.filter((a) => a.is_active))]
+    .sort((a, b) => typeof compareActivitiesForAreaFocus === "function"
+      ? compareActivitiesForAreaFocus(a, b, areas)
+      : ((Number(a.sort_order) || 0) - (Number(b.sort_order) || 0)));
   const tbody = document.getElementById("acts-body");
   document.getElementById("code-column-header").hidden = !canSeeCodes();
   tbody.innerHTML = "";
@@ -130,11 +133,105 @@ function openModal(act) {
   });
 }
 
+function openImportResultModal(result) {
+  const errors = result.errors || [];
+  const shownErrors = errors.slice(0, 25);
+  const extra = Math.max(0, errors.length - shownErrors.length);
+  const rows = shownErrors.map((entry) => `
+    <tr>
+      <td>${entry.row}</td>
+      <td>${escapeHtml(entry.label || "-")}</td>
+      <td>${escapeHtml(entry.error)}</td>
+    </tr>`).join("");
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal wide">
+      <h2>Importresultat</h2>
+      <p class="note">${result.created} skapade, ${result.skipped} hoppades över.</p>
+      ${rows ? `
+        <div class="modal-table-scroll">
+          <table>
+            <thead><tr><th>Rad</th><th>Etikett</th><th>Fel</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      ` : ""}
+      ${extra ? `<p class="note">${extra} fler fel visas inte här.</p>` : ""}
+      <div class="actions">
+        <button class="primary" id="import-result-close">Stäng</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  document.getElementById("import-result-close").addEventListener("click", () => backdrop.remove());
+}
+
+function showImportResult(result) {
+  if (result.created && result.skipped) {
+    showToast(`${result.created} ställen importerades. ${result.skipped} rad(er) hoppades över.`, "warn", 7000);
+    openImportResultModal(result);
+    return;
+  }
+  if (result.created) {
+    showToast(`${result.created} ställen importerades`, "success");
+    return;
+  }
+  if (result.skipped) {
+    showToast("Inga ställen importerades", "error", 7000);
+    openImportResultModal(result);
+    return;
+  }
+  showToast("Excel-filen innehöll inga ställen", "warn");
+}
+
+async function importActivityFile(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const importButton = document.getElementById("import-activities");
+  importButton.disabled = true;
+  try {
+    const result = await api.postForm("/api/activities/import", formData);
+    showImportResult(result);
+    await load();
+  } catch (error) {
+    showToast(error.message, "error", 7000);
+  } finally {
+    importButton.disabled = false;
+  }
+}
+
+function setupImportControls() {
+  const downloadButton = document.getElementById("download-activity-template");
+  const importButton = document.getElementById("import-activities");
+  const helpButton = document.getElementById("activity-import-help");
+  const fileInput = document.getElementById("activity-import-file");
+
+  if (!isAdminUser(currentUser)) return;
+
+  downloadButton.hidden = false;
+  importButton.hidden = false;
+  helpButton.hidden = false;
+
+  setupImportHelpButton("activity-import-help", "Importera ställen");
+  downloadButton.addEventListener("click", () => {
+    window.location.href = "/api/activities/import-template";
+  });
+  importButton.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = "";
+    if (!file) return;
+    await importActivityFile(file);
+  });
+}
+
 (async () => {
   currentUser = await initPage("stallen", { requireEditor: true });
   if (!currentUser) return;
   areas = await api.get("/api/areas");
   await load();
+  setupImportControls();
   document.getElementById("new-act").addEventListener("click", () => openModal(null));
   document.getElementById("show-inactive").addEventListener("change", load);
+  window.addEventListener("bemanning:areaFocusChanged", () => load());
 })();

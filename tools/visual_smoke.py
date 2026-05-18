@@ -59,17 +59,18 @@ VIEWPORTS: tuple[Viewport, ...] = (
 TEST_USERS: dict[str, tuple[str, str]] = {
     "admin": ("admin", "admin123"),
     "leader": ("visual_leader", VISUAL_PASSWORD),
+    "staffing": ("visual_staffing", VISUAL_PASSWORD),
     "viewer": ("visual_viewer", VISUAL_PASSWORD),
     "warehouse": ("visual_lager", VISUAL_PASSWORD),
 }
 
 PAGES: tuple[VisualPage, ...] = (
     VisualPage("login", "/login.html", "#login-form", ("public",)),
-    VisualPage("bemanning", "/index.html", "#scheduleTable", ("admin", "leader", "viewer")),
-    VisualPage("oversikt", "/overblick.html", "#overviewTable", ("admin", "leader", "viewer")),
+    VisualPage("bemanning", "/index.html", "#scheduleTable", ("admin", "leader", "staffing", "viewer")),
+    VisualPage("oversikt", "/overblick.html", "#overviewTable", ("admin", "leader", "staffing", "viewer")),
     VisualPage("produktivitet", "/produktivitet.html", "#productivityUploadPanel", ("admin",)),
-    VisualPage("personer", "/personer.html", "#persons-table", ("admin", "leader")),
-    VisualPage("stallen", "/stallen.html", "#acts-body", ("admin", "leader")),
+    VisualPage("personer", "/personer.html", "#persons-table", ("admin", "leader", "staffing")),
+    VisualPage("stallen", "/stallen.html", "#acts-body", ("admin", "leader", "staffing")),
     VisualPage("historik", "/historik.html", "#auditBody", ("admin",)),
     VisualPage("anvandare", "/anvandare.html", "#users-body", ("admin",)),
     VisualPage("uppladdningar", "/uppladdningar.html", "#allocationRoot .allocation-panel", ("admin", "warehouse")),
@@ -79,19 +80,20 @@ PAGES: tuple[VisualPage, ...] = (
 )
 
 STATES: tuple[VisualState, ...] = (
-    VisualState("bemanning-alla-avdelningar", "/index.html", "#scheduleTable", "schedule_area_all", ("admin", "leader")),
-    VisualState("bemanning-mestergruppen", "/index.html", "#scheduleTable", "schedule_area_mg", ("admin", "leader")),
+    VisualState("bemanning-alla-avdelningar", "/index.html", "#scheduleTable", "schedule_area_all", ("admin", "leader", "staffing")),
+    VisualState("bemanning-mestergruppen", "/index.html", "#scheduleTable", "schedule_area_mg", ("admin", "leader", "staffing")),
     VisualState("bemanning-autostore", "/index.html", "#scheduleTable", "schedule_area_as", ("admin",)),
     VisualState("bemanning-tomt-filter", "/index.html", "#scheduleTable", "schedule_empty_filter", ("admin",)),
-    VisualState("bemanning-kopiera-dag-modal", "/index.html", "#scheduleTable", "schedule_copy_modal", ("admin", "leader")),
+    VisualState("bemanning-kopiera-dag-modal", "/index.html", "#scheduleTable", "schedule_copy_modal", ("admin", "leader", "staffing")),
     VisualState("bemanning-kalkyl-alla", "/index.html", "#scheduleTable", "schedule_calc_all", ("admin",)),
     VisualState("bemanning-sidebar-kompakt", "/index.html", "#scheduleTable", "sidebar_collapsed", ("admin", "viewer")),
-    VisualState("oversikt-mestergruppen", "/overblick.html", "#overviewTable", "overview_area_mg", ("admin", "leader")),
+    VisualState("oversikt-mestergruppen", "/overblick.html", "#overviewTable", "overview_area_mg", ("admin", "leader", "staffing")),
     VisualState("oversikt-manad", "/overblick.html", "#overviewTable", "overview_month"),
     VisualState("oversikt-manad-mestergruppen", "/overblick.html", "#overviewTable", "overview_month_mg"),
     VisualState("oversikt-tomt-filter", "/overblick.html", "#overviewTable", "overview_empty_filter", ("admin",)),
     VisualState("personer-veckomall-modal", "/personer.html", "#persons-body button[data-schedule]", "person_schedule_modal"),
     VisualState("personer-ny-person-modal", "/personer.html", "#new-person", "click_new_person"),
+    VisualState("stallen-import-hjalp", "/stallen.html", "#activity-import-help", "activity_import_help", ("admin",)),
     VisualState("stallen-ny-aktivitet-modal", "/stallen.html", "#new-act", "click_new_activity"),
     VisualState("stallen-redigera-aktivitet-modal", "/stallen.html", "#acts-body button[data-edit]", "activity_edit_modal"),
     VisualState("anvandare-ny-anvandare-modal", "/anvandare.html", "#new-user", "click_new_user"),
@@ -106,7 +108,16 @@ STATES: tuple[VisualState, ...] = (
     VisualState("leader-nekad-historik", "/historik.html", "#scheduleTable", "noop", ("leader",)),
     VisualState("leader-nekad-produktivitet", "/produktivitet.html", "#scheduleTable", "noop", ("leader",)),
     VisualState("leader-nekad-uppladdningar", "/uppladdningar.html", "#scheduleTable", "noop", ("leader",)),
+    VisualState("staffing-nekad-anvandare", "/anvandare.html", "#scheduleTable", "noop", ("staffing",)),
+    VisualState("staffing-nekad-historik", "/historik.html", "#scheduleTable", "noop", ("staffing",)),
+    VisualState("staffing-nekad-produktivitet", "/produktivitet.html", "#scheduleTable", "noop", ("staffing",)),
+    VisualState("staffing-nekad-uppladdningar", "/uppladdningar.html", "#scheduleTable", "noop", ("staffing",)),
     VisualState("viewer-nekad-uppladdningar", "/uppladdningar.html", "#scheduleTable", "noop", ("viewer",)),
+    VisualState("bemanning-fokus-mestergruppen", "/index.html", "#scheduleTable", "area_focus_mg", ("admin", "leader", "staffing")),
+    VisualState("oversikt-fokus-mestergruppen", "/overblick.html", "#overviewTable", "area_focus_mg", ("admin", "leader", "staffing")),
+    VisualState("produktivitet-fokus-mestergruppen", "/produktivitet.html", "#productivityUploadPanel", "area_focus_mg", ("admin",)),
+    VisualState("personer-fokus-mestergruppen", "/personer.html", "#persons-table", "area_focus_mg", ("admin", "leader", "staffing")),
+    VisualState("stallen-fokus-mestergruppen", "/stallen.html", "#acts-body", "area_focus_mg", ("admin", "leader", "staffing")),
 )
 
 
@@ -252,6 +263,17 @@ def _apply_state(page, state: VisualState) -> None:
         page.click("#sidebar-toggle")
         page.wait_for_timeout(500)
         return
+    if state.action == "area_focus_mg":
+        page.evaluate(
+            """() => {
+                localStorage.setItem('bemanning-area-focus', 'MG');
+                localStorage.removeItem('sidebar-collapsed');
+            }"""
+        )
+        page.reload(wait_until="networkidle")
+        _wait_for_page(page, state.wait_for)
+        page.wait_for_timeout(500)
+        return
     if state.action == "schedule_area_all":
         _select_by_label(page, "#areaSelect", "Alla")
         _wait_for_table_rows(page, "#scheduleBody tr")
@@ -304,6 +326,10 @@ def _apply_state(page, state: VisualState) -> None:
         return
     if state.action == "click_new_activity":
         page.click("#new-act")
+        page.wait_for_selector(".modal-backdrop .modal", timeout=15000)
+        return
+    if state.action == "activity_import_help":
+        page.click("#activity-import-help")
         page.wait_for_selector(".modal-backdrop .modal", timeout=15000)
         return
     if state.action == "activity_edit_modal":
@@ -407,8 +433,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output", type=Path, help="Screenshot output directory.")
     parser.add_argument(
         "--roles",
-        default="public,admin,leader,viewer",
-        help="Comma-separated roles to capture: public, admin, leader, viewer, warehouse.",
+        default="public,admin,leader,staffing,viewer",
+        help="Comma-separated roles to capture: public, admin, leader, staffing, viewer, warehouse.",
     )
     parser.add_argument("--headful", action="store_true", help="Show the browser while capturing screenshots.")
     parser.add_argument(

@@ -5,6 +5,7 @@ let productivityTargetsSignature = "";
 let productivityDataset = null;
 let productivityDatasetSignature = "";
 let productivityDatasetPromise = null;
+let productivityGroupFilterManual = false;
 
 const productivityReportCache = new Map();
 const productivityReportRequests = new Map();
@@ -49,7 +50,8 @@ const VISIBLE_PRODUCTIVITY_SOURCE_SPECS = PRODUCTIVITY_SOURCE_SPECS.filter((spec
 const PRODUCTIVITY_SOURCE_BY_KEY = Object.fromEntries(PRODUCTIVITY_SOURCE_SPECS.map((spec) => [spec.key, spec]));
 const PRODUCTIVITY_GROUPS = [
   { id: "gg", title: "Granng\u00e5rden" },
-  { id: "autostore", title: "Autostore och e-handel" },
+  { id: "as", title: "Autostore" },
+  { id: "eh", title: "E-Handel" },
   { id: "mg", title: "Mestergruppen" },
 ];
 const PRODUCTIVITY_GROUP_TITLES = Object.fromEntries(PRODUCTIVITY_GROUPS.map((group) => [group.id, group.title]));
@@ -89,7 +91,7 @@ const PRODUCTIVITY_SECTION_SPECS = [
   },
   {
     id: "as_store_pick",
-    group_id: "autostore",
+    group_id: "as",
     title: "Butik Plock AS - GG + MG",
     source: "pick",
     process: "Autostore",
@@ -100,7 +102,7 @@ const PRODUCTIVITY_SECTION_SPECS = [
   },
   {
     id: "gg_decanting",
-    group_id: "autostore",
+    group_id: "as",
     title: "Granng\u00e5rden Dekantering",
     source: "trans",
     process: "Decanting",
@@ -111,7 +113,7 @@ const PRODUCTIVITY_SECTION_SPECS = [
   },
   {
     id: "gg_ecom_pick",
-    group_id: "autostore",
+    group_id: "eh",
     title: "Granng\u00e5rden E-Handel Plock",
     source: "pick",
     process: "E_Commerce",
@@ -122,7 +124,7 @@ const PRODUCTIVITY_SECTION_SPECS = [
   },
   {
     id: "gg_ecom_pack",
-    group_id: "autostore",
+    group_id: "eh",
     title: "Granng\u00e5rden E-Handel Pack",
     source: "pallet",
     process: "Ecom_pack",
@@ -137,7 +139,7 @@ const PRODUCTIVITY_SECTION_SPECS = [
   },
   {
     id: "mg_decanting",
-    group_id: "autostore",
+    group_id: "as",
     title: "Mestergruppen Dekantering",
     source: "trans",
     process: "Decanting",
@@ -148,7 +150,7 @@ const PRODUCTIVITY_SECTION_SPECS = [
   },
   {
     id: "mg_ecom_pick",
-    group_id: "autostore",
+    group_id: "eh",
     title: "Mestergruppen E-Handel Plock",
     source: "pick",
     process: "E_Commerce",
@@ -159,7 +161,7 @@ const PRODUCTIVITY_SECTION_SPECS = [
   },
   {
     id: "mg_ecom_pack",
-    group_id: "autostore",
+    group_id: "eh",
     title: "Mestergruppen E-Handel Pack",
     source: "pallet",
     process: "Ecom_pack",
@@ -272,6 +274,11 @@ function clearProductivityReportCache() {
   productivityReportRequests.clear();
 }
 
+function preferredProductivityGroupFilter() {
+  const focus = typeof readAreaFocus === "function" ? readAreaFocus() : "ALLT";
+  return ({ GG: "gg", MG: "mg", AS: "as", EH: "eh" }[focus] || "all");
+}
+
 function resetLocalProductivityDataset() {
   productivityDataset = null;
   productivityDatasetSignature = "";
@@ -280,7 +287,8 @@ function resetLocalProductivityDataset() {
 }
 
 function activeGroupFilter() {
-  return document.getElementById("productivityGroupFilter").value;
+  const select = document.getElementById("productivityGroupFilter");
+  return select.value || preferredProductivityGroupFilter();
 }
 
 function activeSearch() {
@@ -938,7 +946,7 @@ function prefetchAdjacentReports(report) {
 
 function renderGroupFilter(report) {
   const select = document.getElementById("productivityGroupFilter");
-  const current = select.value || "all";
+  const current = productivityGroupFilterManual ? (select.value || "all") : preferredProductivityGroupFilter();
   select.innerHTML = '<option value="all">Alla</option>' + (report.groups || [])
     .map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.title)}</option>`)
     .join("");
@@ -1181,7 +1189,17 @@ function setupUploadDropzone() {
     event.target.value = "";
   });
   document.getElementById("productivityDate").addEventListener("change", loadProductivity);
-  document.getElementById("productivityGroupFilter").addEventListener("change", renderContent);
+  document.getElementById("productivityGroupFilter").addEventListener("change", () => {
+    productivityGroupFilterManual = true;
+    renderContent();
+  });
+  window.addEventListener("bemanning:areaFocusChanged", () => {
+    productivityGroupFilterManual = false;
+    if (productivityReport) {
+      renderGroupFilter(productivityReport);
+      renderContent();
+    }
+  });
   document.getElementById("productivitySearch").addEventListener("input", renderContent);
   setupUploadDropzone();
   await initializeProductivityPage();

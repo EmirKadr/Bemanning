@@ -14,6 +14,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+from openpyxl import Workbook
+
 from tools import visual_smoke
 
 
@@ -31,6 +33,7 @@ WEB_WORKFLOW_STEPS = (
     "create_activity",
     "edit_activity",
     "deactivate_activity",
+    "import_activity",
     "create_person",
     "edit_person_inline",
     "edit_person_fields_inline",
@@ -69,6 +72,7 @@ class InteractiveRun:
         self.agent_person_updated = f"Agent Person Redigerad {run_id}"
         self.agent_activity = f"Agent Aktivitet {run_id}"
         self.agent_activity_updated = f"Agent Aktivitet Redigerad {run_id}"
+        self.agent_activity_imported = f"Agent Importställe {run_id}"
 
     def url(self, path: str) -> str:
         return self.base_url + path
@@ -139,6 +143,7 @@ class InteractiveRun:
         self.create_activity()
         self.edit_activity()
         self.deactivate_activity()
+        self.import_activity()
         self.create_person()
         self.edit_person_inline()
         self.edit_person_fields_inline()
@@ -236,6 +241,19 @@ class InteractiveRun:
             show_inactive.check()
         self.wait_for_text(self.agent_activity_updated)
         self.record("deactivate_activity", screenshot=self.screenshot("10-activity-deactivated"))
+
+    def import_activity(self) -> None:
+        self.goto("/stallen.html", "#acts-body")
+        xlsx_path = self.output_dir / f"activity-import-{self.run_id}.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["etikett", "område", "summeras som", "kategori", "färg", "sortering"])
+        sheet.append([self.agent_activity_imported, "Mestergruppen", None, "arbete", "#dbeafe", 91])
+        workbook.save(xlsx_path)
+
+        self.page.set_input_files("#activity-import-file", str(xlsx_path))
+        self.wait_for_text(self.agent_activity_imported)
+        self.record("import_activity", screenshot=self.screenshot("11-activity-imported"))
 
     def create_person(self) -> None:
         self.goto("/personer.html", "#persons-body")

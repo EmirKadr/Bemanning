@@ -7,7 +7,7 @@ const HALF_SEGMENTS = [
   { minute_start: 0, minute_end: 30 },
   { minute_start: 30, minute_end: 60 },
 ];
-const CALC_AREA_KEYS = ["GG", "MG", "AS"];
+const CALC_AREA_KEYS = ["GG", "MG", "AS", "EH"];
 
 const state = {
   currentUser: null,
@@ -40,6 +40,7 @@ const state = {
     GG: { rows: "", time: "", goal: "" },
     MG: { rows: "", time: "", goal: "" },
     AS: { rows: "", time: "", goal: "" },
+    EH: { rows: "", time: "", goal: "" },
   },
 };
 
@@ -100,6 +101,11 @@ function applyScheduleReadOnlyMode() {
 }
 
 function preferredAreaIdForCurrentUser() {
+  const hasFocusedArea = typeof areaFocusCode === "function" && areaFocusCode();
+  if (hasFocusedArea && typeof preferredAreaIdFromFocus === "function") {
+    const focusedAreaId = preferredAreaIdFromFocus(state.areas);
+    if (focusedAreaId != null) return focusedAreaId;
+  }
   const userAreaId = Number(state.currentUser?.area_id);
   if (Number.isInteger(userAreaId) && state.areas.some((area) => Number(area.id) === userAreaId)) {
     return userAreaId;
@@ -748,7 +754,7 @@ function areaCodeById(id) {
 
 function areaNameByCode(code) {
   return state.areas.find((area) => area.code === code)?.name
-    || ({ GG: "Granngården", MG: "Mestergruppen", AS: "Autostore" }[code] || code);
+    || ({ GG: "Granngården", MG: "Mestergruppen", AS: "Autostore", EH: "E-Handel" }[code] || code);
 }
 
 function sanitizeNumericInput(value) {
@@ -939,7 +945,10 @@ function appendActivityOptions(select, includeActivityIds = []) {
     select.appendChild(opt);
   };
 
-  state.activitiesActive.forEach(appendOption);
+  const sortedActivities = typeof compareActivitiesForAreaFocus === "function"
+    ? [...state.activitiesActive].sort((a, b) => compareActivitiesForAreaFocus(a, b, state.areas))
+    : state.activitiesActive;
+  sortedActivities.forEach(appendOption);
   includeActivityIds
     .map((id) => Number(id))
     .filter((id) => Number.isInteger(id))
@@ -2330,6 +2339,14 @@ async function loadSchedule() {
   document.getElementById("weekInput").addEventListener("change", onControlChange);
   document.getElementById("daySelect").addEventListener("change", onControlChange);
   document.getElementById("areaSelect").addEventListener("change", onControlChange);
+  window.addEventListener("bemanning:areaFocusChanged", async () => {
+    state.areaId = preferredAreaIdForCurrentUser();
+    const areaSelect = document.getElementById("areaSelect");
+    if (areaSelect) areaSelect.value = state.areaId == null ? "" : String(state.areaId);
+    state.calcSelectionManual = false;
+    syncCalculatorWithSelectedArea();
+    await loadSchedule();
+  });
   document.getElementById("dateInput").addEventListener("change", onDateChange);
   document.getElementById("prevDayBtn").addEventListener("click", () => stepDay(-1));
   document.getElementById("nextDayBtn").addEventListener("click", () => stepDay(1));

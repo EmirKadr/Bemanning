@@ -46,6 +46,12 @@ def test_df_to_table_serializes_preview_without_nan_values():
     }
 
 
+def test_allocation_bridge_uses_vendored_warehouse_tools_by_default():
+    assert bridge.warehouse_tools_dir().name == "warehouse_tools"
+    assert bridge.allokering_backend_dir() == bridge.warehouse_tools_dir()
+    assert (bridge.warehouse_tools_dir() / "vendor" / "allokering12.1.py").is_file()
+
+
 def test_run_flow_handler_serializes_tables_and_keeps_session(monkeypatch):
     df = pd.DataFrame({"Artikel": ["A100", ""], "Antal": [1, 2]})
     flows = SimpleNamespace(

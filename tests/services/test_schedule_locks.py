@@ -2,8 +2,10 @@ import pytest
 from fastapi import HTTPException
 
 from app.backend.models import ScheduleCell, User
+from app.backend import schedule_locks
 from app.backend.schedule_locks import (
     assert_can_modify_schedule_cells,
+    foreign_schedule_cell_lock_applies,
     is_foreign_schedule_cell,
     user_can_bypass_schedule_cell_lock,
 )
@@ -63,6 +65,15 @@ def test_admins_can_bypass_schedule_cell_lock():
     assert user_can_bypass_schedule_cell_lock(make_user(1, role="admin")) is True
     assert user_can_bypass_schedule_cell_lock(make_user(3, role="viewer", roles=["viewer", "admin"])) is True
     assert user_can_bypass_schedule_cell_lock(make_user(2, role="leader")) is False
+
+
+def test_bemanningsansvarig_can_bypass_schedule_cell_lock(monkeypatch):
+    user = make_user(4, role="staffing_manager", roles=["staffing_manager"])
+    monkeypatch.setattr(schedule_locks, "get_lock_foreign_schedule_cells", lambda _db: True)
+
+    assert user_can_bypass_schedule_cell_lock(user) is True
+    assert foreign_schedule_cell_lock_applies(object(), user) is False
+    assert_can_modify_schedule_cells([make_cell(2)], user, lock_enabled=foreign_schedule_cell_lock_applies(object(), user))
 
 
 def test_bool_setting_parser_accepts_swedish_truthy_value():

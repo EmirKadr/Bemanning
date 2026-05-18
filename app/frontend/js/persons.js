@@ -163,6 +163,10 @@ function editSelect(td, person, field, currentId, options, getId, getLabel) {
 // ---- Rendering ----
 function renderRows() {
   const filtered = persons.filter(passesFilter).sort((a, b) => {
+    if (typeof comparePersonsForAreaFocus === "function") {
+      const areaCompare = comparePersonsForAreaFocus(a, b, areas);
+      if (areaCompare !== 0) return areaCompare;
+    }
     const av = sortKeyValue(a);
     const bv = sortKeyValue(b);
     if (av < bv) return sortAsc ? -1 : 1;
@@ -339,6 +343,7 @@ function setupImportControls() {
   const importButton = document.getElementById("import-persons");
   const fileInput = document.getElementById("person-import-file");
 
+  setupImportHelpButton("person-import-help", "Importera personer");
   downloadButton.addEventListener("click", () => {
     window.location.href = "/api/persons/import-template";
   });
@@ -530,6 +535,7 @@ function updateRowDisabled(row) {
   setupImportControls();
   document.getElementById("new-person").addEventListener("click", () => openModal(null));
   document.getElementById("show-inactive").addEventListener("change", loadPersons);
+  window.addEventListener("bemanning:areaFocusChanged", () => renderRows());
 
   document.querySelectorAll("tr.filter-row input").forEach((inp) => {
     inp.addEventListener("input", () => {

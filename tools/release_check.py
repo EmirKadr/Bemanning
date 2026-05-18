@@ -20,6 +20,9 @@ REQUIRED_PACKAGE_FILES = (
     "_internal/app/frontend/js/api.js",
     "_internal/app/frontend/js/common.js",
     "_internal/app/frontend/js/productivity.js",
+    "_internal/warehouse_tools/vendor/allokering12.1.py",
+    "_internal/warehouse_tools/vendor/wms_sok79.py",
+    "_internal/warehouse_tools/vendor/lowfreqdata/buffertpall/artikel_max.csv",
 )
 
 
@@ -113,4 +116,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

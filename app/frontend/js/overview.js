@@ -65,6 +65,11 @@ function applyOverviewReadOnlyMode() {
 }
 
 function preferredAreaIdForCurrentUser() {
+  const hasFocusedArea = typeof areaFocusCode === "function" && areaFocusCode();
+  if (hasFocusedArea && typeof preferredAreaIdFromFocus === "function") {
+    const focusedAreaId = preferredAreaIdFromFocus(state.areas);
+    if (focusedAreaId != null) return focusedAreaId;
+  }
   const userAreaId = Number(state.currentUser?.area_id);
   if (Number.isInteger(userAreaId) && state.areas.some((area) => Number(area.id) === userAreaId)) {
     return userAreaId;
@@ -184,7 +189,10 @@ function buildActivitySelect(includeActivityIds = []) {
     select.appendChild(opt);
   };
 
-  state.activitiesActive.forEach(appendOption);
+  const sortedActivities = typeof compareActivitiesForAreaFocus === "function"
+    ? [...state.activitiesActive].sort((a, b) => compareActivitiesForAreaFocus(a, b, state.areas))
+    : state.activitiesActive;
+  sortedActivities.forEach(appendOption);
   includeActivityIds
     .map((id) => Number(id))
     .filter((id) => Number.isInteger(id))
@@ -206,6 +214,10 @@ function refreshPersons() {
   if (q) list = list.filter((p) => p.name.toLowerCase().includes(q));
   const getSortVal = (p) => state.sortKey === "name" ? (p.name || "").toLowerCase() : p.sort_order;
   list = [...list].sort((a, b) => {
+    if (typeof comparePersonsForAreaFocus === "function") {
+      const areaCompare = comparePersonsForAreaFocus(a, b, state.areas);
+      if (areaCompare !== 0) return areaCompare;
+    }
     const av = getSortVal(a), bv = getSortVal(b);
     if (av < bv) return state.sortAsc ? -1 : 1;
     if (av > bv) return state.sortAsc ? 1 : -1;
@@ -1068,6 +1080,12 @@ function updateViewVisibility() {
   document.getElementById("weekInput").addEventListener("change", onControlChange);
   document.getElementById("monthSelect").addEventListener("change", onControlChange);
   document.getElementById("areaSelect").addEventListener("change", onControlChange);
+  window.addEventListener("bemanning:areaFocusChanged", async () => {
+    state.areaId = preferredAreaIdForCurrentUser();
+    const areaSelect = document.getElementById("areaSelect");
+    if (areaSelect) areaSelect.value = state.areaId == null ? "" : String(state.areaId);
+    await load();
+  });
   document.getElementById("prev").addEventListener("click", () => shiftPeriod(-1));
   document.getElementById("next").addEventListener("click", () => shiftPeriod(1));
   document.getElementById("undoBtn").addEventListener("click", () => undoLastOverviewAction());

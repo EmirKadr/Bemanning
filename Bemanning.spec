@@ -6,6 +6,7 @@ from pathlib import Path
 project_root = Path(SPECPATH)
 app_icon = project_root / "desktop" / "assets" / "app_icon.ico"
 frontend_dir = project_root / "app" / "frontend"
+warehouse_vendor_dir = project_root / "warehouse_tools" / "vendor"
 
 a = Analysis(
     ["desktop/main.py"],
@@ -14,6 +15,7 @@ a = Analysis(
     datas=[
         (str(app_icon), "desktop/assets"),
         (str(frontend_dir), "app/frontend"),
+        (str(warehouse_vendor_dir), "warehouse_tools/vendor"),
     ],
     hiddenimports=[
         "PyQt6.QtWebEngineCore",

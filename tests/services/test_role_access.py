@@ -21,6 +21,10 @@ def test_leader_and_admin_can_edit_planning():
     assert require_planning_editor(make_user("admin")).role == "admin"
 
 
+def test_bemanningsansvarig_can_edit_planning():
+    assert require_planning_editor(make_user("staffing_manager")).role == "staffing_manager"
+
+
 def test_user_with_viewer_and_leader_can_edit_planning():
     assert require_planning_editor(make_user("viewer", roles=["viewer", "leader"])).role == "viewer"
 

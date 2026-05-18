@@ -31,7 +31,8 @@ def test_visual_smoke_covers_expected_routes():
         "dela",
         "harleda",
     }
-    assert pages_by_name["bemanning"].roles == ("admin", "leader", "viewer")
+    assert pages_by_name["bemanning"].roles == ("admin", "leader", "staffing", "viewer")
+    assert pages_by_name["personer"].roles == ("admin", "leader", "staffing")
     assert pages_by_name["produktivitet"].roles == ("admin",)
     assert pages_by_name["anvandare"].roles == ("admin",)
     assert pages_by_name["uppladdningar"].roles == ("admin", "warehouse")
@@ -46,8 +47,14 @@ def test_visual_smoke_covers_critical_scenarios():
         "bemanning-autostore",
         "bemanning-kopiera-dag-modal",
         "bemanning-kalkyl-alla",
+        "bemanning-fokus-mestergruppen",
+        "oversikt-fokus-mestergruppen",
+        "produktivitet-fokus-mestergruppen",
+        "personer-fokus-mestergruppen",
+        "stallen-fokus-mestergruppen",
         "oversikt-manad-mestergruppen",
         "personer-veckomall-modal",
+        "stallen-import-hjalp",
         "stallen-redigera-aktivitet-modal",
         "anvandare-redigera-anvandare-modal",
         "historik-filter",
@@ -56,6 +63,10 @@ def test_visual_smoke_covers_critical_scenarios():
         "leader-nekad-historik",
         "leader-nekad-produktivitet",
         "leader-nekad-uppladdningar",
+        "staffing-nekad-anvandare",
+        "staffing-nekad-historik",
+        "staffing-nekad-produktivitet",
+        "staffing-nekad-uppladdningar",
         "viewer-nekad-uppladdningar",
     }.issubset(state_names)
 
@@ -165,7 +176,7 @@ def test_desktop_build_bundles_local_frontend():
 def test_visual_smoke_outputs_have_unique_names():
     names = []
     for viewport in visual_smoke.VIEWPORTS:
-        for role in ("public", "admin", "leader", "viewer", "warehouse"):
+        for role in ("public", "admin", "leader", "staffing", "viewer", "warehouse"):
             for page in visual_smoke.PAGES:
                 if role in page.roles:
                     names.append(visual_smoke._safe_name(viewport.name, role, page.name))
@@ -204,7 +215,7 @@ def test_visual_data_seeds_disposable_sqlite_database(tmp_path):
 
     with sqlite3.connect(db_path) as connection:
         users = connection.execute(
-            "select username, role from users where username in ('visual_leader', 'visual_viewer', 'visual_lager')"
+            "select username, role from users where username in ('visual_leader', 'visual_staffing', 'visual_viewer', 'visual_lager')"
         ).fetchall()
         visual_people = connection.execute(
             "select count(*) from persons where name like 'Visual %'"
@@ -217,6 +228,7 @@ def test_visual_data_seeds_disposable_sqlite_database(tmp_path):
     assert sorted(users) == [
         ("visual_lager", "warehouse_clerk"),
         ("visual_leader", "leader"),
+        ("visual_staffing", "staffing_manager"),
         ("visual_viewer", "viewer"),
     ]
     assert visual_people >= 6
@@ -268,6 +280,75 @@ def test_frontend_theme_toggle_is_wired_globally():
     for html_path in frontend.glob("*.html"):
         html = html_path.read_text(encoding="utf-8")
         assert "/js/common.js" in html
+
+
+def test_area_focus_toggle_is_wired_to_views():
+    frontend = ROOT / "app" / "frontend"
+    common = (frontend / "js" / "common.js").read_text(encoding="utf-8")
+    styles = (frontend / "css" / "styles.css").read_text(encoding="utf-8")
+    schedule = (frontend / "js" / "schedule.js").read_text(encoding="utf-8")
+    overview = (frontend / "js" / "overview.js").read_text(encoding="utf-8")
+    productivity = (frontend / "js" / "productivity.js").read_text(encoding="utf-8")
+    persons = (frontend / "js" / "persons.js").read_text(encoding="utf-8")
+    activities = (frontend / "js" / "activities.js").read_text(encoding="utf-8")
+
+    assert "bemanning-area-focus" in common
+    assert "id=\"area-focus-toggle\"" in common
+    assert "AREA_FOCUS_OPTIONS" in common
+    assert "preferredAreaIdFromFocus" in common
+    assert "compareActivitiesForAreaFocus" in common
+    assert "comparePersonsForAreaFocus" in common
+    assert ".area-focus-toggle" in styles
+
+    assert 'const CALC_AREA_KEYS = ["GG", "MG", "AS", "EH"]' in schedule
+    assert 'typeof areaFocusCode === "function" && areaFocusCode()' in schedule
+    assert 'typeof areaFocusCode === "function" && areaFocusCode()' in overview
+    assert '"bemanning:areaFocusChanged"' in schedule
+    assert '"bemanning:areaFocusChanged"' in overview
+    assert '"bemanning:areaFocusChanged"' in productivity
+    assert '"bemanning:areaFocusChanged"' in persons
+    assert '"bemanning:areaFocusChanged"' in activities
+    assert '{ id: "eh", title: "E-Handel" }' in productivity
+
+
+def test_frontend_knows_bemanningsansvarig_role():
+    frontend = ROOT / "app" / "frontend"
+    common = (frontend / "js" / "common.js").read_text(encoding="utf-8")
+    users = (frontend / "js" / "users.js").read_text(encoding="utf-8")
+
+    assert '{ value: "staffing_manager", label: "Bemanningsansvarig" }' in users
+    assert 'roles.includes("staffing_manager")' in users
+    assert 'roles.includes("staffing_manager") || roles.includes("admin")' in common
+    assert '!roles.includes("staffing_manager")' in common
+
+
+def test_import_views_have_templates_and_help_buttons():
+    frontend = ROOT / "app" / "frontend"
+    common = (frontend / "js" / "common.js").read_text(encoding="utf-8")
+    persons_html = (frontend / "personer.html").read_text(encoding="utf-8")
+    persons_js = (frontend / "js" / "persons.js").read_text(encoding="utf-8")
+    users_html = (frontend / "anvandare.html").read_text(encoding="utf-8")
+    users_js = (frontend / "js" / "users.js").read_text(encoding="utf-8")
+    activities_html = (frontend / "stallen.html").read_text(encoding="utf-8")
+    activities_js = (frontend / "js" / "activities.js").read_text(encoding="utf-8")
+
+    assert "setupImportHelpButton" in common
+    assert "Ladda ner importmallen" in common
+
+    assert 'id="download-person-template"' in persons_html
+    assert 'id="person-import-help"' in persons_html
+    assert 'setupImportHelpButton("person-import-help", "Importera personer")' in persons_js
+
+    assert 'id="download-user-template"' in users_html
+    assert 'id="user-import-help"' in users_html
+    assert 'setupImportHelpButton("user-import-help", "Importera användare")' in users_js
+
+    assert 'id="download-activity-template"' in activities_html
+    assert 'id="import-activities"' in activities_html
+    assert 'id="activity-import-help"' in activities_html
+    assert "/api/activities/import-template" in activities_js
+    assert "/api/activities/import" in activities_js
+    assert 'setupImportHelpButton("activity-import-help", "Importera ställen")' in activities_js
 
 
 def test_sidebar_pages_reserve_layout_before_auth_finishes():

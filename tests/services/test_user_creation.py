@@ -112,6 +112,22 @@ def test_create_lagerkontorist_user(monkeypatch, db_session, admin_user):
     assert saved.roles == ["warehouse_clerk"]
 
 
+def test_create_bemanningsansvarig_user(monkeypatch, db_session, admin_user):
+    monkeypatch.setattr(users_router.audit, "log", lambda *args, **kwargs: None)
+
+    result = users_router.create_user(
+        UserCreate(username="petra", display_name="Petra Bemanning", roles=["staffing_manager"]),
+        db_session,
+        admin_user,
+    )
+
+    saved = db_session.query(User).filter_by(username="petra").one()
+    assert result.role == "staffing_manager"
+    assert result.roles == ["staffing_manager"]
+    assert saved.role == "staffing_manager"
+    assert saved.roles == ["staffing_manager"]
+
+
 def test_create_artikelplacerare_user(monkeypatch, db_session, admin_user):
     monkeypatch.setattr(users_router.audit, "log", lambda *args, **kwargs: None)
 

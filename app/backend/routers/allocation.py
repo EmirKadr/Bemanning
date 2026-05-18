@@ -25,7 +25,7 @@ def health(_user: User = Depends(require_allocation_tools_user)) -> dict:
         "status": "ok",
         "version": getattr(engine_module, "APP_VERSION", ""),
         "title": getattr(engine_module, "APP_TITLE", "Allokering"),
-        "backend_dir": str(bridge.allokering_backend_dir()),
+        "backend_dir": str(bridge.warehouse_tools_dir()),
     }
 
 

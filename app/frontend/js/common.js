@@ -3,6 +3,20 @@
 const THEME_STORAGE_KEY = "bemanning-theme";
 const SIDEBAR_USER_CACHE_KEY = "bemanning-sidebar-user";
 const ALLOCATION_UPLOAD_NOTICE_KEY = "bemanning-allocation-upload-notice";
+const AREA_FOCUS_STORAGE_KEY = "bemanning-area-focus";
+const AREA_FOCUS_OPTIONS = [
+  { value: "MG", label: "MG", title: "Mestergruppen" },
+  { value: "GG", label: "GG", title: "Granngården" },
+  { value: "AS", label: "AS", title: "Autostore" },
+  { value: "EH", label: "EH", title: "E-Handel" },
+  { value: "ALLT", label: "ALLT", title: "Alla områden" },
+];
+const AREA_FOCUS_FALLBACK_NAMES = {
+  MG: "Mestergruppen",
+  GG: "Granngården",
+  AS: "Autostore",
+  EH: "E-Handel",
+};
 
 const THEME_ICONS = {
   light: `
@@ -65,6 +79,110 @@ function initThemeToggle() {
 
 applyTheme(readTheme(), { persist: false });
 
+function normalizeAreaFocus(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  return AREA_FOCUS_OPTIONS.some((option) => option.value === normalized) ? normalized : "ALLT";
+}
+
+function readAreaFocus() {
+  try {
+    return normalizeAreaFocus(localStorage.getItem(AREA_FOCUS_STORAGE_KEY));
+  } catch (e) {
+    return "ALLT";
+  }
+}
+
+function writeAreaFocus(value) {
+  const normalized = normalizeAreaFocus(value);
+  try { localStorage.setItem(AREA_FOCUS_STORAGE_KEY, normalized); } catch (e) {}
+  updateAreaFocusToggle(normalized);
+  window.dispatchEvent(new CustomEvent("bemanning:areaFocusChanged", { detail: { value: normalized } }));
+  return normalized;
+}
+
+function areaFocusCode() {
+  const focus = readAreaFocus();
+  return focus === "ALLT" ? null : focus;
+}
+
+function findAreaByCode(areas, code) {
+  const wanted = String(code || "").trim().toUpperCase();
+  if (!wanted) return null;
+  return (areas || []).find((area) => String(area.code || "").trim().toUpperCase() === wanted) || null;
+}
+
+function preferredAreaIdFromFocus(areas) {
+  const focus = areaFocusCode();
+  if (!focus) return null;
+  const area = findAreaByCode(areas, focus);
+  return area ? Number(area.id) : null;
+}
+
+function areaFocusName(areas, value = readAreaFocus()) {
+  const focus = normalizeAreaFocus(value);
+  if (focus === "ALLT") return "Alla områden";
+  const area = findAreaByCode(areas || [], focus);
+  return area?.name || AREA_FOCUS_FALLBACK_NAMES[focus] || focus;
+}
+
+function activityAreaCode(activity, areas) {
+  const area = (areas || []).find((item) => Number(item.id) === Number(activity?.area_id));
+  return String(area?.code || "").trim().toUpperCase();
+}
+
+function activityFocusRank(activity, areas) {
+  const focus = areaFocusCode();
+  if (!focus) return 0;
+  if (activity?.category === "absence") return 1;
+  return activityAreaCode(activity, areas) === focus ? 0 : 2;
+}
+
+function compareActivitiesForAreaFocus(a, b, areas) {
+  const focus = areaFocusCode();
+  if (focus) {
+    const rank = activityFocusRank(a, areas) - activityFocusRank(b, areas);
+    if (rank !== 0) return rank;
+  }
+  return (Number(a?.sort_order) || 0) - (Number(b?.sort_order) || 0)
+    || String(a?.label || "").localeCompare(String(b?.label || ""), "sv");
+}
+
+function comparePersonsForAreaFocus(a, b, areas) {
+  const focus = areaFocusCode();
+  if (!focus) return 0;
+  const focusedArea = findAreaByCode(areas || [], focus);
+  if (!focusedArea) return 0;
+  const aFocused = Number(a?.home_area_id) === Number(focusedArea.id) ? 0 : 1;
+  const bFocused = Number(b?.home_area_id) === Number(focusedArea.id) ? 0 : 1;
+  return aFocused - bFocused;
+}
+
+function updateAreaFocusToggle(value = readAreaFocus()) {
+  const toggle = document.getElementById("area-focus-toggle");
+  if (!toggle) return;
+  const normalized = normalizeAreaFocus(value);
+  toggle.value = normalized;
+  toggle.title = `Områdesfokus: ${areaFocusName([], normalized)}`;
+  toggle.setAttribute("aria-label", toggle.title);
+}
+
+function initAreaFocusToggle() {
+  const toggle = document.getElementById("area-focus-toggle");
+  if (!toggle) return;
+  toggle.innerHTML = AREA_FOCUS_OPTIONS
+    .map((option) => `<option value="${option.value}">${option.label}</option>`)
+    .join("");
+  updateAreaFocusToggle(readAreaFocus());
+  toggle.addEventListener("change", () => writeAreaFocus(toggle.value));
+}
+
+window.addEventListener("storage", (event) => {
+  if (event.key !== AREA_FOCUS_STORAGE_KEY) return;
+  const value = normalizeAreaFocus(event.newValue);
+  updateAreaFocusToggle(value);
+  window.dispatchEvent(new CustomEvent("bemanning:areaFocusChanged", { detail: { value } }));
+});
+
 async function loadCurrentUser() {
   try {
     return await api.get("/api/auth/me");
@@ -115,12 +233,12 @@ function isAdminUser(user) {
 
 function isReadOnlyUser(user) {
   const roles = userRoles(user);
-  return roles.includes("viewer") && !roles.includes("leader") && !roles.includes("admin") && !user?.is_super_user;
+  return roles.includes("viewer") && !roles.includes("leader") && !roles.includes("staffing_manager") && !roles.includes("admin") && !user?.is_super_user;
 }
 
 function canEditPlanning(user) {
   const roles = userRoles(user);
-  return roles.includes("leader") || roles.includes("admin") || user?.is_super_user;
+  return roles.includes("leader") || roles.includes("staffing_manager") || roles.includes("admin") || user?.is_super_user;
 }
 
 function canUseAllocationTools(user) {
@@ -305,6 +423,9 @@ function renderSidebar(user, activePage) {
       ${adminLink}
     </nav>
     <div class="sidebar-footer">
+      <div class="sidebar-area-focus">
+        <select class="area-focus-toggle" id="area-focus-toggle" title="Områdesfokus" aria-label="Områdesfokus"></select>
+      </div>
       <div class="sidebar-utility">
         ${canUseAllocationTools(user) ? `
           <a href="/uppladdningar.html" class="database-toggle ${activePage === "allocationUploads" ? "active" : ""}" id="allocation-upload-link" title="Uppladdningar" aria-label="Uppladdningar">
@@ -325,6 +446,7 @@ function renderSidebar(user, activePage) {
     </div>
   `;
 
+  initAreaFocusToggle();
   initThemeToggle();
   updateAllocationUploadIndicator();
   document.body.classList.add("sidebar-hydrated");
@@ -424,6 +546,34 @@ async function initPage(activePage, options = {}) {
   return user;
 }
 
+function openImportHelpModal(title = "Importera") {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal">
+      <h2>${title}</h2>
+      <p class="note">Importen görs via Excel-mallen som hör till vyn.</p>
+      <ol class="import-help-list">
+        <li>Ladda ner importmallen.</li>
+        <li>Fyll i värdena i filen utan att ändra rubrikerna.</li>
+        <li>Spara Excel-filen.</li>
+        <li>Klicka på Importera Excel och välj filen.</li>
+      </ol>
+      <p class="note">Efter importen visas hur många rader som skapades och vilka rader som hoppades över.</p>
+      <div class="actions">
+        <button class="primary" id="import-help-close">Stäng</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  backdrop.querySelector("#import-help-close").addEventListener("click", () => backdrop.remove());
+}
+
+function setupImportHelpButton(buttonId, title = "Importera") {
+  const button = document.getElementById(buttonId);
+  if (!button) return;
+  button.addEventListener("click", () => openImportHelpModal(title));
+}
+
 // ---- Date-selection persistence (sessionStorage) ----
 // Tabs hold their own selection across page navigation; login clears it so
 // the next session starts on today's date.
@@ -462,6 +612,14 @@ window.isAdminUser = isAdminUser;
 window.isReadOnlyUser = isReadOnlyUser;
 window.canEditPlanning = canEditPlanning;
 window.canUseAllocationTools = canUseAllocationTools;
+window.readAreaFocus = readAreaFocus;
+window.writeAreaFocus = writeAreaFocus;
+window.areaFocusCode = areaFocusCode;
+window.areaFocusName = areaFocusName;
+window.preferredAreaIdFromFocus = preferredAreaIdFromFocus;
+window.compareActivitiesForAreaFocus = compareActivitiesForAreaFocus;
+window.comparePersonsForAreaFocus = comparePersonsForAreaFocus;
+window.setupImportHelpButton = setupImportHelpButton;
 window.allocationUploadActivity = {
   start: startAllocationUploadActivity,
   finish: finishAllocationUploadActivity,

@@ -35,14 +35,18 @@ _LOAD_ERROR: str | None = None
 SESSIONS: dict[str, dict] = {}
 
 
-def _default_allokering_backend_dir() -> Path:
-    projects_root = Path(__file__).resolve().parents[3]
-    return projects_root / "allokering" / "web" / "backend"
+def _default_warehouse_tools_dir() -> Path:
+    return Path(__file__).resolve().parents[2] / "warehouse_tools"
+
+
+def warehouse_tools_dir() -> Path:
+    configured = os.environ.get("BEMANNING_WAREHOUSE_TOOLS_DIR")
+    return Path(configured).expanduser().resolve() if configured else _default_warehouse_tools_dir()
 
 
 def allokering_backend_dir() -> Path:
-    configured = os.environ.get("BEMANNING_ALLOKERING_WEB_BACKEND")
-    return Path(configured).expanduser().resolve() if configured else _default_allokering_backend_dir()
+    """Backward-compatible name for older router/tests/tooling."""
+    return warehouse_tools_dir()
 
 
 def _load_modules() -> tuple[ModuleType, ModuleType]:
@@ -51,19 +55,14 @@ def _load_modules() -> tuple[ModuleType, ModuleType]:
         if _ENGINE_MODULE is not None and _FLOWS_MODULE is not None:
             return _ENGINE_MODULE, _FLOWS_MODULE
 
-        backend_dir = allokering_backend_dir()
-        if not backend_dir.exists():
-            _LOAD_ERROR = f"Allokering-webbens backend hittades inte: {backend_dir}"
+        tools_dir = warehouse_tools_dir()
+        if not tools_dir.exists():
+            _LOAD_ERROR = f"Lagerverktygens backend hittades inte: {tools_dir}"
             raise AllocationBridgeUnavailable(_LOAD_ERROR)
 
-        allokering_root = backend_dir.parents[1]
-        for path in (str(backend_dir), str(allokering_root)):
-            if path not in sys.path:
-                sys.path.insert(0, path)
-
         try:
-            _ENGINE_MODULE = importlib.import_module("engine")
-            _FLOWS_MODULE = importlib.import_module("flows")
+            _ENGINE_MODULE = importlib.import_module("warehouse_tools.engine")
+            _FLOWS_MODULE = importlib.import_module("warehouse_tools.flows")
             _LOAD_ERROR = None
         except Exception as exc:  # noqa: BLE001
             _ENGINE_MODULE = None
@@ -89,8 +88,8 @@ def unavailable_detail() -> dict:
         pass
     return {
         "available": False,
-        "message": _LOAD_ERROR or "Allokering är inte tillgängligt.",
-        "backend_dir": str(allokering_backend_dir()),
+        "message": _LOAD_ERROR or "Lagerverktygen är inte tillgängliga.",
+        "backend_dir": str(warehouse_tools_dir()),
     }
 
 
@@ -123,7 +122,7 @@ def df_to_table(df, preview_limit: int = 1000) -> dict:
     try:
         import pandas as pd  # type: ignore
     except Exception as exc:  # noqa: BLE001
-        raise AllocationBridgeUnavailable("Pandas saknas för Allokering-resultat.") from exc
+        raise AllocationBridgeUnavailable("Pandas saknas för lagerverktygsresultat.") from exc
 
     if not isinstance(df, pd.DataFrame) or df.empty:
         cols = [str(c) for c in df.columns] if isinstance(df, pd.DataFrame) else []

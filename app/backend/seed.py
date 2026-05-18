@@ -16,6 +16,7 @@ AREAS: list[dict] = [
     {"code": "GG", "name": "Granngården", "sort_order": 1},
     {"code": "MG", "name": "Mestergruppen", "sort_order": 2},
     {"code": "AS", "name": "Autostore", "sort_order": 3},
+    {"code": "EH", "name": "E-Handel", "sort_order": 4},
     {"code": "ANNAT", "name": "Annat", "sort_order": 9},
 ]
 
@@ -54,6 +55,12 @@ ACTIVITIES: list[dict] = [
     {"code": "AS_DEK",        "label": "AS Dek",        "area": "AS", "color": "#a89cff", "sort_order": 53},
     {"code": "AS_UTLAST",     "label": "AS Utlast",     "area": "AS", "color": "#b3a3e6", "sort_order": 54},
     {"code": "AS_VAS",        "label": "AS VAS",        "area": "AS", "color": "#c2b5ff", "sort_order": 55},
+
+    # E-Handel
+    {"code": "EH_PLOCK",      "label": "EH Plock",      "area": "EH", "color": "#bfdbfe", "sort_order": 61},
+    {"code": "EH_PACK",       "label": "EH Pack",       "area": "EH", "color": "#dbeafe", "sort_order": 62},
+    {"code": "EH_STOD",       "label": "EH Stöd",       "area": "EH", "color": "#e0f2fe", "sort_order": 63},
+    {"code": "EH_VAS",        "label": "EH VAS",        "area": "EH", "color": "#bae6fd", "sort_order": 64},
 
     # Frånvaro & övrigt
     {"code": "LEDIG", "label": "Ledig", "area": None, "color": "#dddddd", "category": "absence", "sort_order": 91},

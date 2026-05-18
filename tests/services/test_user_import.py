@@ -34,6 +34,7 @@ def test_parse_user_import_excel_accepts_template_headers_and_swedish_roles():
         [
             ["anv\u00e4ndarnamn", "namn", "roll", "avdelning"],
             ["anna", "Anna Andersson", "arbetsledare", ""],
+            ["petra", "Petra Bemanning", "bemanningsansvarig", ""],
             ["bo", "Bo Berg", "administrat\u00f6r", "GG"],
             ["viola", "Viola Visning", "visning", "Mestergruppen"],
             ["lina", "Lina Lager", "lagerkontorist", ""],
@@ -46,6 +47,7 @@ def test_parse_user_import_excel_accepts_template_headers_and_swedish_roles():
     assert errors == []
     assert [(row.username, row.display_name, row.roles, row.area_name) for row in rows] == [
         ("anna", "Anna Andersson", ["leader"], None),
+        ("petra", "Petra Bemanning", ["staffing_manager"], None),
         ("bo", "Bo Berg", ["admin"], "GG"),
         ("viola", "Viola Visning", ["viewer"], "Mestergruppen"),
         ("lina", "Lina Lager", ["warehouse_clerk"], None),

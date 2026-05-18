@@ -7,6 +7,7 @@ let appSettings = {
 
 const ROLE_OPTIONS = [
   { value: "leader", label: "Arbetsledare" },
+  { value: "staffing_manager", label: "Bemanningsansvarig" },
   { value: "admin", label: "Administratör" },
   { value: "warehouse_clerk", label: "Lagerkontorist" },
   { value: "article_placer", label: "Artikelplacerare" },
@@ -27,6 +28,7 @@ function rolesForUser(user) {
 
 function primaryRoleFromRoles(roles) {
   if (roles.includes("admin")) return "admin";
+  if (roles.includes("staffing_manager")) return "staffing_manager";
   if (roles.includes("leader")) return "leader";
   if (roles.includes("warehouse_clerk")) return "warehouse_clerk";
   if (roles.includes("article_placer")) return "article_placer";
@@ -285,13 +287,16 @@ async function importUserFile(file) {
 function setupImportControls() {
   const downloadButton = document.getElementById("download-user-template");
   const importButton = document.getElementById("import-users");
+  const helpButton = document.getElementById("user-import-help");
   const fileInput = document.getElementById("user-import-file");
 
   if (!currentUser?.is_super_user) return;
 
   downloadButton.hidden = false;
   importButton.hidden = false;
+  helpButton.hidden = false;
 
+  setupImportHelpButton("user-import-help", "Importera användare");
   downloadButton.addEventListener("click", () => {
     window.location.href = "/api/users/import-template";
   });

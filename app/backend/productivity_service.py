@@ -61,7 +61,8 @@ HEADER_HINTS = {
 
 GROUPS = (
     {"id": "gg", "title": "Granngården"},
-    {"id": "autostore", "title": "Autostore och e-handel"},
+    {"id": "as", "title": "Autostore"},
+    {"id": "eh", "title": "E-Handel"},
     {"id": "mg", "title": "Mestergruppen"},
 )
 
@@ -624,7 +625,7 @@ def _section_specs() -> tuple[SectionSpec, ...]:
         ),
         SectionSpec(
             "as_store_pick",
-            "autostore",
+            "as",
             "Butik Plock AS - GG + MG",
             "pick",
             "Autostore",
@@ -635,7 +636,7 @@ def _section_specs() -> tuple[SectionSpec, ...]:
         ),
         SectionSpec(
             "gg_decanting",
-            "autostore",
+            "as",
             "Granngården Dekantering",
             "trans",
             "Decanting",
@@ -646,7 +647,7 @@ def _section_specs() -> tuple[SectionSpec, ...]:
         ),
         SectionSpec(
             "gg_ecom_pick",
-            "autostore",
+            "eh",
             "Granngården E-Handel Plock",
             "pick",
             "E_Commerce",
@@ -657,7 +658,7 @@ def _section_specs() -> tuple[SectionSpec, ...]:
         ),
         SectionSpec(
             "gg_ecom_pack",
-            "autostore",
+            "eh",
             "Granngården E-Handel Pack",
             "pallet",
             "Ecom_pack",
@@ -672,7 +673,7 @@ def _section_specs() -> tuple[SectionSpec, ...]:
         ),
         SectionSpec(
             "mg_decanting",
-            "autostore",
+            "as",
             "Mestergruppen Dekantering",
             "trans",
             "Decanting",
@@ -683,7 +684,7 @@ def _section_specs() -> tuple[SectionSpec, ...]:
         ),
         SectionSpec(
             "mg_ecom_pick",
-            "autostore",
+            "eh",
             "Mestergruppen E-Handel Plock",
             "pick",
             "E_Commerce",
@@ -694,7 +695,7 @@ def _section_specs() -> tuple[SectionSpec, ...]:
         ),
         SectionSpec(
             "mg_ecom_pack",
-            "autostore",
+            "eh",
             "Mestergruppen E-Handel Pack",
             "pallet",
             "Ecom_pack",

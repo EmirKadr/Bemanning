@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-UserRole = Literal["admin", "leader", "viewer", "warehouse_clerk", "article_placer"]
+UserRole = Literal["admin", "leader", "staffing_manager", "viewer", "warehouse_clerk", "article_placer"]
 
 
 class AreaOut(BaseModel):
@@ -67,6 +67,18 @@ class ActivityUpdate(BaseModel):
     sort_order: int | None = None
     is_active: bool | None = None
     required_competency: str | None = None
+
+
+class ActivityImportError(BaseModel):
+    row: int
+    label: str | None = None
+    error: str
+
+
+class ActivityImportResult(BaseModel):
+    created: int
+    skipped: int
+    errors: list[ActivityImportError] = Field(default_factory=list)
 
 
 class PersonOut(BaseModel):

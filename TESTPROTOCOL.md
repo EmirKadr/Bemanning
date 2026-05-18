@@ -67,12 +67,27 @@ python -m playwright install chromium
 Vanliga varianter:
 
 ```powershell
-python -m tools.visual_smoke --roles public,admin
+python -m tools.visual_smoke --roles public,admin,leader,staffing,viewer
 python -m tools.visual_smoke --roles admin,warehouse
 python -m tools.visual_smoke --base-url http://127.0.0.1:8000 --roles admin
 python -m tools.visual_smoke --via-desktop-proxy --roles public,admin,warehouse
 python -m tools.visual_smoke --output artifacts\visual\manual-check
 ```
+
+## Lagerverktyg / gammal Allokering-paritet
+
+Bearbeta, Dela och Harleda kor Bemannings egna `warehouse_tools`-paket. For att
+sakra att resultatet fortfarande matchar gamla Allokering-appen finns ett
+paritetstest som kor verkliga floden mot `projects/allokering/testdata`:
+
+```powershell
+python -m pytest tests\services\test_warehouse_tools_parity.py
+```
+
+Testet jamfor publikt flodesregister, datapool och tabeller/summor for de
+deterministiska flodena. Om gamla Allokering-projektet inte finns i workspace
+skippas testet, men lokalt i denna workspace ska det koras nar lagerverktygen
+andras.
 
 `--via-desktop-proxy` testar samma frontend via desktop-appens lokala appserver
 och proxar API-anrop till testbackend. Anvand den nar en andring paverkar
@@ -121,7 +136,7 @@ Granska visuellt att:
 - Rollerna visar ratt navigation och ratt vyer.
 - Otillgangliga sidor skickar anvandaren till Bemanning och visar feltoast.
 - Databasikonen, uppladdningsnotis och uppladdningspilen syns pa Lager-sidorna.
-- Allokering-vyerna kan visas via desktop-proxyn utan att sidebar blinkar bort.
+- Lagerverktygsvyerna kan visas via desktop-proxyn utan att sidebar blinkar bort.
 - Farger, halvceller, schemalagda/lediga celler och kalkyl syns begripligt.
 - Modaler far plats och har fungerande primar/sekundar-knappar.
 
@@ -217,7 +232,7 @@ men det blockerar inte de vanliga webbarbetsflodena. Anvand da:
 
 `tools.visual_data` lagger in:
 
-- admin, arbetsledare, visningsroll och Lagerkontorist
+- admin, arbetsledare, Bemanningsansvarig, visningsroll och Lagerkontorist
 - personer i flera avdelningar
 - veckomallar med ledig helg
 - schemaceller med heldagar och halvtimmar
@@ -246,11 +261,12 @@ Innan ny release:
 1. `python -m pytest`
 2. JS-syntaxkontroll
 3. `python desktop\main.py --smoke-test`
-4. `python -m tools.visual_smoke --roles public,admin,leader,viewer`
+4. `python -m tools.visual_smoke --roles public,admin,leader,staffing,viewer`
    Kor ocksa `python -m tools.visual_smoke --via-desktop-proxy --roles admin,warehouse`
    nar Lager/Allokering, sidebar, filuppladdning eller desktop-appytan har andrats.
-5. `python -m tools.interactive_e2e`
-6. `python -m tools.desktop_shell_screens`
-7. `python -m tools.desktop_app_probe`
-8. `cmd /c build_windows.bat`
-9. Skapa och pusha release-tagg enligt `RELEASE.md`.
+5. `python -m pytest tests\services\test_warehouse_tools_parity.py`
+6. `python -m tools.interactive_e2e`
+7. `python -m tools.desktop_shell_screens`
+8. `python -m tools.desktop_app_probe`
+9. `cmd /c build_windows.bat`
+10. Skapa och pusha release-tagg enligt `RELEASE.md`.

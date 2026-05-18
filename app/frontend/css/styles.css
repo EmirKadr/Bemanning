@@ -224,6 +224,10 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
 .sidebar.collapsed .sidebar-utility {
   align-items: center;
 }
+.sidebar.collapsed .area-focus-toggle {
+  width: 40px;
+  padding: 0 4px;
+}
 .sidebar.collapsed .sidebar-bottom > div:not(.avatar) {
   max-width: 0;
   opacity: 0;
@@ -288,11 +292,34 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   flex-direction: column;
   gap: 10px;
 }
-.sidebar-utility {
+.sidebar-area-focus {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 42px;
+  min-height: 34px;
+}
+.area-focus-toggle {
+  width: 72px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: none;
+}
+.area-focus-toggle:hover {
+  background: var(--bg-2);
+  border-color: var(--border);
+}
+.sidebar-utility {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 86px;
 }
 .database-toggle,
 .theme-toggle {
@@ -940,6 +967,14 @@ button.primary {
   border-color: var(--accent);
 }
 button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+button.import-help-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  justify-content: center;
+  font-weight: 800;
+}
 .button-like {
   background: var(--surface);
   border: 1px solid var(--border-2);
@@ -1840,6 +1875,15 @@ tr.filter-row input {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+.import-help-list {
+  margin: 12px 0 0;
+  padding-left: 22px;
+  color: var(--text);
+  line-height: 1.6;
+}
+.import-help-list li + li {
+  margin-top: 4px;
 }
 
 /* ============================================================
