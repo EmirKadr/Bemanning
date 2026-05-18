@@ -293,8 +293,12 @@ def test_area_focus_toggle_is_wired_to_views():
     activities = (frontend / "js" / "activities.js").read_text(encoding="utf-8")
 
     assert "bemanning-area-focus" in common
-    assert "id=\"area-focus-toggle\"" in common
+    assert '<button class="area-focus-toggle" id="area-focus-toggle"' in common
+    assert '<select class="area-focus-toggle"' not in common
     assert "AREA_FOCUS_OPTIONS" in common
+    assert 'label: "∞"' in common
+    assert "function nextAreaFocus" in common
+    assert 'toggle.addEventListener("click", () => writeAreaFocus(nextAreaFocus()))' in common
     assert "preferredAreaIdFromFocus" in common
     assert "compareActivitiesForAreaFocus" in common
     assert "comparePersonsForAreaFocus" in common

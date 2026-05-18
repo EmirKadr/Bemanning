@@ -9,7 +9,7 @@ const AREA_FOCUS_OPTIONS = [
   { value: "GG", label: "GG", title: "Granngården" },
   { value: "AS", label: "AS", title: "Autostore" },
   { value: "EH", label: "EH", title: "E-Handel" },
-  { value: "ALLT", label: "&infin;", title: "Alla områden" },
+  { value: "ALLT", label: "∞", title: "Alla områden" },
 ];
 const AREA_FOCUS_FALLBACK_NAMES = {
   MG: "Mestergruppen",
@@ -82,6 +82,17 @@ applyTheme(readTheme(), { persist: false });
 function normalizeAreaFocus(value) {
   const normalized = String(value || "").trim().toUpperCase();
   return AREA_FOCUS_OPTIONS.some((option) => option.value === normalized) ? normalized : "ALLT";
+}
+
+function areaFocusOption(value) {
+  const normalized = normalizeAreaFocus(value);
+  return AREA_FOCUS_OPTIONS.find((option) => option.value === normalized) || AREA_FOCUS_OPTIONS[AREA_FOCUS_OPTIONS.length - 1];
+}
+
+function nextAreaFocus(value = readAreaFocus()) {
+  const normalized = normalizeAreaFocus(value);
+  const index = AREA_FOCUS_OPTIONS.findIndex((option) => option.value === normalized);
+  return AREA_FOCUS_OPTIONS[(index + 1) % AREA_FOCUS_OPTIONS.length].value;
 }
 
 function readAreaFocus() {
@@ -161,19 +172,19 @@ function updateAreaFocusToggle(value = readAreaFocus()) {
   const toggle = document.getElementById("area-focus-toggle");
   if (!toggle) return;
   const normalized = normalizeAreaFocus(value);
-  toggle.value = normalized;
+  const option = areaFocusOption(normalized);
+  toggle.dataset.value = normalized;
+  toggle.textContent = option.label;
   toggle.title = `Områdesfokus: ${areaFocusName([], normalized)}`;
   toggle.setAttribute("aria-label", toggle.title);
+  toggle.setAttribute("aria-pressed", normalized === "ALLT" ? "false" : "true");
 }
 
 function initAreaFocusToggle() {
   const toggle = document.getElementById("area-focus-toggle");
   if (!toggle) return;
-  toggle.innerHTML = AREA_FOCUS_OPTIONS
-    .map((option) => `<option value="${option.value}">${option.label}</option>`)
-    .join("");
   updateAreaFocusToggle(readAreaFocus());
-  toggle.addEventListener("change", () => writeAreaFocus(toggle.value));
+  toggle.addEventListener("click", () => writeAreaFocus(nextAreaFocus()));
 }
 
 window.addEventListener("storage", (event) => {
@@ -423,10 +434,8 @@ function renderSidebar(user, activePage) {
       ${adminLink}
     </nav>
     <div class="sidebar-footer">
-      <div class="sidebar-area-focus">
-        <select class="area-focus-toggle" id="area-focus-toggle" title="Områdesfokus" aria-label="Områdesfokus"></select>
-      </div>
       <div class="sidebar-utility">
+        <button class="area-focus-toggle" id="area-focus-toggle" type="button" title="Områdesfokus" aria-label="Områdesfokus"></button>
         ${canUseAllocationTools(user) ? `
           <a href="/uppladdningar.html" class="database-toggle ${activePage === "allocationUploads" ? "active" : ""}" id="allocation-upload-link" title="Uppladdningar" aria-label="Uppladdningar">
             ${DATABASE_ICON}

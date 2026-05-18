@@ -303,12 +303,12 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
 .sidebar-area-focus {
   display: flex;
   align-items: center;
-  min-height: 34px;
+  min-height: 40px;
 }
 .area-focus-toggle {
-  width: 72px;
-  height: 34px;
-  padding: 0 8px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   background: var(--surface);
@@ -317,6 +317,8 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   font-weight: 800;
   cursor: pointer;
   box-shadow: none;
+  display: grid;
+  place-items: center;
 }
 .area-focus-toggle:hover {
   background: var(--bg-2);
@@ -327,10 +329,11 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  min-height: 86px;
+  min-height: 132px;
 }
 .database-toggle,
-.theme-toggle {
+.theme-toggle,
+.area-focus-toggle {
   width: 40px;
   height: 40px;
   padding: 0;
