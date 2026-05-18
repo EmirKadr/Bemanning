@@ -190,3 +190,19 @@ def test_frontend_icon_assets_are_referenced_and_present():
 
     for asset in ("favicon.ico", "app-icon-192.png", "app-icon-512.png", "manifest.webmanifest"):
         assert (frontend / asset).is_file()
+
+
+def test_frontend_theme_toggle_is_wired_globally():
+    frontend = ROOT / "app" / "frontend"
+    common = (frontend / "js" / "common.js").read_text(encoding="utf-8")
+    styles = (frontend / "css" / "styles.css").read_text(encoding="utf-8")
+
+    assert "bemanning-theme" in common
+    assert "id=\"theme-toggle\"" in common
+    assert "THEME_ICONS" in common
+    assert ':root[data-theme="dark"]' in styles
+    assert ".theme-toggle" in styles
+
+    for html_path in frontend.glob("*.html"):
+        html = html_path.read_text(encoding="utf-8")
+        assert "/js/common.js" in html

@@ -1,5 +1,60 @@
 // Delade hjälpare: navbar, toast, auth-check.
 
+const THEME_STORAGE_KEY = "bemanning-theme";
+
+const THEME_ICONS = {
+  light: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+    </svg>
+  `,
+  dark: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12.8A8.6 8.6 0 1 1 11.2 3a6.8 6.8 0 0 0 9.8 9.8Z"></path>
+    </svg>
+  `,
+};
+
+function readTheme() {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    return stored === "dark" ? "dark" : "light";
+  } catch (e) {
+    return "light";
+  }
+}
+
+function updateThemeToggle(theme) {
+  const toggle = document.getElementById("theme-toggle");
+  if (!toggle) return;
+  const isDark = theme === "dark";
+  toggle.innerHTML = THEME_ICONS[theme] || THEME_ICONS.light;
+  toggle.title = isDark ? "Växla till ljust läge" : "Växla till mörkt läge";
+  toggle.setAttribute("aria-label", toggle.title);
+  toggle.setAttribute("aria-pressed", isDark ? "true" : "false");
+}
+
+function applyTheme(theme, { persist = true } = {}) {
+  const nextTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = nextTheme;
+  if (persist) {
+    try { localStorage.setItem(THEME_STORAGE_KEY, nextTheme); } catch (e) {}
+  }
+  updateThemeToggle(nextTheme);
+}
+
+function initThemeToggle() {
+  const toggle = document.getElementById("theme-toggle");
+  if (!toggle) return;
+  updateThemeToggle(readTheme());
+  toggle.addEventListener("click", () => {
+    applyTheme(readTheme() === "dark" ? "light" : "dark");
+  });
+}
+
+applyTheme(readTheme(), { persist: false });
+
 async function loadCurrentUser() {
   try {
     return await api.get("/api/auth/me");
@@ -105,14 +160,21 @@ function renderSidebar(user, activePage) {
       ${analyticsLink}
       ${adminLink}
     </nav>
-    <div class="sidebar-bottom">
-      <div class="avatar">${initials(user?.display_name || user?.username)}</div>
-      <div>
-        <div class="who">${user?.display_name || user?.username || ""}</div>
-        <a href="#" class="logout" id="logout-link">Logga ut</a>
+    <div class="sidebar-footer">
+      <div class="sidebar-theme">
+        <button class="theme-toggle" id="theme-toggle" type="button"></button>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="avatar">${initials(user?.display_name || user?.username)}</div>
+        <div>
+          <div class="who">${user?.display_name || user?.username || ""}</div>
+          <a href="#" class="logout" id="logout-link">Logga ut</a>
+        </div>
       </div>
     </div>
   `;
+
+  initThemeToggle();
 
   const logout = document.getElementById("logout-link");
   if (logout) {
