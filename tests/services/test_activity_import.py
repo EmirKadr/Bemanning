@@ -1,10 +1,20 @@
 import io
+import asyncio
 
 import pytest
 from fastapi import HTTPException
 from openpyxl import Workbook, load_workbook
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
-from app.backend.routers.activities import build_activity_import_template_excel, parse_activity_import_excel
+from app.backend.database import Base
+from app.backend.models import Activity, Area, User
+from app.backend.routers.activities import (
+    build_activity_import_template_excel,
+    download_import_template,
+    import_activities,
+    parse_activity_import_excel,
+)
 
 
 def workbook_bytes(rows):
@@ -17,17 +27,47 @@ def workbook_bytes(rows):
     return stream.getvalue()
 
 
+class FakeUpload:
+    def __init__(self, content: bytes):
+        self.content = content
+
+    async def read(self) -> bytes:
+        return self.content
+
+
+@pytest.fixture()
+def import_db():
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+        Base.metadata.drop_all(engine)
+
+
+def seed_activity_import_base(db):
+    gg = Area(code="GG", name="Gastro Grönt", sort_order=1)
+    mg = Area(code="MG", name="Mästergruppen", sort_order=2)
+    summary = Activity(code="LEDIGT", label="Ledigt", color="#fee2e2", category="absence", sort_order=10)
+    admin = User(username="admin", display_name="Admin", role="admin", roles=["admin"], is_active=True)
+    db.add_all([gg, mg, summary, admin])
+    db.flush()
+    return gg, mg, summary, admin
+
+
 def test_build_activity_import_template_excel_has_expected_headers():
     workbook = load_workbook(io.BytesIO(build_activity_import_template_excel()))
     sheet = workbook.active
 
-    assert [sheet["A1"].value, sheet["B1"].value, sheet["C1"].value, sheet["D1"].value, sheet["E1"].value, sheet["F1"].value] == [
+    assert [sheet["A1"].value, sheet["B1"].value, sheet["C1"].value, sheet["D1"].value, sheet["E1"].value] == [
         "etikett",
         "område",
         "summeras som",
-        "kategori",
-        "färg",
         "sortering",
+        None,
     ]
 
 
@@ -35,8 +75,8 @@ def test_parse_activity_import_excel_accepts_label_only():
     rows, errors = parse_activity_import_excel(
         workbook_bytes(
             [
-                ["etikett", "område", "summeras som", "kategori", "färg", "sortering"],
-                ["GG Påfyllning", None, None, None, None, None],
+                ["etikett", "område", "summeras som", "sortering"],
+                ["GG Påfyllning", None, None, None],
             ]
         )
     )
@@ -46,8 +86,6 @@ def test_parse_activity_import_excel_accepts_label_only():
     assert rows[0].label == "GG Påfyllning"
     assert rows[0].area is None
     assert rows[0].summary_activity is None
-    assert rows[0].category == "work"
-    assert rows[0].color == "#ffffff"
     assert rows[0].sort_order is None
 
 
@@ -55,8 +93,8 @@ def test_parse_activity_import_excel_accepts_optional_fields():
     rows, errors = parse_activity_import_excel(
         workbook_bytes(
             [
-                ["etikett", "område", "summeras som", "kategori", "färg", "sortering"],
-                ["Frånvaro", "GG", "Ledigt", "frånvaro", "fee2e2", 20],
+                ["etikett", "område", "summeras som", "sortering"],
+                ["Frånvaro", "GG", "Ledigt", 20],
             ]
         )
     )
@@ -65,30 +103,40 @@ def test_parse_activity_import_excel_accepts_optional_fields():
     assert len(rows) == 1
     assert rows[0].area == "GG"
     assert rows[0].summary_activity == "Ledigt"
-    assert rows[0].category == "absence"
-    assert rows[0].color == "#fee2e2"
     assert rows[0].sort_order == 20
+
+
+def test_parse_activity_import_excel_ignores_legacy_category_and_color_columns():
+    rows, errors = parse_activity_import_excel(
+        workbook_bytes(
+            [
+                ["etikett", "kategori", "färg", "sortering"],
+                ["Gammal mall", "frånvaro", "gul", 7],
+            ]
+        )
+    )
+
+    assert errors == []
+    assert len(rows) == 1
+    assert rows[0].label == "Gammal mall"
+    assert rows[0].sort_order == 7
 
 
 def test_parse_activity_import_excel_collects_row_errors():
     rows, errors = parse_activity_import_excel(
         workbook_bytes(
             [
-                ["etikett", "kategori", "färg", "sortering"],
-                [None, "arbete", "#ffffff", 1],
-                ["Okänd kategori", "annat", "#ffffff", 2],
-                ["Fel färg", "arbete", "gul", 3],
-                ["Fel sort", "arbete", "#ffffff", "1,5"],
+                ["etikett", "sortering"],
+                [None, 1],
+                ["Fel sort", "1,5"],
             ]
         )
     )
 
     assert rows == []
-    assert [error.row for error in errors] == [2, 3, 4, 5]
+    assert [error.row for error in errors] == [2, 3]
     assert "Etikett" in errors[0].error
-    assert "Kategori" in errors[1].error
-    assert "Färg" in errors[2].error
-    assert "heltal" in errors[3].error
+    assert "heltal" in errors[1].error
 
 
 def test_parse_activity_import_excel_requires_label_header():
@@ -96,3 +144,54 @@ def test_parse_activity_import_excel_requires_label_header():
         parse_activity_import_excel(workbook_bytes([["område"], ["GG"]]))
 
     assert exc.value.status_code == 400
+
+
+def test_downloaded_activity_template_imports_mixed_optional_summary_and_sorting(import_db):
+    _gg, _mg, summary, admin = seed_activity_import_base(import_db)
+    response = download_import_template(_admin=admin)
+
+    assert response.headers["Content-Disposition"] == 'attachment; filename="stallen-importmall.xlsx"'
+    workbook = load_workbook(io.BytesIO(response.body))
+    sheet = workbook.active
+    assert [sheet.cell(1, column).value for column in range(1, 5)] == [
+        "etikett",
+        "område",
+        "summeras som",
+        "sortering",
+    ]
+
+    sheet.append(["Test utan frivilligt", "GG", None, None])
+    sheet.append(["Test med allt", "MG", "Ledigt", 42])
+    sheet.append(["Test bara summeras", None, "Ledigt", None])
+    sheet.append(["Test bara sortering", "GG", None, 77])
+    stream = io.BytesIO()
+    workbook.save(stream)
+
+    result = asyncio.run(import_activities(file=FakeUpload(stream.getvalue()), db=import_db, admin=admin))
+
+    assert result.created == 4
+    assert result.skipped == 0
+    assert result.errors == []
+
+    imported = {
+        activity.label: activity
+        for activity in import_db.query(Activity).filter(Activity.label.like("Test %")).all()
+    }
+    assert set(imported) == {
+        "Test utan frivilligt",
+        "Test med allt",
+        "Test bara summeras",
+        "Test bara sortering",
+    }
+    assert imported["Test utan frivilligt"].summary_activity_id is None
+    assert imported["Test utan frivilligt"].sort_order == 11
+    assert imported["Test med allt"].summary_activity_id == summary.id
+    assert imported["Test med allt"].sort_order == 42
+    assert imported["Test bara summeras"].summary_activity_id == summary.id
+    assert imported["Test bara summeras"].sort_order == 12
+    assert imported["Test bara sortering"].summary_activity_id is None
+    assert imported["Test bara sortering"].sort_order == 77
+
+    for activity in imported.values():
+        assert activity.category == "work"
+        assert activity.color == "#ffffff"

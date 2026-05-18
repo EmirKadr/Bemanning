@@ -44,28 +44,9 @@ HEADER_ALIASES = {
     "huvudställe": "summary_activity",
     "summary": "summary_activity",
     "summaryactivity": "summary_activity",
-    "kategori": "category",
-    "category": "category",
-    "farg": "color",
-    "färg": "color",
-    "color": "color",
-    "colour": "color",
     "sortering": "sort_order",
     "sort": "sort_order",
     "sortorder": "sort_order",
-}
-
-CATEGORY_ALIASES = {
-    "": "work",
-    "arbete": "work",
-    "arbetsstalle": "work",
-    "arbetsställe": "work",
-    "work": "work",
-    "franvaro": "absence",
-    "frånvaro": "absence",
-    "absence": "absence",
-    "ledig": "absence",
-    "ledigt": "absence",
 }
 
 
@@ -75,8 +56,6 @@ class ImportActivityRow:
     label: str
     area: str | None
     summary_activity: str | None
-    category: str
-    color: str
     sort_order: int | None
 
 
@@ -127,43 +106,15 @@ def _parse_sort_order(value: str, *, row_number: int, label: str) -> tuple[int |
     return int(parsed), None
 
 
-def _parse_category(value: str, *, row_number: int, label: str) -> tuple[str, ActivityImportError | None]:
-    category = CATEGORY_ALIASES.get(_compact_key(value))
-    if category is None:
-        return "work", ActivityImportError(
-            row=row_number,
-            label=label or None,
-            error="Kategori måste vara arbete eller frånvaro",
-        )
-    return category, None
-
-
-def _parse_color(value: str, *, row_number: int, label: str) -> tuple[str, ActivityImportError | None]:
-    if not value:
-        return "#ffffff", None
-    color = value.strip()
-    if re.fullmatch(r"[0-9A-Fa-f]{6}", color):
-        color = f"#{color}"
-    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", color):
-        return "#ffffff", ActivityImportError(
-            row=row_number,
-            label=label or None,
-            error="Färg måste vara hex, till exempel #ffffff",
-        )
-    return color.lower(), None
-
-
 def build_activity_import_template_excel() -> bytes:
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Ställen"
-    sheet.append(["etikett", "område", "summeras som", "kategori", "färg", "sortering"])
+    sheet.append(["etikett", "område", "summeras som", "sortering"])
     sheet.column_dimensions["A"].width = 28
     sheet.column_dimensions["B"].width = 24
     sheet.column_dimensions["C"].width = 28
-    sheet.column_dimensions["D"].width = 16
-    sheet.column_dimensions["E"].width = 14
-    sheet.column_dimensions["F"].width = 14
+    sheet.column_dimensions["D"].width = 14
     sheet.freeze_panes = "A2"
 
     stream = io.BytesIO()
@@ -204,16 +155,6 @@ def parse_activity_import_excel(content: bytes) -> tuple[list[ImportActivityRow]
             errors.append(ActivityImportError(row=row_number, label=label, error="Etikett får vara max 60 tecken"))
             continue
 
-        category, category_error = _parse_category(values.get("category", ""), row_number=row_number, label=label)
-        if category_error is not None:
-            errors.append(category_error)
-            continue
-
-        color, color_error = _parse_color(values.get("color", ""), row_number=row_number, label=label)
-        if color_error is not None:
-            errors.append(color_error)
-            continue
-
         sort_order, sort_error = _parse_sort_order(values.get("sort_order", ""), row_number=row_number, label=label)
         if sort_error is not None:
             errors.append(sort_error)
@@ -225,8 +166,6 @@ def parse_activity_import_excel(content: bytes) -> tuple[list[ImportActivityRow]
                 label=label,
                 area=values.get("area") or None,
                 summary_activity=values.get("summary_activity") or None,
-                category=category,
-                color=color,
                 sort_order=sort_order,
             )
         )
@@ -415,8 +354,8 @@ async def import_activities(
             label=row.label,
             area_id=area.id if area is not None else None,
             summary_activity_id=summary_activity_id,
-            color=row.color,
-            category=row.category,
+            color="#ffffff",
+            category="work",
             sort_order=sort_order,
             is_active=True,
             required_competency=None,
