@@ -59,10 +59,16 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-import tkinter as tk
+import os
+try:
+    if os.environ.get("WAREHOUSE_TOOLS_FORCE_HEADLESS_TK") == "1":
+        raise ImportError("Headless Tk fallback forced")
+    import tkinter as tk
+    from tkinter import ttk, filedialog, messagebox, scrolledtext
+except (ImportError, ModuleNotFoundError):
+    from warehouse_tools.headless_tk import filedialog, messagebox, scrolledtext, tk, ttk
 from datetime import datetime, timezone
 from dataclasses import dataclass
-from tkinter import ttk, filedialog, messagebox, scrolledtext
 from typing import Deque, Dict, List, Tuple, Optional
 import importlib.util
 import webbrowser
@@ -77,7 +83,6 @@ except ImportError:
 from collections import defaultdict, deque
 import pandas as pd
 import tempfile
-import os
 import sys
 import subprocess
 import numpy as np

@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -68,6 +69,30 @@ def test_allocation_bridge_imports_warehouse_tools_when_started_from_app_root():
             ),
         ],
         cwd=ROOT / "app",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "12.1.5" in result.stdout
+
+
+def test_allocation_bridge_imports_without_tkinter_on_headless_server():
+    env = dict(**os.environ, WAREHOUSE_TOOLS_FORCE_HEADLESS_TK="1")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from backend import allocation_bridge as bridge; "
+                "engine, flows = bridge.require_available(); "
+                "print(engine.APP_VERSION, len(flows.FLOW_BY_ID))"
+            ),
+        ],
+        cwd=ROOT / "app",
+        env=env,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

@@ -28,8 +28,13 @@ import argparse
 import os
 import shutil
 import tempfile
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+try:
+    if os.environ.get("WAREHOUSE_TOOLS_FORCE_HEADLESS_TK") == "1":
+        raise ImportError("Headless Tk fallback forced")
+    import tkinter as tk
+    from tkinter import ttk, filedialog, messagebox
+except (ImportError, ModuleNotFoundError):
+    from warehouse_tools.headless_tk import filedialog, messagebox, tk, ttk
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
