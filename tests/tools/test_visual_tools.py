@@ -21,12 +21,14 @@ def test_visual_smoke_covers_expected_routes():
         "login",
         "bemanning",
         "oversikt",
+        "produktivitet",
         "personer",
         "stallen",
         "historik",
         "anvandare",
     }
     assert pages_by_name["bemanning"].roles == ("admin", "leader", "viewer")
+    assert pages_by_name["produktivitet"].roles == ("admin",)
     assert pages_by_name["anvandare"].roles == ("admin",)
 
 
@@ -44,7 +46,9 @@ def test_visual_smoke_covers_critical_scenarios():
         "anvandare-redigera-anvandare-modal",
         "historik-filter",
         "viewer-nekad-personer",
+        "viewer-nekad-produktivitet",
         "leader-nekad-historik",
+        "leader-nekad-produktivitet",
     }.issubset(state_names)
 
 

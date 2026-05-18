@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Produktivitet - Bemanning</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/app-icon-192.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <header class="topbar"></header>
+
+  <section class="controls">
+    <button id="refreshProductivityBtn" type="button">Uppdatera</button>
+    <label>Datum
+      <input id="productivityDate" type="date" />
+    </label>
+    <label>Block
+      <select id="productivityGroupFilter">
+        <option value="all">Alla</option>
+      </select>
+    </label>
+    <label>Sök
+      <input id="productivitySearch" type="search" autocomplete="off" />
+    </label>
+  </section>
+
+  <main class="productivity-page">
+    <div class="section-title">Produktivitet</div>
+    <div id="productivityStatus" class="productivity-status"></div>
+    <div id="productivitySummary" class="productivity-summary"></div>
+    <div id="productivitySources" class="productivity-sources"></div>
+    <div id="productivityContent" class="productivity-content"></div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/productivity.js"></script>
+</body>
+</html>

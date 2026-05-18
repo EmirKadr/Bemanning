@@ -14,6 +14,7 @@ from .routers import (
     overview,
     person_schedules,
     persons,
+    productivity,
     public,
     schedule,
     settings as app_settings,
@@ -45,6 +46,7 @@ app.include_router(person_schedules.router)
 app.include_router(schedule.router)
 app.include_router(bulk.router)
 app.include_router(overview.router)
+app.include_router(productivity.router)
 app.include_router(app_settings.router)
 app.include_router(users.router)
 app.include_router(public.router)

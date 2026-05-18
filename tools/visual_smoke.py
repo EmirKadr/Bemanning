@@ -66,6 +66,7 @@ PAGES: tuple[VisualPage, ...] = (
     VisualPage("login", "/login.html", "#login-form", ("public",)),
     VisualPage("bemanning", "/index.html", "#scheduleTable", ("admin", "leader", "viewer")),
     VisualPage("oversikt", "/overblick.html", "#overviewTable", ("admin", "leader", "viewer")),
+    VisualPage("produktivitet", "/produktivitet.html", "#productivityContent", ("admin",)),
     VisualPage("personer", "/personer.html", "#persons-table", ("admin", "leader")),
     VisualPage("stallen", "/stallen.html", "#acts-body", ("admin", "leader")),
     VisualPage("historik", "/historik.html", "#auditBody", ("admin",)),
@@ -95,8 +96,10 @@ STATES: tuple[VisualState, ...] = (
     VisualState("viewer-nekad-stallen", "/stallen.html", "#scheduleTable", "noop", ("viewer",)),
     VisualState("viewer-nekad-anvandare", "/anvandare.html", "#scheduleTable", "noop", ("viewer",)),
     VisualState("viewer-nekad-historik", "/historik.html", "#scheduleTable", "noop", ("viewer",)),
+    VisualState("viewer-nekad-produktivitet", "/produktivitet.html", "#scheduleTable", "noop", ("viewer",)),
     VisualState("leader-nekad-anvandare", "/anvandare.html", "#scheduleTable", "noop", ("leader",)),
     VisualState("leader-nekad-historik", "/historik.html", "#scheduleTable", "noop", ("leader",)),
+    VisualState("leader-nekad-produktivitet", "/produktivitet.html", "#scheduleTable", "noop", ("leader",)),
 )
 
 

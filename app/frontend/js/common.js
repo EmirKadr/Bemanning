@@ -80,6 +80,9 @@ function renderSidebar(user, activePage) {
   const analyticsLink = user?.is_super_user
     ? `<a href="/historik.html" class="${activePage === "analytics" ? "active" : ""}"><span class="icon" aria-hidden="true">📊</span><span>Historik</span></a>`
     : "";
+  const productivityLink = user?.is_super_user
+    ? `<a href="/produktivitet.html" class="${activePage === "productivity" ? "active" : ""}"><span class="icon" aria-hidden="true">📈</span><span>Produktivitet</span></a>`
+    : "";
 
   const editorLinks = canEditPlanning(user)
     ? `
@@ -97,6 +100,7 @@ function renderSidebar(user, activePage) {
     <nav>
       <a href="/index.html" class="${activePage === "schedule" ? "active" : ""}"><span class="icon" aria-hidden="true">📋</span><span>Bemanning</span></a>
       <a href="/overblick.html" class="${activePage === "overview" ? "active" : ""}"><span class="icon" aria-hidden="true">📅</span><span>Översikt</span></a>
+      ${productivityLink}
       ${editorLinks}
       ${analyticsLink}
       ${adminLink}

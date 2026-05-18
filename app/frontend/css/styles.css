@@ -241,6 +241,192 @@ button, input, select, textarea { font-family: inherit; color: inherit; }
 }
 .sidebar-bottom .logout:hover { color: var(--danger); text-decoration: underline; }
 
+/* ============================================================
+   Produktivitet
+   ============================================================ */
+
+.productivity-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.productivity-status {
+  color: var(--text-muted);
+  font-size: 13px;
+  min-height: 20px;
+}
+
+.productivity-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.productivity-kpi,
+.productivity-source {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-1);
+}
+
+.productivity-kpi {
+  padding: 12px 14px;
+}
+
+.productivity-kpi span,
+.productivity-source span,
+.productivity-panel-header span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.productivity-kpi strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.productivity-sources {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.productivity-source {
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.productivity-source strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 3px;
+  font-size: 13px;
+}
+
+.productivity-source small {
+  display: block;
+  color: var(--text-soft);
+  margin-top: 3px;
+}
+
+.productivity-content,
+.productivity-section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.productivity-group h2 {
+  margin: 8px 0 10px;
+  font-size: 18px;
+}
+
+.productivity-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.productivity-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.productivity-panel-header h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+
+.productivity-panel-score,
+.productivity-pct {
+  font-weight: 700;
+}
+
+.productivity-panel-score.good,
+.productivity-pct.good { color: var(--success); }
+
+.productivity-panel-score.warn,
+.productivity-pct.warn { color: var(--warning); }
+
+.productivity-panel-score.low,
+.productivity-pct.low { color: var(--danger); }
+
+.productivity-table-wrap {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+}
+
+table.productivity-table {
+  min-width: 1240px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table.productivity-table th,
+table.productivity-table td {
+  padding: 6px 7px;
+  font-size: 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+table.productivity-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--header);
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+table.productivity-table th.name,
+table.productivity-table td.name {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  min-width: 128px;
+  max-width: 128px;
+  text-align: left;
+  background: var(--surface);
+}
+
+table.productivity-table th.name {
+  background: var(--header);
+}
+
+table.productivity-table td.has-work {
+  background: #e8f7ef;
+  color: #166534;
+  font-weight: 650;
+}
+
+.empty-state {
+  background: var(--surface);
+  border: 1px dashed var(--border-2);
+  border-radius: 8px;
+  color: var(--text-muted);
+  padding: 20px;
+  text-align: center;
+}
+
 .app > main {
   padding: 28px 28px 60px;
   min-width: 0;
@@ -1427,6 +1613,8 @@ tr.filter-row input {
   .summary-grid { grid-template-columns: 1fr; }
   .analytics-grid { grid-template-columns: 1fr; }
   .analytics-split { grid-template-columns: 1fr; }
+  .productivity-summary { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+  .productivity-sources { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
   .calc-card-header { align-items: stretch; flex-direction: column; }
   .calc-area-picker { margin-left: 0; }
 }
@@ -1434,4 +1622,7 @@ tr.filter-row input {
 @media (max-width: 640px) {
   .modal { min-width: 320px; padding: 18px 20px; }
   main { padding: 18px 16px 50px; }
+  .productivity-summary,
+  .productivity-sources { grid-template-columns: 1fr; }
+  .productivity-panel-header { align-items: flex-start; flex-direction: column; }
 }
