@@ -284,8 +284,6 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   width: 18px;
   flex: 0 0 18px;
   text-align: center;
-  color: var(--text-muted);
-  filter: grayscale(1) saturate(0);
 }
 .sidebar nav a > span:not(.icon) {
   max-width: 150px;
