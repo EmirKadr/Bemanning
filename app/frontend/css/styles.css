@@ -326,6 +326,7 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
 }
 .area-focus-toggle.infinity {
   font-size: 22px;
+  font-weight: 400;
   line-height: 1;
 }
 .sidebar-utility {
