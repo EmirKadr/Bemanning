@@ -175,6 +175,7 @@ function updateAreaFocusToggle(value = readAreaFocus()) {
   const option = areaFocusOption(normalized);
   toggle.dataset.value = normalized;
   toggle.textContent = option.label;
+  toggle.classList.toggle("infinity", normalized === "ALLT");
   toggle.title = `Områdesfokus: ${areaFocusName([], normalized)}`;
   toggle.setAttribute("aria-label", toggle.title);
   toggle.setAttribute("aria-pressed", normalized === "ALLT" ? "false" : "true");

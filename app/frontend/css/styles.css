@@ -324,6 +324,10 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   background: var(--bg-2);
   border-color: var(--border);
 }
+.area-focus-toggle.infinity {
+  font-size: 22px;
+  line-height: 1;
+}
 .sidebar-utility {
   display: flex;
   flex-direction: column;
