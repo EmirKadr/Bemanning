@@ -11,10 +11,14 @@ from app.backend.database import Base
 from app.backend.models import Activity, Area, User
 from app.backend.routers.activities import (
     build_activity_import_template_excel,
+    create_activity,
+    delete_activity,
     download_import_template,
     import_activities,
     parse_activity_import_excel,
+    update_activity,
 )
+from app.backend.schemas import ActivityCreate, ActivityUpdate
 
 
 def workbook_bytes(rows):
@@ -53,9 +57,16 @@ def seed_activity_import_base(db):
     mg = Area(code="MG", name="Mästergruppen", sort_order=2)
     summary = Activity(code="LEDIGT", label="Ledigt", color="#fee2e2", category="absence", sort_order=10)
     admin = User(username="admin", display_name="Admin", role="admin", roles=["admin"], is_active=True)
-    db.add_all([gg, mg, summary, admin])
+    staffing = User(
+        username="staffing",
+        display_name="Bemanningsansvarig",
+        role="staffing_manager",
+        roles=["staffing_manager"],
+        is_active=True,
+    )
+    db.add_all([gg, mg, summary, admin, staffing])
     db.flush()
-    return gg, mg, summary, admin
+    return gg, mg, summary, admin, staffing
 
 
 def test_build_activity_import_template_excel_has_expected_headers():
@@ -147,7 +158,7 @@ def test_parse_activity_import_excel_requires_label_header():
 
 
 def test_downloaded_activity_template_imports_mixed_optional_summary_and_sorting(import_db):
-    _gg, _mg, summary, admin = seed_activity_import_base(import_db)
+    _gg, _mg, summary, admin, _staffing = seed_activity_import_base(import_db)
     response = download_import_template(_admin=admin)
 
     assert response.headers["Content-Disposition"] == 'attachment; filename="stallen-importmall.xlsx"'
@@ -195,3 +206,33 @@ def test_downloaded_activity_template_imports_mixed_optional_summary_and_sorting
     for activity in imported.values():
         assert activity.category == "work"
         assert activity.color == "#ffffff"
+
+
+def test_bemanningsansvarig_can_manage_activities(import_db):
+    gg, _mg, _summary, _admin, staffing = seed_activity_import_base(import_db)
+
+    response = download_import_template(_admin=staffing)
+    assert response.headers["Content-Disposition"] == 'attachment; filename="stallen-importmall.xlsx"'
+
+    created = create_activity(
+        payload=ActivityCreate(label="Bemanning test", area_id=gg.id, sort_order=99),
+        db=import_db,
+        admin=staffing,
+    )
+
+    assert created.id is not None
+    assert created.label == "Bemanning test"
+    assert created.code.startswith("GG_BEMANNING_TEST")
+
+    updated = update_activity(
+        activity_id=created.id,
+        payload=ActivityUpdate(label="Bemanning test uppdaterad"),
+        db=import_db,
+        admin=staffing,
+    )
+
+    assert updated.label == "Bemanning test uppdaterad"
+
+    delete_activity(activity_id=created.id, db=import_db, admin=staffing)
+
+    assert import_db.get(Activity, created.id).is_active is False

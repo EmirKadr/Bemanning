@@ -1762,6 +1762,89 @@ def _recompute_artikel_max(observations: pd.DataFrame, ut_path: Path) -> int:
     return len(rader)
 
 
+def _read_artikel_max(path: Path) -> pd.DataFrame:
+    cols = ["artikelnummer", "max", "pallid"]
+    if path.exists() and path.stat().st_size > 0:
+        try:
+            df = pd.read_csv(path, dtype=str, encoding="utf-8-sig")
+        except Exception:
+            return pd.DataFrame(columns=cols)
+        for col in cols:
+            if col not in df.columns:
+                df[col] = ""
+        return df[cols]
+    return pd.DataFrame(columns=cols)
+
+
+def _normalise_artikel_max_for_compare(df: pd.DataFrame) -> pd.DataFrame:
+    cols = ["artikelnummer", "max", "pallid"]
+    if df is None or df.empty:
+        return pd.DataFrame(columns=cols).set_index("artikelnummer")
+    out = df.copy()
+    for col in cols:
+        if col not in out.columns:
+            out[col] = ""
+    out = out[cols]
+    out["artikelnummer"] = out["artikelnummer"].astype(str).str.strip()
+    out["pallid"] = out["pallid"].astype(str).str.strip()
+    out["max"] = pd.to_numeric(out["max"], errors="coerce")
+    out = out[out["artikelnummer"] != ""]
+    return out.drop_duplicates(subset="artikelnummer", keep="first").set_index("artikelnummer")
+
+
+def _same_article_max_value(before: float, after: float) -> bool:
+    if pd.isna(before) and pd.isna(after):
+        return True
+    if pd.isna(before) or pd.isna(after):
+        return False
+    return float(before) == float(after)
+
+
+def _format_article_max_value(value: float) -> str:
+    if pd.isna(value):
+        return ""
+    value = float(value)
+    return str(int(value)) if value.is_integer() else str(value)
+
+
+def _artikel_max_change_summary(before: pd.DataFrame, after: pd.DataFrame) -> Dict[str, object]:
+    before_norm = _normalise_artikel_max_for_compare(before)
+    after_norm = _normalise_artikel_max_for_compare(after)
+    before_articles = set(before_norm.index)
+    after_articles = set(after_norm.index)
+    common_articles = sorted(before_articles & after_articles)
+    changed = []
+    increased = 0
+    decreased = 0
+
+    for article in common_articles:
+        before_value = before_norm.at[article, "max"]
+        after_value = after_norm.at[article, "max"]
+        if _same_article_max_value(before_value, after_value):
+            continue
+        if not pd.isna(before_value) and not pd.isna(after_value):
+            if float(after_value) > float(before_value):
+                increased += 1
+            elif float(after_value) < float(before_value):
+                decreased += 1
+        changed.append({
+            "artikelnummer": str(article),
+            "before_max": _format_article_max_value(before_value),
+            "after_max": _format_article_max_value(after_value),
+            "before_pallid": str(before_norm.at[article, "pallid"]),
+            "after_pallid": str(after_norm.at[article, "pallid"]),
+        })
+
+    return {
+        "changed_rows": int(len(changed)),
+        "increased_rows": int(increased),
+        "decreased_rows": int(decreased),
+        "new_article_rows": int(len(after_articles - before_articles)),
+        "removed_article_rows": int(len(before_articles - after_articles)),
+        "examples": changed[:5],
+    }
+
+
 def update_observations_from_buffer(
     buffer_raw: pd.DataFrame,
     observations_path: Optional[Path] = None,
@@ -3311,7 +3394,14 @@ class ChunkedValuesResult:
 class ObservationsUpdateResult:
     new_rows_df: pd.DataFrame
     new_row_count: int
+    github_sent_rows: int
     article_max_rows: int
+    article_max_changed_rows: int
+    article_max_increased_rows: int
+    article_max_decreased_rows: int
+    article_max_new_rows: int
+    article_max_removed_rows: int
+    article_max_changed_examples: List[Dict[str, str]]
     pushed_to_github: bool
     observations_path: str
     article_max_path: str
@@ -3695,12 +3785,16 @@ def build_observations_update_result(
 ) -> ObservationsUpdateResult:
     obs_path = Path(observations_path) if observations_path else _observations_path()
     max_path = Path(artikel_max_out) if artikel_max_out else _artikel_max_path()
+    article_max_before = _read_artikel_max(max_path)
     new_row_count, new_rows_df = update_observations_from_buffer(
         buffer_df,
         observations_path=obs_path,
         artikel_max_path=max_path,
     )
     pushed = bool(push_to_github and new_row_count and push_new_observations_to_github(new_rows_df))
+    github_sent_rows = int(new_row_count) if pushed else 0
+    article_max_after = _read_artikel_max(max_path)
+    max_changes = _artikel_max_change_summary(article_max_before, article_max_after)
     article_max_rows = 0
     if max_path.exists() and max_path.stat().st_size > 0:
         try:
@@ -3710,7 +3804,14 @@ def build_observations_update_result(
     return ObservationsUpdateResult(
         new_rows_df=new_rows_df,
         new_row_count=int(new_row_count),
+        github_sent_rows=github_sent_rows,
         article_max_rows=article_max_rows,
+        article_max_changed_rows=int(max_changes["changed_rows"]),
+        article_max_increased_rows=int(max_changes["increased_rows"]),
+        article_max_decreased_rows=int(max_changes["decreased_rows"]),
+        article_max_new_rows=int(max_changes["new_article_rows"]),
+        article_max_removed_rows=int(max_changes["removed_article_rows"]),
+        article_max_changed_examples=list(max_changes["examples"]),
         pushed_to_github=pushed,
         observations_path=str(obs_path.resolve()),
         article_max_path=str(max_path.resolve()),
@@ -9051,10 +9152,18 @@ def _cli_observations_update(args: argparse.Namespace) -> int:
     summary = {
         "command": "observations-update",
         "new_rows": int(result.new_row_count),
+        "github_sent_rows": int(result.github_sent_rows),
         "article_max_rows": int(result.article_max_rows),
+        "article_max_changed_rows": int(result.article_max_changed_rows),
+        "article_max_increased_rows": int(result.article_max_increased_rows),
+        "article_max_decreased_rows": int(result.article_max_decreased_rows),
+        "article_max_new_rows": int(result.article_max_new_rows),
+        "article_max_removed_rows": int(result.article_max_removed_rows),
         "pushed_to_github": bool(result.pushed_to_github),
         "outputs": output_paths,
     }
+    if args.json:
+        summary["article_max_changed_examples"] = result.article_max_changed_examples
     _emit_cli_summary(summary, args.json)
     return 0
 

@@ -13,10 +13,15 @@ NAME_HINTS = {
     "v_ask_receive_log": "wms_receive",
     "v_ask_booking_putaway": "wms_booking",
     "v_ask_article_buffertpallet": "buffer",
+    "v_ask_article_bufferpallet": "buffer",
     "v_ask_trans_log": "wms_trans",
     "v_ask_pick_log_full": "wms_pick",
     "v_ask_correct_log": "wms_correct",
     "item_option": "item",
+    "kampanjplock": "campaign",
+    "campaign": "campaign",
+    "prognos idag": "prognos",
+    "prognos": "prognos",
 }
 
 BUFFER_NAME_HINTS = (
@@ -102,9 +107,13 @@ def detect_file_type(path: str | os.PathLike[str]) -> str | None:
         return None
 
     if suffix in {".xlsx", ".xlsm", ".xls"}:
+        has_product_code = _has_any(cols, ("artikelnummer", "artikel", "sku", "product code", "produktkod"))
+        has_quantity = _has_part(cols, "antal") or _has_any(cols, ("qty", "quantity"))
+        if has_product_code and (_has_part(cols, "kampanj") or _has_part(cols, "projicerat")) and has_quantity:
+            return "campaign"
         if cols == ["artikelnummer", "antal styck"] or ("artikelnummer" in cols and "antal styck" in cols):
             return "campaign"
-        if _has_any(cols, ("artikelnummer", "artikel", "sku")) and _has_part(cols, "antal"):
+        if has_product_code and has_quantity:
             return "prognos"
         return None
 

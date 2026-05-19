@@ -86,7 +86,14 @@ async def update_observations(
         path.unlink(missing_ok=True)
     return {
         "new_rows": int(result.new_row_count),
+        "github_sent_rows": int(result.github_sent_rows),
         "article_max_rows": int(result.article_max_rows),
+        "article_max_changed_rows": int(result.article_max_changed_rows),
+        "article_max_increased_rows": int(result.article_max_increased_rows),
+        "article_max_decreased_rows": int(result.article_max_decreased_rows),
+        "article_max_new_rows": int(result.article_max_new_rows),
+        "article_max_removed_rows": int(result.article_max_removed_rows),
+        "article_max_changed_examples": list(result.article_max_changed_examples),
         "pushed_to_github": bool(result.pushed_to_github),
         "observations_path": result.observations_path,
         "article_max_path": result.article_max_path,

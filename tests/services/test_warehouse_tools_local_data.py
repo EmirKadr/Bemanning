@@ -43,7 +43,7 @@ EXPECTED_SUMMARIES = {
     "eftersok": {"Inköp": "999109415", "Artikel": "200847340", "Rapportrader": 22},
     "hib-koppling": {"Ändringar": 49, "Missade avgångar": 1},
     "lyx": {"LYX-artiklar": 264, "Filtrerade rader": 5510},
-    "observations-update": {"Nya observationer": 24047, "Artikel-max-rader": 3026},
+    "observations-update": {"Nya observationer": 24047, "Skickade pallid": 0, "Artikel-max-rader": 3026, "Ändrade maxvärden": 0},
     "ordersaldo": {"Kompletta ordrar": 300, "Artiklar med underskott": 3777},
     "overview-check": {"Sändningsrader": 0, "HIB-rader": 6},
     "pafyllnadsprio": {"Läge": "Lastningsfönster", "Rapportrader": 3777, "Saknad referens": 2951},
@@ -92,23 +92,40 @@ EXPECTED_FIRST_VALUES = {
     "split-values": {"report": (0, "A")},
 }
 
+LEGACY_FIXTURE_NAMES = {
+    "orders": "v_ask_customer_order_details_all-20260317145125.csv",
+    "buffer": "v_ask_article_buffertpallet-20260317145136.csv",
+    "saldo": "v_ask_item_summary_stock_automation-20260317145351.csv",
+    "items": "item_option-20260317145203.csv",
+    "overview": "v_ask_order_overview-20260317145114.csv",
+    "dispatch": "v_ask_dispatch_pallet-20260316130458.csv",
+    "wms_receive": "v_ask_receive_log-20260317145157.csv",
+    "wms_booking": "v_ask_booking_putaway-20260317145232.csv",
+    "wms_trans": "v_ask_trans_log-20260317170854.csv",
+    "wms_pick": "v_ask_pick_log_full-20260317170910.csv",
+    "wms_correct": "v_ask_correct_log-20260317145302.csv",
+}
+
 
 def _testdata() -> dict[str, Path]:
+    missing = [filename for filename in LEGACY_FIXTURE_NAMES.values() if not (WAREHOUSE_TESTDATA / filename).is_file()]
+    if missing:
+        pytest.skip(f"Lokala warehouse-regressionsfiler saknas: {', '.join(missing[:3])}")
     return {
-        "orders": WAREHOUSE_TESTDATA / "v_ask_customer_order_details_all-20260317145125.csv",
-        "buffer": WAREHOUSE_TESTDATA / "v_ask_article_buffertpallet-20260317145136.csv",
-        "saldo": WAREHOUSE_TESTDATA / "v_ask_item_summary_stock_automation-20260317145351.csv",
-        "items": WAREHOUSE_TESTDATA / "item_option-20260317145203.csv",
-        "overview": WAREHOUSE_TESTDATA / "v_ask_order_overview-20260317145114.csv",
-        "dispatch": WAREHOUSE_TESTDATA / "v_ask_dispatch_pallet-20260316130458.csv",
+        "orders": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["orders"],
+        "buffer": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["buffer"],
+        "saldo": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["saldo"],
+        "items": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["items"],
+        "overview": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["overview"],
+        "dispatch": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["dispatch"],
         "prognos": next(WAREHOUSE_TESTDATA.glob("Prognos idag_*.xlsx")),
         "campaign": next(WAREHOUSE_TESTDATA.glob("Granng*prognos*.xlsx")),
-        "wms_receive": WAREHOUSE_TESTDATA / "v_ask_receive_log-20260317145157.csv",
-        "wms_booking": WAREHOUSE_TESTDATA / "v_ask_booking_putaway-20260317145232.csv",
-        "wms_buffert": WAREHOUSE_TESTDATA / "v_ask_article_buffertpallet-20260317145136.csv",
-        "wms_trans": WAREHOUSE_TESTDATA / "v_ask_trans_log-20260317170854.csv",
-        "wms_pick": WAREHOUSE_TESTDATA / "v_ask_pick_log_full-20260317170910.csv",
-        "wms_correct": WAREHOUSE_TESTDATA / "v_ask_correct_log-20260317145302.csv",
+        "wms_receive": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["wms_receive"],
+        "wms_booking": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["wms_booking"],
+        "wms_buffert": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["buffer"],
+        "wms_trans": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["wms_trans"],
+        "wms_pick": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["wms_pick"],
+        "wms_correct": WAREHOUSE_TESTDATA / LEGACY_FIXTURE_NAMES["wms_correct"],
     }
 
 
@@ -168,7 +185,7 @@ def _first_value(table, column_index: int) -> str:
 
 def test_warehouse_tool_testdata_is_local_to_bemanning():
     assert WAREHOUSE_TESTDATA.is_dir()
-    assert (WAREHOUSE_TESTDATA / "v_ask_pick_log_full-20260317170910.csv").is_file()
+    assert any(WAREHOUSE_TESTDATA.glob("v_ask_pick_log_full-*.csv"))
     assert ROOT.name == "Bemanningsfil"
 
 

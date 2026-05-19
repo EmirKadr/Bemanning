@@ -270,11 +270,17 @@ def flow_observations_update(files: dict, params: dict) -> dict:
     return {
         "summary": {
             "Nya observationer": result.new_row_count,
+            "Skickade pallid": result.github_sent_rows,
             "Artikel-max-rader": result.article_max_rows,
+            "Ändrade maxvärden": result.article_max_changed_rows,
         },
         "tables": [("new_rows", "Nya observationer", result.new_rows_df)],
         "log": [
             "Skrivet till temporära filer (repo-data orörd).",
+            f"Nya pallid: {result.new_row_count}. Skickade till GitHub: {result.github_sent_rows}.",
+            f"Artikel-max ändrade maxvärden: {result.article_max_changed_rows} "
+            f"(upp: {result.article_max_increased_rows}, ned: {result.article_max_decreased_rows}, "
+            f"nya artiklar: {result.article_max_new_rows}).",
             f"Observations: {result.observations_path}",
             f"Artikel-max: {result.article_max_path}",
         ],

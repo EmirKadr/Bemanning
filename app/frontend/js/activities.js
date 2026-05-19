@@ -206,7 +206,7 @@ function setupImportControls() {
   const helpButton = document.getElementById("activity-import-help");
   const fileInput = document.getElementById("activity-import-file");
 
-  if (!isAdminUser(currentUser)) return;
+  if (!canEditPage(currentUser, "stallen")) return;
 
   downloadButton.hidden = false;
   importButton.hidden = false;

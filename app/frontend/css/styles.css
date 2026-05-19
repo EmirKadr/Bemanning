@@ -429,6 +429,7 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   min-height: 86px;
 }
 .database-toggle,
+.log-toggle,
 .theme-toggle,
 .area-focus-toggle {
   width: 40px;
@@ -445,20 +446,27 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   text-decoration: none;
 }
 .database-toggle svg,
+.log-toggle svg,
 .theme-toggle svg {
   width: 24px;
   height: 24px;
   display: block;
 }
 .database-toggle:hover,
+.log-toggle:hover,
 .theme-toggle:hover {
   background: var(--bg-2);
   border-color: var(--border);
 }
-.database-toggle.active {
+.database-toggle.active,
+.log-toggle.active {
   background: var(--accent-soft);
   border-color: var(--accent-soft);
   color: var(--text-muted);
+}
+.log-toggle .log-icon {
+  width: 28px;
+  height: 28px;
 }
 .database-toggle .upload-notice {
   position: absolute;
@@ -512,6 +520,77 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
 .upload-context-menu button:hover {
   background: #fef2f2;
   border-color: transparent;
+}
+.log-sidebar {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 2200;
+  width: min(380px, calc(100vw - 24px));
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -18px 0 40px rgba(15, 23, 42, .14);
+  display: flex;
+  flex-direction: column;
+}
+.log-sidebar[hidden] {
+  display: none;
+}
+.log-sidebar-head {
+  min-height: 58px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.log-sidebar-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.log-sidebar-close {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+}
+.log-sidebar-body {
+  padding: 16px;
+  overflow: auto;
+}
+.log-sidebar-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.log-entry {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 10px 12px;
+}
+.log-entry + .log-entry {
+  margin-top: 8px;
+}
+.log-entry.warn {
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+}
+.log-entry.error {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+.log-entry-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+.log-entry-message {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-line;
 }
 @keyframes uploadArrowRise {
   0% { opacity: 0; transform: translateY(10px); }

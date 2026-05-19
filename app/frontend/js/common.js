@@ -23,6 +23,7 @@ const AREA_FOCUS_FALLBACK_NAMES = {
   AS: "Autostore",
   EH: "E-Handel",
 };
+const appLogEntries = [];
 
 const THEME_ICONS = {
   light: `
@@ -43,6 +44,16 @@ const DATABASE_ICON = `
     <ellipse cx="12" cy="5" rx="8" ry="3"></ellipse>
     <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"></path>
     <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"></path>
+  </svg>
+`;
+
+const LOG_ICON = `
+  <svg class="log-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M8 3.5h11.5L24 8v20.5H8z"></path>
+    <path d="M19.5 3.5V8H24"></path>
+    <text x="16" y="17.2" text-anchor="middle" fill="currentColor" stroke="none" font-size="6" font-family="Arial, sans-serif" font-weight="700">LOG</text>
+    <path d="M11 22h10"></path>
+    <path d="M11 25.5h10"></path>
   </svg>
 `;
 
@@ -328,6 +339,34 @@ function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]
   );
+}
+
+function renderAppLogEntries() {
+  const body = document.querySelector("#log-sidebar .log-sidebar-body");
+  if (!body) return;
+  if (!appLogEntries.length) {
+    body.innerHTML = '<p class="log-sidebar-empty">Ingen logg att visa ännu.</p>';
+    return;
+  }
+  body.innerHTML = appLogEntries.map((entry) => `
+    <div class="log-entry ${escapeHtml(entry.kind)}">
+      <div class="log-entry-meta">${escapeHtml(entry.time)} · ${escapeHtml(entry.title)}</div>
+      <div class="log-entry-message">${escapeHtml(entry.message)}</div>
+    </div>
+  `).join("");
+}
+
+function appendAppLog(message, kind = "info", title = "System") {
+  const entry = {
+    time: new Date().toLocaleString("sv-SE"),
+    kind,
+    title,
+    message: String(message || ""),
+  };
+  appLogEntries.unshift(entry);
+  if (appLogEntries.length > 100) appLogEntries.length = 100;
+  renderAppLogEntries();
+  console.info(`[${title}] ${entry.message}`);
 }
 
 function userRoles(user) {
@@ -653,6 +692,56 @@ function renderAllocationUploadUtility(user, activePage) {
           <span class="upload-notice" id="allocation-upload-notice" hidden></span>
         </a>
   `;
+}
+
+function renderLogUtility() {
+  return `
+        <button class="log-toggle" id="log-toggle" type="button" title="Logg" aria-label="Öppna logg" aria-controls="log-sidebar" aria-expanded="false">
+          ${LOG_ICON}
+        </button>
+  `;
+}
+
+function setLogSidebarOpen(open) {
+  const panel = document.getElementById("log-sidebar");
+  const toggle = document.getElementById("log-toggle");
+  if (!panel) return;
+  panel.hidden = !open;
+  panel.classList.toggle("is-open", open);
+  toggle?.classList.toggle("active", open);
+  toggle?.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function ensureLogSidebar(app) {
+  if (!app) return;
+  let panel = document.getElementById("log-sidebar");
+  if (!panel) {
+    panel = document.createElement("aside");
+    panel.id = "log-sidebar";
+    panel.className = "log-sidebar";
+    panel.hidden = true;
+    app.appendChild(panel);
+  }
+  panel.innerHTML = `
+    <div class="log-sidebar-head">
+      <h2>Logg</h2>
+      <button type="button" class="log-sidebar-close" id="log-sidebar-close" aria-label="Stäng logg">&times;</button>
+    </div>
+    <div class="log-sidebar-body">
+      <p class="log-sidebar-empty">Ingen logg att visa ännu.</p>
+    </div>
+  `;
+  panel.querySelector("#log-sidebar-close").addEventListener("click", () => setLogSidebarOpen(false));
+  renderAppLogEntries();
+}
+
+function initLogSidebarToggle() {
+  const toggle = document.getElementById("log-toggle");
+  if (!toggle) return;
+  toggle.addEventListener("click", () => {
+    const panel = document.getElementById("log-sidebar");
+    setLogSidebarOpen(panel?.hidden);
+  });
 }
 
 function renderSidebarNav(user, activePage) {
@@ -1026,6 +1115,7 @@ function renderSidebar(user, activePage) {
     `
     : "";
   const uploadUtility = renderAllocationUploadUtility(user, activePage);
+  const logUtility = renderLogUtility();
 
   sidebar.innerHTML = `
     <div class="sidebar-top-row">
@@ -1042,6 +1132,7 @@ function renderSidebar(user, activePage) {
     <div class="sidebar-footer">
       <div class="sidebar-utility">
         <button class="area-focus-toggle" id="area-focus-toggle" type="button" title="Områdesfokus" aria-label="Områdesfokus"></button>
+        ${logUtility}
         ${uploadUtility}
         <button class="theme-toggle" id="theme-toggle" type="button"></button>
       </div>
@@ -1057,6 +1148,8 @@ function renderSidebar(user, activePage) {
 
   initAreaFocusToggle();
   initThemeToggle();
+  ensureLogSidebar(app);
+  initLogSidebarToggle();
   updateAllocationUploadIndicator();
   document.body.classList.add("sidebar-hydrated");
   const allocationUploadLink = document.getElementById("allocation-upload-link");
@@ -1263,6 +1356,7 @@ window.preferredAreaIdFromFocus = preferredAreaIdFromFocus;
 window.compareActivitiesForAreaFocus = compareActivitiesForAreaFocus;
 window.comparePersonsForAreaFocus = comparePersonsForAreaFocus;
 window.setupImportHelpButton = setupImportHelpButton;
+window.appendAppLog = appendAppLog;
 window.clearAllUploadedFiles = clearAllUploadedFiles;
 window.allocationUploadActivity = {
   start: startAllocationUploadActivity,

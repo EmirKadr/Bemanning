@@ -340,28 +340,42 @@
     });
   }
 
+  async function refreshPanels() {
+    for (const panel of Array.from(registeredPanels)) {
+      if (!document.body.contains(panel)) {
+        registeredPanels.delete(panel);
+        continue;
+      }
+      await refreshPanel(panel);
+    }
+  }
+
   async function saveFiles(files, options = {}) {
     const targetKey = options.targetKey || "";
     const statusElement = options.statusElement || options.panel?.querySelector("#productivityUploadStatus") || null;
+    const reportUnknown = options.reportUnknown !== false;
+    const showResultToast = options.showToast !== false;
     const incoming = Array.from(files || []);
-    if (!incoming.length) return { saved: [], unknown: [], hiddenSaved: 0, message: "Ingen fil uppdaterades." };
+    if (!incoming.length) return { saved: [], unknown: [], hiddenSaved: 0, recognized: [], message: "Ingen fil uppdaterades." };
 
     if (statusElement) statusElement.textContent = "Läser filval...";
     const saved = [];
     const unknown = [];
+    const recognized = [];
     let hiddenSaved = 0;
 
     for (const file of incoming) {
       const fileType = targetKey || await classifyFile(file);
       if (!fileType || !SOURCE_BY_KEY[fileType]) {
-        unknown.push(file.name || "okänd fil");
+        if (reportUnknown) unknown.push(file.name || "okänd fil");
         continue;
       }
+      recognized.push(file.name || fileType);
       if (fileType === "kpi") {
         if (statusElement) statusElement.textContent = `Uppdaterar KPI-mål: ${file.name}`;
         const result = await uploadPermanentKpiFile(file);
         hiddenSaved += (result.saved || []).length;
-        unknown.push(...(result.unknown || []));
+        if (reportUnknown) unknown.push(...(result.unknown || []));
         continue;
       }
       await saveFile(fileType, file);
@@ -369,15 +383,16 @@
     }
 
     if (options.panel) await refreshPanel(options.panel);
+    else if (saved.length || hiddenSaved) await refreshPanels();
     const parts = [];
     if (saved.length) parts.push(`${saved.length} fil(er) valda`);
     if (hiddenSaved) parts.push("KPI-mål uppdaterat i bakgrunden");
-    if (unknown.length) parts.push(`Okänd filtyp: ${unknown.join(", ")}`);
+    if (reportUnknown && unknown.length) parts.push(`Okänd filtyp: ${unknown.join(", ")}`);
     const message = parts.join(". ") || "Ingen fil uppdaterades.";
     if (statusElement) statusElement.textContent = message;
-    if (saved.length || hiddenSaved) showToast(message, "success", 3500);
-    else if (unknown.length) showToast(message, "warn", 7000);
-    return { saved, unknown, hiddenSaved, message };
+    if (showResultToast && (saved.length || hiddenSaved)) showToast(message, "success", 3500);
+    else if (showResultToast && reportUnknown && unknown.length) showToast(message, "warn", 7000);
+    return { saved, unknown, hiddenSaved, recognized, message };
   }
 
   async function handleFiles(panel, files, targetKey = "") {
@@ -447,15 +462,7 @@
     await refreshPanel(panel);
   }
 
-  window.addEventListener("bemanning:uploadsCleared", async () => {
-    for (const panel of Array.from(registeredPanels)) {
-      if (!document.body.contains(panel)) {
-        registeredPanels.delete(panel);
-        continue;
-      }
-      await refreshPanel(panel);
-    }
-  });
+  window.addEventListener("bemanning:uploadsCleared", refreshPanels);
 
   window.addEventListener("dragend", clearDropHighlights);
 
@@ -466,6 +473,7 @@
     fileStatus,
     saveFiles,
     handleFiles,
+    refreshPanels,
     setupDropTarget,
     setupPanel,
   };

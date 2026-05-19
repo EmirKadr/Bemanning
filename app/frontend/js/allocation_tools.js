@@ -5,11 +5,30 @@ const ALLOCATION_STORE = "files";
 const ALLOCATION_HIDDEN_FLOW_IDS = new Set(["observations-update", "observations-sync", "update-check"]);
 const ALLOCATION_KEY_OVERRIDES = { details: "orders", wms_buffert: "buffer" };
 const ALLOCATION_FILE_WORDS = {
+  orders: ["v_ask_customer_order_details_all", "customer_order_details_all", "customer_order_details", "detalj kundorder"],
+  buffer: ["v_ask_article_buffertpallet", "v_ask_article_bufferpallet", "article_buffertpallet", "article_bufferpallet", "buffertpall", "buffertpallet", "bufferpall", "bufferpallet"],
+  overview: ["v_ask_order_overview", "order_overview", "orderoversikt"],
+  dispatch: ["v_ask_dispatch_pallet", "dispatch_pallet", "dispatchpall"],
+  saldo: ["v_ask_item_summary_stock_automation", "item_summary_stock_automation", "saldo ink", "automation"],
+  items: ["item_option", "item option"],
   max_csv: ["artikel_max", "article_max"],
   not_putaway: ["not_putaway", "not putaway", "ej_inlag", "ej inlag", "ejinlag"],
+  campaign: ["kampanjplock", "kampanj", "campaign"],
+  prognos: ["prognos idag", "prognos", "forecast"],
+  wms_receive: ["v_ask_receive_log", "receive_log", "mottagningslogg"],
+  wms_booking: ["v_ask_booking_putaway", "booking_putaway", "inlagringslogg"],
+  wms_trans: ["v_ask_trans_log", "trans_log", "transaktionslogg"],
+  wms_pick: ["v_ask_pick_log_full", "pick_log_full", "plocklogg"],
+  wms_correct: ["v_ask_correct_log", "correct_log", "korrigeringslogg"],
   remote_file: ["observations", "observationer"],
   values_file: ["values", "varden", "värden"],
 };
+const PRODUCTIVITY_SHARED_UPLOAD_WORDS = [
+  "v_ask_pick_log_full",
+  "v_ask_trans_log",
+  "v_ask_palletloading_log",
+  "v_ask_kpi_target",
+];
 const ALLOCATION_SLOT_LABELS = {
   orders: "Detalj Kundorder(alla)",
   buffer: "Buffertpallar",
@@ -232,15 +251,58 @@ function deriveAllocationSlots(flows) {
   return keys.map((key) => ({ ...map.get(key), detect: [...map.get(key).detect] }));
 }
 
-function fallbackAllocationSlot(file, slots, droppedCount, fallbackSlotKey = "") {
+function allocationNameHintScore(slot, name) {
+  return (ALLOCATION_FILE_WORDS[slot.key] || []).reduce((best, word) => {
+    const normalized = String(word || "").toLowerCase();
+    return normalized && name.includes(normalized) ? Math.max(best, normalized.length) : best;
+  }, 0);
+}
+
+function hintedAllocationSlot(file, slots) {
   const name = String(file.name || "").toLowerCase();
-  const hinted = slots.find((slot) => (ALLOCATION_FILE_WORDS[slot.key] || []).some((word) => name.includes(word)));
+  let bestSlot = null;
+  let bestScore = 0;
+  for (const slot of slots) {
+    const score = allocationNameHintScore(slot, name);
+    if (score > bestScore) {
+      bestSlot = slot;
+      bestScore = score;
+    }
+  }
+  return bestSlot;
+}
+
+function fallbackAllocationSlot(file, slots, droppedCount, fallbackSlotKey = "") {
+  const hinted = hintedAllocationSlot(file, slots);
   if (hinted) return hinted;
   if (fallbackSlotKey && droppedCount === 1) {
     const fallback = slots.find((slot) => slot.key === fallbackSlotKey);
     if (fallback) return fallback;
   }
   return droppedCount === 1 && slots.length === 1 ? slots[0] : null;
+}
+
+function productivitySharedUploadCandidates(files) {
+  return Array.from(files || []).filter((file) => {
+    const name = String(file.name || "").toLowerCase();
+    return PRODUCTIVITY_SHARED_UPLOAD_WORDS.some((word) => name.includes(word));
+  });
+}
+
+async function routeProductivityFilesFromSharedUpload(files) {
+  const candidates = productivitySharedUploadCandidates(files);
+  if (!candidates.length || !window.productivityUploads?.saveFiles) {
+    return { saved: [], unknown: [], hiddenSaved: 0, recognized: [] };
+  }
+  try {
+    return await window.productivityUploads.saveFiles(candidates, {
+      reportUnknown: false,
+      showToast: false,
+    });
+  } catch (error) {
+    console.warn("Kunde inte uppdatera produktivitetsfiler.", error);
+    return { saved: [], unknown: [], hiddenSaved: 0, recognized: [] };
+  }
 }
 
 async function detectAllocationFile(file) {
@@ -257,6 +319,7 @@ async function routeAllocationFiles(files, slots, options = {}) {
   renderAllocationPage();
   const assigned = [];
   const unknown = [];
+  let productivityResult = { saved: [], unknown: [], hiddenSaved: 0, recognized: [] };
   try {
     for (const file of dropped) {
       let target = null;
@@ -274,12 +337,61 @@ async function routeAllocationFiles(files, slots, options = {}) {
         unknown.push(file.name);
       }
     }
+    productivityResult = await routeProductivityFilesFromSharedUpload(dropped);
   } finally {
-    window.allocationUploadActivity?.finish(assigned.length);
+    const productivityCount = (productivityResult.saved?.length || 0) + (productivityResult.hiddenSaved || 0);
+    window.allocationUploadActivity?.finish(assigned.length + productivityCount);
   }
-  allocationState.status = assigned.length === 1 ? "1 fil inlagd." : assigned.length > 1 ? `${assigned.length} filer inlagda.` : "";
-  if (unknown.length) showToast(`Kunde inte sortera: ${unknown.join(", ")}`, "warn");
+  const productivityNames = new Set(productivityResult.recognized || productivityResult.saved || []);
+  const visibleUnknown = unknown.filter((name) => !productivityNames.has(name));
+  const statusParts = [];
+  if (assigned.length === 1) statusParts.push("1 fil inlagd");
+  else if (assigned.length > 1) statusParts.push(`${assigned.length} filer inlagda`);
+  const productivityCount = (productivityResult.saved?.length || 0) + (productivityResult.hiddenSaved || 0);
+  if (productivityCount === 1) statusParts.push("1 produktivitetsfil inlagd");
+  else if (productivityCount > 1) statusParts.push(`${productivityCount} produktivitetsfiler inlagda`);
+  allocationState.status = statusParts.length ? `${statusParts.join(". ")}.` : "";
+  if (visibleUnknown.length) showToast(`Kunde inte sortera: ${visibleUnknown.join(", ")}`, "warn");
   renderAllocationPage();
+}
+
+function observationsUpdateStatusText(result) {
+  const newRows = Number(result?.new_rows || 0);
+  const sentRows = Number(result?.github_sent_rows || 0);
+  const changedMax = Number(result?.article_max_changed_rows || 0);
+  const newArticles = Number(result?.article_max_new_rows || 0);
+  if (!newRows) {
+    return `Observations kontrollerad: 0 nya pallid. artikel_max: ${changedMax} maxvärden ändrade.`;
+  }
+  const githubText = sentRows
+    ? `${sentRows} skickade till GitHub`
+    : "GitHub-push ej bekräftad";
+  const articleText = newArticles
+    ? `${changedMax} maxvärden ändrade, ${newArticles} nya artiklar`
+    : `${changedMax} maxvärden ändrade`;
+  return `Observations uppdaterad: ${newRows} nya pallid, ${githubText}. artikel_max: ${articleText}.`;
+}
+
+function observationsUpdateLogText(result) {
+  const lines = [
+    `Nya pallid hittade: ${Number(result?.new_rows || 0)}`,
+    `Pallid skickade till GitHub: ${Number(result?.github_sent_rows || 0)}`,
+    `GitHub-push: ${result?.pushed_to_github ? "bekräftad" : "ej bekräftad"}`,
+    `Artikel-max-rader: ${Number(result?.article_max_rows || 0)}`,
+    `Ändrade maxvärden: ${Number(result?.article_max_changed_rows || 0)}`,
+    `Max upp/ned: ${Number(result?.article_max_increased_rows || 0)} / ${Number(result?.article_max_decreased_rows || 0)}`,
+    `Nya artiklar i artikel_max: ${Number(result?.article_max_new_rows || 0)}`,
+  ];
+  const examples = Array.isArray(result?.article_max_changed_examples)
+    ? result.article_max_changed_examples.slice(0, 3)
+    : [];
+  if (examples.length) {
+    lines.push("Exempel:");
+    examples.forEach((item) => {
+      lines.push(`- ${item.artikelnummer}: ${item.before_max} -> ${item.after_max} (${item.before_pallid} -> ${item.after_pallid})`);
+    });
+  }
+  return lines.join("\n");
 }
 
 async function triggerAllocationObservationsUpdate(entry) {
@@ -294,12 +406,16 @@ async function triggerAllocationObservationsUpdate(entry) {
   fd.append("file", file, entry.name);
   try {
     const result = await allocationPostForm(`${ALLOCATION_API}/observations/update`, fd);
-    allocationState.autoStatus = result.new_rows > 0
-      ? `Observations uppdaterad: ${result.new_rows} nya pallid.`
-      : "Observations kontrollerad.";
+    allocationState.autoStatus = observationsUpdateStatusText(result);
+    window.appendAppLog?.(
+      observationsUpdateLogText(result),
+      Number(result?.new_rows || 0) && !result.pushed_to_github ? "warn" : "info",
+      "Observations",
+    );
   } catch (error) {
     allocationState.lastBufferSignature = "";
     allocationState.autoStatus = "";
+    window.appendAppLog?.(error.message || "Observations-uppdatering misslyckades.", "error", "Observations");
   }
   renderAllocationPage();
 }

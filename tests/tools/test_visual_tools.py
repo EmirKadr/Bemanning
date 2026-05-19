@@ -162,10 +162,15 @@ def test_allocation_observations_github_sync_is_wired():
     assert "warehouse_tools/vendor/lowfreqdata/buffertpall/" in workflow
     assert "artikel_max.csv" in workflow
     assert "np.percentile(group['antal'], [25, 75])" in workflow
+    assert "Nya pallid från sessionsfiler" in workflow
+    assert "Ändrade maxvärden" in workflow
+    assert "GITHUB_STEP_SUMMARY" in workflow
     assert "fetch_observations_from_github()" in main
     assert "sync_allocation_observations_on_startup" in main
     assert '"OBSERVATIONS_GITHUB_TOKEN"' in engine
     assert '"BEMANNING_GITHUB_TOKEN"' in engine
+    assert "github_sent_rows" in engine
+    assert "article_max_changed_rows" in engine
 
 
 def test_app_migration_plan_documents_high_risk_workflows():
@@ -301,10 +306,19 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert 'id="sidebar-edit"' in common
     assert "SIDEBAR_MOVE_UP_ICON" in common
     assert "SIDEBAR_MOVE_DOWN_ICON" in common
+    assert "LOG_ICON" in common
     assert 'api.get("/api/settings/sidebar")' in common
     assert 'api.put("/api/settings/sidebar"' in common
     assert "renderSidebarNav" in common
     assert "renderAllocationUploadUtility" in common
+    assert "renderLogUtility" in common
+    assert 'id="log-toggle"' in common
+    assert 'panel.id = "log-sidebar"' in common
+    assert 'id="log-sidebar-close"' in common
+    assert "ensureLogSidebar" in common
+    assert "appendAppLog" in common
+    assert "log-entry" in styles
+    assert "${logUtility}\n        ${uploadUtility}" in common
     assert 'class="database-toggle${activeClass}"' in common
     assert "openUploadContextMenu" in common
     assert "Rensa filer" in common
@@ -317,6 +331,10 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert "THEME_ICONS" in common
     assert ':root[data-theme="dark"]' in styles
     assert ".theme-toggle" in styles
+    assert ".log-toggle" in styles
+    assert ".log-sidebar" in styles
+    assert ".log-sidebar[hidden]" in styles
+    assert ".log-sidebar-close" in styles
     assert ".sidebar-heading" in styles
     assert ".sidebar-subviews" in styles
     assert ".sidebar-editor-row" in styles
@@ -338,9 +356,17 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert "window.productivityUploads.loadFiles()" in productivity
     assert "productivityUploads?.setupPanel" in allocation_tools
     assert "data-productivity-upload-panel" in allocation_tools
+    assert "PRODUCTIVITY_SHARED_UPLOAD_WORDS" in allocation_tools
+    assert "v_ask_booking_putaway" in allocation_tools
+    assert "v_ask_receive_log" in allocation_tools
+    assert "v_ask_palletloading_log" in allocation_tools
+    assert "routeProductivityFilesFromSharedUpload" in allocation_tools
+    assert "reportUnknown: false" in allocation_tools
     assert "statusItems" in productivity_uploads
     assert "clearFiles" in productivity_uploads
     assert "saveFiles" in productivity_uploads
+    assert "recognized" in productivity_uploads
+    assert "refreshPanels" in productivity_uploads
     assert "setupDropTarget" in productivity_uploads
     assert "productivity-file-slot[data-file-key]" in productivity_uploads
     assert "Permanent målfil inlagd" in productivity_uploads
@@ -469,6 +495,7 @@ def test_import_views_have_templates_and_help_buttons():
     assert 'id="activity-import-help"' in activities_html
     assert "/api/activities/import-template" in activities_js
     assert "/api/activities/import" in activities_js
+    assert 'canEditPage(currentUser, "stallen")' in activities_js
     assert 'setupImportHelpButton("activity-import-help", "Importera ställen")' in activities_js
 
 
@@ -525,7 +552,11 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert 'const ALLOCATION_DB_NAME = "bemanning-allokering-files"' in allocation
     assert "indexedDB.open(ALLOCATION_DB_NAME" in allocation
     assert "window.allocationUploadActivity?.start()" in allocation
-    assert "window.allocationUploadActivity?.finish(assigned.length)" in allocation
+    assert "window.allocationUploadActivity?.finish(assigned.length + productivityCount)" in allocation
+    assert "observationsUpdateStatusText" in allocation
+    assert "observationsUpdateLogText" in allocation
+    assert "github_sent_rows" in allocation
+    assert "article_max_changed_rows" in allocation
     assert "allocationState.files = await loadStoredAllocationFiles()" in allocation
     assert 'id="allocation-clear-all-files"' in allocation
     assert "Rensa alla" in allocation

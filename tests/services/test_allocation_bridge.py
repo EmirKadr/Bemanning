@@ -124,6 +124,96 @@ def test_native_detector_uses_ask_filename_hints_without_reading_headers(tmp_pat
     assert bridge.detect_file_type(orders) == "orders"
 
 
+def test_native_detector_recognizes_current_upload_filename_hints(tmp_path):
+    cases = {
+        "item_option-20260519090653.csv": "item",
+        "v_ask_article_bufferpallet-20260519090645.csv": "buffer",
+        "v_ask_article_buffertpallet-20260519090645.csv": "buffer",
+        "v_ask_booking_putaway-20260519090707.csv": "wms_booking",
+        "v_ask_receive_log-20260519090715.csv": "wms_receive",
+        "v_ask_trans_log-20260519051930.csv": "wms_trans",
+        "Granngarden prognos kampanjplock +6v.xlsx": "campaign",
+        "Prognos idag_1227934.xlsx": "prognos",
+    }
+    for filename, expected in cases.items():
+        source = tmp_path / filename
+        source.write_text("helt;okand;header\n1;2;3\n", encoding="utf-8")
+        assert bridge.detect_file_type(source) == expected
+
+
+def test_native_detector_recognizes_relex_forecast_workbooks(tmp_path):
+    openpyxl = pytest.importorskip("openpyxl")
+
+    campaign = tmp_path / "relex-layout-c.xlsx"
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["The information and calculation results in this sheet were produced by RELEX Solutions."])
+    sheet.append(["Period start date", "2025-10-23", "Period end date", "2025-11-23"])
+    sheet.append(["Total", "2025-10-23 Thu", "2025-10-24 Fri"])
+    sheet.append(["Location code", "Location name", "Produktkod", "Produktnam", "Kampanjstart", "Projicerat antal"])
+    workbook.save(campaign)
+
+    forecast = tmp_path / "relex-layout-p.xlsx"
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["The information and calculation results in this sheet were produced by RELEX Solutions."])
+    sheet.append(["Period start date", "2025-10-01", "Period end date", "2025-10-01"])
+    sheet.append(["Product code", "Product name", "Antal styck", "Antal rader", "Antal butiker"])
+    workbook.save(forecast)
+
+    assert bridge.detect_file_type(campaign) == "campaign"
+    assert bridge.detect_file_type(forecast) == "prognos"
+
+
+def test_observations_update_reports_github_sent_rows_and_max_changes(tmp_path, monkeypatch):
+    pd = pytest.importorskip("pandas")
+    engine, _flows = bridge.require_available()
+    observations_path = tmp_path / "observations.csv.gz"
+    article_max_path = tmp_path / "artikel_max.csv"
+    pd.DataFrame([
+        {"artikelnummer": "A1", "pallid": "P1", "antal": "10"},
+    ]).to_csv(observations_path, index=False, compression="gzip")
+    pd.DataFrame([
+        {"artikelnummer": "A1", "max": "10", "pallid": "P1"},
+    ]).to_csv(article_max_path, index=False, encoding="utf-8-sig")
+
+    sent = {}
+
+    def fake_push(rows):
+        sent["count"] = len(rows)
+        return True
+
+    monkeypatch.setitem(
+        engine.build_observations_update_result.__globals__,
+        "push_new_observations_to_github",
+        fake_push,
+    )
+    buffer_df = pd.DataFrame([
+        {"Artikel": "A1", "Pallid": "P2", "Antal": "12", "Status": "30"},
+        {"Artikel": "B1", "Pallid": "P3", "Antal": "5", "Status": "30"},
+    ])
+
+    result = engine.build_observations_update_result(
+        buffer_df,
+        observations_path=str(observations_path),
+        artikel_max_out=str(article_max_path),
+        push_to_github=True,
+    )
+
+    assert result.new_row_count == 2
+    assert result.github_sent_rows == 2
+    assert sent["count"] == 2
+    assert result.pushed_to_github is True
+    assert result.article_max_rows == 2
+    assert result.article_max_changed_rows == 1
+    assert result.article_max_increased_rows == 1
+    assert result.article_max_decreased_rows == 0
+    assert result.article_max_new_rows == 1
+    assert result.article_max_changed_examples[0]["artikelnummer"] == "A1"
+    assert result.article_max_changed_examples[0]["before_max"] == "10"
+    assert result.article_max_changed_examples[0]["after_max"] == "12"
+
+
 def test_allocation_bridge_imports_without_tkinter_on_headless_server():
     env = dict(**os.environ, WAREHOUSE_TOOLS_FORCE_HEADLESS_TK="1")
     result = subprocess.run(
