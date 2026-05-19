@@ -51,6 +51,8 @@
   --shadow-3: 0 20px 40px -16px rgba(15, 23, 42, .18);
 
   --sidebar-w: 220px;
+  --scrollbar-thumb: #c3cad6;
+  --scrollbar-thumb-hover: #aeb8c6;
 }
 
 :root[data-theme="dark"] {
@@ -96,6 +98,8 @@
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .35), 0 1px 1px rgba(0, 0, 0, .24);
   --shadow-2: 0 12px 28px -16px rgba(0, 0, 0, .7), 0 2px 8px rgba(0, 0, 0, .28);
   --shadow-3: 0 24px 48px -18px rgba(0, 0, 0, .78);
+  --scrollbar-thumb: #515a67;
+  --scrollbar-thumb-hover: #687384;
 }
 
 * { box-sizing: border-box; }
@@ -107,12 +111,43 @@ html, body {
   color: var(--text);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: thin;
 }
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 button, input, select, textarea { font-family: inherit; color: inherit; }
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+  background: transparent;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-track-piece {
+  background: transparent;
+  border: 0;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  background-clip: content-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  min-height: 38px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
 body.with-sidebar:not(.sidebar-hydrated) {
   display: grid;
@@ -875,6 +910,18 @@ table.productivity-table td.has-work {
   margin: 4px 0 12px;
   border-bottom: 1px solid var(--border);
   letter-spacing: -0.005em;
+}
+.allocation-section-title.has-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.allocation-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .section-title-with-action {
   display: flex;
@@ -2113,6 +2160,10 @@ tr.filter-row input {
   padding: 18px;
   margin: 16px 0;
 }
+.allocation-panel--compact {
+  padding: 16px;
+  min-height: 360px;
+}
 .allocation-panel.drag-over,
 .allocation-upload-prompt.drag-over,
 .allocation-file-slot.drag-over {
@@ -2251,26 +2302,27 @@ tr.filter-row input {
 
 /* Kompakt körningar-tavla: kategorier som kolumner, flöden som knappar */
 .allocation-board {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 18px 16px;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 20px 42px;
   margin-top: 4px;
 }
 .allocation-board-col {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 214px;
 }
 .allocation-board-col > h3 {
-  margin: 0 0 1px;
-  font-size: 12px;
+  margin: 0 0 5px;
+  font-size: 15px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  color: var(--text-muted);
+  color: var(--text);
 }
 .allocation-flow-chip {
   position: relative;
+  width: 214px;
 }
 .allocation-flow-chip-row {
   display: flex;
@@ -2290,13 +2342,14 @@ tr.filter-row input {
   min-width: 0;
   border: 0;
   background: transparent;
-  padding: 9px 12px;
+  padding: 9px 12px 9px 13px;
   font: inherit;
   font-weight: 600;
   font-size: 14px;
   text-align: left;
   color: var(--text);
   cursor: pointer;
+  white-space: nowrap;
 }
 .allocation-flow-run:hover:not(:disabled) {
   background: var(--accent-soft);
@@ -2308,6 +2361,7 @@ tr.filter-row input {
 .allocation-flow-info {
   display: flex;
   align-items: center;
+  justify-content: center;
   border: 0;
   border-left: 1px solid var(--border);
   background: transparent;
@@ -2337,8 +2391,8 @@ tr.filter-row input {
   z-index: 30;
   top: calc(100% + 6px);
   left: 0;
-  min-width: 240px;
-  max-width: 320px;
+  min-width: 290px;
+  max-width: 360px;
   padding: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -2371,10 +2425,21 @@ tr.filter-row input {
   top: auto;
   bottom: calc(100% + 6px);
 }
+.allocation-solo-compact {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
 .allocation-fields {
   display: grid;
   gap: 12px;
   margin: 14px 0;
+}
+.allocation-fields--compact {
+  grid-template-columns: repeat(2, minmax(150px, 220px));
+  align-items: end;
+  margin: 0;
 }
 .allocation-fields label span {
   display: block;
@@ -2388,6 +2453,19 @@ tr.filter-row input {
 .allocation-fields input,
 .allocation-fields textarea {
   width: 100%;
+}
+.allocation-run-row--compact {
+  min-height: 36px;
+  margin-bottom: 1px;
+}
+.allocation-run-row--compact .allocation-flow-popover {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+.allocation-run-row--compact > span {
+  min-width: 120px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 .allocation-summary {
   display: grid;
@@ -2446,6 +2524,10 @@ tr.filter-row input {
     align-items: flex-start;
     flex-direction: column;
   }
+  .allocation-section-title.has-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
   .allocation-panel-head > div,
   .allocation-table-head > div {
     width: 100%;
@@ -2461,10 +2543,29 @@ tr.filter-row input {
     grid-template-columns: 1fr;
   }
   .allocation-board {
+    display: grid;
     grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .allocation-board-col,
+  .allocation-flow-chip {
+    width: 100%;
+    max-width: none;
+  }
+  .allocation-flow-run {
+    white-space: normal;
   }
   .allocation-flow-popover {
     max-width: none;
+    min-width: min(290px, 100%);
+  }
+  .allocation-fields--compact {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+  .allocation-run-row--compact,
+  .allocation-run-row--compact .allocation-flow-chip {
+    width: 100%;
   }
 }
 

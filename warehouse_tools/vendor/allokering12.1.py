@@ -137,7 +137,7 @@ def _parse_boolish(value: object) -> Optional[bool]:
 
 def _app_config_path() -> Path:
     appdata = os.environ.get("APPDATA") or str(Path.home())
-    return Path(appdata) / "allokering" / "config.json"
+    return Path(appdata) / "bemanning" / "warehouse_tools_config.json"
 
 
 def _load_app_config() -> dict:
@@ -302,7 +302,7 @@ class AnalyticsClient:
                     method="POST",
                     headers={
                         "Content-Type": "application/json",
-                        "User-Agent": "allokering-analytics",
+                        "User-Agent": "bemanning-analytics",
                     },
                 )
                 with urllib.request.urlopen(request, timeout=5):
@@ -1694,9 +1694,10 @@ def build_pafyllnadsprio_lastningsfonster_report(
 
 OBSERVATIONS_FILENAME = "observations.csv.gz"
 OBSERVATIONS_COLS = ["artikelnummer", "pallid", "antal"]
-GITHUB_REPO = "EmirKadr/allokering"
+GITHUB_REPO = "EmirKadr/Bemanning"
 GITHUB_OBS_BRANCH = "data/community-observations"
-GITHUB_OBS_FILE = "lowfreqdata/buffertpall/observations.csv.gz"
+GITHUB_OBS_DIR = "warehouse_tools/vendor/lowfreqdata/buffertpall"
+GITHUB_OBS_FILE = f"{GITHUB_OBS_DIR}/observations.csv.gz"
 
 
 def _observations_path() -> Path:
@@ -1825,7 +1826,7 @@ def _load_github_token() -> Optional[str]:
 
 def _github_request(url: str, method: str = "GET", token: Optional[str] = None,
                     payload: Optional[dict] = None, timeout: int = 15) -> Tuple[int, dict]:
-    headers = {"Accept": "application/vnd.github+json", "User-Agent": "allokering-app"}
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "bemanning-app"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
@@ -1863,7 +1864,7 @@ def push_new_observations_to_github(nya: pd.DataFrame) -> bool:
 
     user = re.sub(r"[^A-Za-z0-9_-]", "_", os.environ.get("USERNAME") or "user")
     ts = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-    remote_name = f"lowfreqdata/buffertpall/observations_{user}_{ts}.csv.gz"
+    remote_name = f"{GITHUB_OBS_DIR}/observations_{user}_{ts}.csv.gz"
     api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{urllib.parse.quote(remote_name)}"
     payload = {
         "message": f"User observations {user} {ts}",
@@ -1899,7 +1900,7 @@ def fetch_observations_from_github(
     else:
         raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_OBS_BRANCH}/{GITHUB_OBS_FILE}"
         token = _load_github_token()
-        headers = {"User-Agent": "allokering-app"}
+        headers = {"User-Agent": "bemanning-app"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
         req = urllib.request.Request(raw_url, headers=headers)

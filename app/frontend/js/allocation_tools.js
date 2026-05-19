@@ -340,11 +340,14 @@ function allocationFileRows(slots) {
   }).join("");
 }
 
-function renderAllocationShell(content) {
+function renderAllocationShell(content, headerActions = "") {
   const root = document.getElementById("allocationRoot");
   if (!root) return;
   root.innerHTML = `
-    <div class="section-title">${allocationEscape(allocationPrimaryTitle(allocationState.page))}</div>
+    <div class="section-title allocation-section-title ${headerActions ? "has-actions" : ""}">
+      <span>${allocationEscape(allocationPrimaryTitle(allocationState.page))}</span>
+      ${headerActions ? `<div class="allocation-title-actions">${headerActions}</div>` : ""}
+    </div>
     ${content}
   `;
   bindAllocationCommonEvents(root);
@@ -471,11 +474,11 @@ function renderFlowFileList(flow) {
   `;
 }
 
-function renderFieldInputs(flow) {
+function renderFieldInputs(flow, extraClass = "") {
   const fields = (flow?.inputs || []).filter((input) => input.type !== "file");
   if (!fields.length) return "";
   return `
-    <div class="allocation-fields">
+    <div class="allocation-fields ${allocationEscape(extraClass)}">
       ${fields.map((input) => `
         <label>
           <span>${allocationEscape(input.label)}${input.required ? " *" : ""}</span>
@@ -627,6 +630,11 @@ function renderFlowChip(flow) {
   `;
 }
 
+function allocationGroupTitle(name) {
+  if (name === "Sökning & prognos") return "Prognos";
+  return name;
+}
+
 function closeFlowPopovers(root) {
   root.querySelectorAll("[data-flow-popover]").forEach((popover) => { popover.hidden = true; });
   root.querySelectorAll("[data-flow-info].active").forEach((button) => button.classList.remove("active"));
@@ -670,33 +678,24 @@ function renderCombinedView() {
     group.flows.push(flow);
   }
   const anyFile = Object.keys(allocationState.files).length > 0;
+  const fileActionLabel = anyFile ? "Välj fler filer" : "Välj filer";
   renderAllocationShell(`
-    ${!anyFile ? `
-      <section class="allocation-upload-prompt" data-allocation-drop>
-        <span>Inga filer inlagda.</span>
-        <label class="button-like primary" for="allocation-combined-files">Välj filer</label>
-        <input id="allocation-combined-files" type="file" multiple hidden />
-        <a class="button-like" href="/uppladdningar.html">Uppladdningar</a>
-      </section>
-    ` : ""}
-    <section class="allocation-panel" data-allocation-drop>
-      ${anyFile ? `
-        <div class="allocation-panel-head allocation-panel-head--end">
-          <label class="button-like" for="allocation-combined-files">Välj fler filer</label>
-          <input id="allocation-combined-files" type="file" multiple hidden />
-        </div>
-      ` : ""}
+    <section class="allocation-panel allocation-panel--compact" data-allocation-drop>
+      ${!anyFile ? `<p class="allocation-status">Inga filer inlagda. Dra filer hit eller använd Välj filer.</p>` : ""}
       ${allocationState.status ? `<p class="allocation-status">${allocationEscape(allocationState.status)}</p>` : ""}
       <div class="allocation-board">
         ${groups.map((group) => `
           <div class="allocation-board-col">
-            <h3>${allocationEscape(group.name)}</h3>
+            <h3>${allocationEscape(allocationGroupTitle(group.name))}</h3>
             ${group.flows.map((flow) => renderFlowChip(flow)).join("")}
           </div>
         `).join("")}
       </div>
     </section>
     ${renderResultPanel(allocationState.result)}
+  `, `
+    <label class="button-like" for="allocation-combined-files">${fileActionLabel}</label>
+    <input id="allocation-combined-files" type="file" multiple hidden />
   `);
   const input = document.getElementById("allocation-combined-files");
   if (input) input.addEventListener("change", async (event) => routeAllocationFiles(event.target.files, currentAllocationSlots()));
@@ -713,28 +712,41 @@ function renderSoloFlowView(flowId) {
   const missing = missingForFlow(flow);
   const ready = missing.length === 0 && !allocationState.busyId;
   const compact = flowId === "eftersok";
+  const hasFileSlots = slots.length > 0;
+  const hasUploadedFile = slots.some((slot) => allocationDisplayFile(slot.key));
+  const fileActionLabel = hasUploadedFile ? "Välj fler filer" : "Välj filer";
   renderAllocationShell(`
-    <section class="allocation-panel" data-allocation-drop data-drop-scope="flow" data-flow-id="${allocationEscape(flow.id)}">
-      <div class="allocation-panel-head${compact ? " allocation-panel-head--end" : ""}">
-        ${compact ? "" : `<h2>${allocationEscape(flow.label)}</h2>`}
-        ${slots.length ? `<label class="button-like" for="allocation-solo-files">Välj filer</label><input id="allocation-solo-files" type="file" multiple hidden />` : ""}
-      </div>
-      ${compact ? "" : `<p class="allocation-muted">${allocationEscape(flow.description)}</p>`}
-      ${compact || !slots.length ? "" : `<div class="allocation-file-grid compact">${allocationFileRows(slots)}</div>`}
-      ${renderFieldInputs(flow)}
-      <div class="allocation-run-row">
-        ${compact
-          ? renderFlowChip(flow)
-          : `<button type="button" class="primary" data-run-flow="${allocationEscape(flow.id)}" ${ready ? "" : "disabled"}>
-              ${allocationState.busyId === flow.id ? "Kör..." : flow.id === "split-values" ? "Dela värden" : `Kör ${allocationEscape(flow.label)}`}
-            </button>`
-        }
-        <span>${allocationEscape(allocationState.status)}</span>
-      </div>
+    <section class="allocation-panel ${compact ? "allocation-panel--compact" : ""}" data-allocation-drop data-drop-scope="flow" data-flow-id="${allocationEscape(flow.id)}">
+      ${compact ? `
+        <div class="allocation-solo-compact">
+          ${renderFieldInputs(flow, "allocation-fields--compact")}
+          <div class="allocation-run-row allocation-run-row--compact">
+            ${renderFlowChip(flow)}
+            <span>${allocationEscape(allocationState.status)}</span>
+          </div>
+        </div>
+      ` : `
+        <div class="allocation-panel-head">
+          <h2>${allocationEscape(flow.label)}</h2>
+          ${slots.length ? `<label class="button-like" for="allocation-solo-files">Välj filer</label><input id="allocation-solo-files" type="file" multiple hidden />` : ""}
+        </div>
+        <p class="allocation-muted">${allocationEscape(flow.description)}</p>
+        ${slots.length ? `<div class="allocation-file-grid compact">${allocationFileRows(slots)}</div>` : ""}
+        ${renderFieldInputs(flow)}
+        <div class="allocation-run-row">
+          <button type="button" class="primary" data-run-flow="${allocationEscape(flow.id)}" ${ready ? "" : "disabled"}>
+            ${allocationState.busyId === flow.id ? "Kör..." : flow.id === "split-values" ? "Dela värden" : `Kör ${allocationEscape(flow.label)}`}
+          </button>
+          <span>${allocationEscape(allocationState.status)}</span>
+        </div>
+      `}
       ${missing.length ? `<p class="allocation-muted">Saknas: ${missing.map((item) => allocationEscape(item.label)).join(", ")}</p>` : ""}
     </section>
     ${renderResultPanel(allocationState.result)}
-  `);
+  `, compact && hasFileSlots ? `
+    <label class="button-like" for="allocation-solo-files">${fileActionLabel}</label>
+    <input id="allocation-solo-files" type="file" multiple hidden />
+  ` : "");
   document.getElementById("allocation-solo-files")?.addEventListener("change", async (event) => routeAllocationFiles(event.target.files, slots));
   bindFlowFields(document.getElementById("allocationRoot"));
   bindRunButtons();

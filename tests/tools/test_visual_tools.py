@@ -526,4 +526,4 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert ".database-toggle .upload-notice" in styles
     assert ".sidebar-upload-link" not in styles
     assert ".allocation-file-slot.drag-over" in styles
-    assert ".allocation-action-card.drag-over" in styles
+    assert ".allocation-flow-chip.drag-over .allocation-flow-chip-row" in styles

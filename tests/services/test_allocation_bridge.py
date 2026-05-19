@@ -56,8 +56,7 @@ def test_df_to_table_serializes_preview_without_nan_values():
 
 
 def test_allocation_bridge_uses_vendored_warehouse_tools_by_default():
-    assert bridge.warehouse_tools_dir().name == "warehouse_tools"
-    assert bridge.allokering_backend_dir() == bridge.warehouse_tools_dir()
+    assert bridge.warehouse_tools_dir() == ROOT / "warehouse_tools"
     assert (bridge.warehouse_tools_dir() / "vendor" / "allokering12.1.py").is_file()
 
 

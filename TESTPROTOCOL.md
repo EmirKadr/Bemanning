@@ -74,20 +74,18 @@ python -m tools.visual_smoke --via-desktop-proxy --roles public,admin,warehouse
 python -m tools.visual_smoke --output artifacts\visual\manual-check
 ```
 
-## Lagerverktyg / gammal Allokering-paritet
+## Lagerverktyg / lokal Bemanning-data
 
-Bearbeta, Dela och Harleda kor Bemannings egna `warehouse_tools`-paket. For att
-sakra att resultatet fortfarande matchar gamla Allokering-appen finns ett
-paritetstest som kor verkliga floden mot `projects/allokering/testdata`:
+Bearbeta, Dela och Harleda kor Bemannings egna `warehouse_tools`-paket.
+Lagerflodena testas mot lokal fixture-data i `testdata/warehouse_tools`, sa
+testsviten inte kraver nagot sibling-projekt.
 
 ```powershell
-python -m pytest tests\services\test_warehouse_tools_parity.py
+python -m pytest tests\services\test_warehouse_tools_local_data.py
 ```
 
-Testet jamfor publikt flodesregister, datapool och tabeller/summor for de
-deterministiska flodena. Om gamla Allokering-projektet inte finns i workspace
-skippas testet, men lokalt i denna workspace ska det koras nar lagerverktygen
-andras.
+Testet kontrollerar publikt flodesregister, datapool, summaries, tabellnycklar,
+radantal och representativa cellvarden for de deterministiska flodena.
 
 `--via-desktop-proxy` testar samma frontend via desktop-appens lokala appserver
 och proxar API-anrop till testbackend. Anvand den nar en andring paverkar
@@ -264,7 +262,7 @@ Innan ny release:
 4. `python -m tools.visual_smoke --roles public,admin,leader,staffing,viewer`
    Kor ocksa `python -m tools.visual_smoke --via-desktop-proxy --roles admin,warehouse`
    nar Lager/Allokering, sidebar, filuppladdning eller desktop-appytan har andrats.
-5. `python -m pytest tests\services\test_warehouse_tools_parity.py`
+5. `python -m pytest tests\services\test_warehouse_tools_local_data.py`
 6. `python -m tools.interactive_e2e`
 7. `python -m tools.desktop_shell_screens`
 8. `python -m tools.desktop_app_probe`

@@ -44,13 +44,7 @@ def _default_warehouse_tools_dir() -> Path:
 
 
 def warehouse_tools_dir() -> Path:
-    configured = os.environ.get("BEMANNING_WAREHOUSE_TOOLS_DIR")
-    return Path(configured).expanduser().resolve() if configured else _default_warehouse_tools_dir()
-
-
-def allokering_backend_dir() -> Path:
-    """Backward-compatible name for older router/tests/tooling."""
-    return warehouse_tools_dir()
+    return _default_warehouse_tools_dir()
 
 
 def _ensure_tools_importable() -> None:

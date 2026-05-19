@@ -10,7 +10,7 @@ from app_info import ANALYTICS_LOCAL_STORAGE_DIR, ANALYTICS_STORAGE_DIR_ENV, APP
 
 def default_analytics_storage_dir() -> Path:
     appdata = os.environ.get("APPDATA") or str(Path.home())
-    app_slug = re.sub(r"[^a-z0-9]+", "-", APP_NAME.lower()).strip("-") or "allokering"
+    app_slug = re.sub(r"[^a-z0-9]+", "-", APP_NAME.lower()).strip("-") or "bemanning"
     return Path(appdata) / app_slug / "analytics"
 
 

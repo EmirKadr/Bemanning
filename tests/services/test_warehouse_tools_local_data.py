@@ -1,0 +1,237 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from warehouse_tools import flows
+
+
+pd = pytest.importorskip("pandas")
+
+ROOT = Path(__file__).resolve().parents[2]
+WAREHOUSE_TESTDATA = ROOT / "testdata" / "warehouse_tools"
+
+REGISTRY_FLOW_IDS = (
+    "allocate",
+    "ordersaldo",
+    "lyx",
+    "pafyllnadsprio",
+    "hib-koppling",
+    "overview-check",
+    "dispatch-check",
+    "vecka27-check",
+    "eftersok",
+    "prognos-report",
+    "observations-update",
+    "observations-sync",
+    "split-values",
+    "update-check",
+)
+
+LOCAL_DATA_FLOW_IDS = tuple(flow_id for flow_id in REGISTRY_FLOW_IDS if flow_id not in {"observations-sync", "update-check"})
+
+EXPECTED_SUMMARIES = {
+    "allocate": {
+        "Resultatrader": 20129,
+        "Near-miss": 18,
+        "Refill Huvudplock": 529,
+        "Refill AutoStore": 121,
+        "Pallplatser": 220,
+    },
+    "dispatch-check": {"Avvikelser": 0},
+    "eftersok": {"Inköp": "999109415", "Artikel": "200847340", "Rapportrader": 22},
+    "hib-koppling": {"Ändringar": 49, "Missade avgångar": 1},
+    "lyx": {"LYX-artiklar": 264, "Filtrerade rader": 5510},
+    "observations-update": {"Nya observationer": 24047, "Artikel-max-rader": 3026},
+    "ordersaldo": {"Kompletta ordrar": 300, "Artiklar med underskott": 3777},
+    "overview-check": {"Sändningsrader": 0, "HIB-rader": 6},
+    "pafyllnadsprio": {"Läge": "Lastningsfönster", "Rapportrader": 3777, "Saknad referens": 2951},
+    "prognos-report": {"Rapportrader": 238, "Kombinerade rader": 1963, "Partiell": "Nej"},
+    "split-values": {"Antal värden": 5, "Antal kolumner": 3, "Per kolumn": 2},
+    "vecka27-check": {"Avvikelser": 0},
+}
+
+EXPECTED_TABLE_ROWS = {
+    "allocate": {
+        "result": 20129,
+        "near_miss": 18,
+        "refill_hp": 529,
+        "refill_autostore": 121,
+        "pallet_spaces": 220,
+    },
+    "dispatch-check": {"diff": 0},
+    "eftersok": {"report": 22},
+    "hib-koppling": {"changes": 49, "missed": 1},
+    "lyx": {"articles": 264},
+    "observations-update": {"new_rows": 24047},
+    "ordersaldo": {"complete": 300, "shortage": 3777},
+    "overview-check": {"orderkontroll": 6, "hib_utan_butikssändning": 6},
+    "pafyllnadsprio": {"report": 3777, "window_map": 4},
+    "prognos-report": {"report": 238, "combined": 1963},
+    "split-values": {"report": 2},
+    "vecka27-check": {"report": 0},
+}
+
+EXPECTED_FIRST_VALUES = {
+    "allocate": {
+        "result": (0, "33"),
+        "near_miss": (0, "1166795"),
+        "refill_hp": (0, "1251405"),
+        "refill_autostore": (0, "2000515"),
+        "pallet_spaces": (0, "110"),
+    },
+    "eftersok": {"report": (0, "Analys för Ink")},
+    "hib-koppling": {"changes": (0, "PR100500372"), "missed": (0, "324042")},
+    "lyx": {"articles": (0, "10010")},
+    "observations-update": {"new_rows": (0, "10001")},
+    "ordersaldo": {"complete": (0, "301331"), "shortage": (0, "1000279")},
+    "overview-check": {"orderkontroll": (1, "322882"), "hib_utan_butikssändning": (1, "322882")},
+    "pafyllnadsprio": {"report": (0, "1000279"), "window_map": (0, "PRIO 1")},
+    "prognos-report": {"report": (0, "2002903"), "combined": (0, "1169944")},
+    "split-values": {"report": (0, "A")},
+}
+
+
+def _testdata() -> dict[str, Path]:
+    return {
+        "orders": WAREHOUSE_TESTDATA / "v_ask_customer_order_details_all-20260317145125.csv",
+        "buffer": WAREHOUSE_TESTDATA / "v_ask_article_buffertpallet-20260317145136.csv",
+        "saldo": WAREHOUSE_TESTDATA / "v_ask_item_summary_stock_automation-20260317145351.csv",
+        "items": WAREHOUSE_TESTDATA / "item_option-20260317145203.csv",
+        "overview": WAREHOUSE_TESTDATA / "v_ask_order_overview-20260317145114.csv",
+        "dispatch": WAREHOUSE_TESTDATA / "v_ask_dispatch_pallet-20260316130458.csv",
+        "prognos": next(WAREHOUSE_TESTDATA.glob("Prognos idag_*.xlsx")),
+        "campaign": next(WAREHOUSE_TESTDATA.glob("Granng*prognos*.xlsx")),
+        "wms_receive": WAREHOUSE_TESTDATA / "v_ask_receive_log-20260317145157.csv",
+        "wms_booking": WAREHOUSE_TESTDATA / "v_ask_booking_putaway-20260317145232.csv",
+        "wms_buffert": WAREHOUSE_TESTDATA / "v_ask_article_buffertpallet-20260317145136.csv",
+        "wms_trans": WAREHOUSE_TESTDATA / "v_ask_trans_log-20260317170854.csv",
+        "wms_pick": WAREHOUSE_TESTDATA / "v_ask_pick_log_full-20260317170910.csv",
+        "wms_correct": WAREHOUSE_TESTDATA / "v_ask_correct_log-20260317145302.csv",
+    }
+
+
+def _scenario_payloads() -> dict[str, tuple[dict[str, Path], dict[str, str]]]:
+    files = _testdata()
+    return {
+        "allocate": (
+            {
+                "orders": files["orders"],
+                "buffer": files["buffer"],
+                "saldo": files["saldo"],
+                "items": files["items"],
+            },
+            {},
+        ),
+        "ordersaldo": ({"orders": files["orders"], "saldo": files["saldo"]}, {}),
+        "lyx": ({"saldo": files["saldo"]}, {}),
+        "pafyllnadsprio": (
+            {"orders": files["orders"], "saldo": files["saldo"], "overview": files["overview"]},
+            {},
+        ),
+        "hib-koppling": ({"details": files["orders"], "overview": files["overview"]}, {}),
+        "overview-check": ({"overview": files["overview"], "details": files["orders"]}, {}),
+        "dispatch-check": (
+            {"overview": files["overview"], "dispatch": files["dispatch"], "details": files["orders"]},
+            {},
+        ),
+        "vecka27-check": ({"orders": files["orders"]}, {}),
+        "eftersok": (
+            {
+                "wms_receive": files["wms_receive"],
+                "wms_booking": files["wms_booking"],
+                "wms_buffert": files["wms_buffert"],
+                "wms_trans": files["wms_trans"],
+                "wms_pick": files["wms_pick"],
+                "wms_correct": files["wms_correct"],
+            },
+            {"purchase": "999109415", "article": "200847340"},
+        ),
+        "prognos-report": (
+            {
+                "prognos": files["prognos"],
+                "campaign": files["campaign"],
+                "saldo": files["saldo"],
+                "buffer": files["buffer"],
+            },
+            {},
+        ),
+        "observations-update": ({"buffer": files["buffer"]}, {}),
+        "split-values": ({}, {"values": "A\nB\nC\nD\nE", "chunk_size": "2"}),
+    }
+
+
+def _first_value(table, column_index: int) -> str:
+    return str(table.iloc[0, column_index])
+
+
+def test_warehouse_tool_testdata_is_local_to_bemanning():
+    assert WAREHOUSE_TESTDATA.is_dir()
+    assert (WAREHOUSE_TESTDATA / "v_ask_pick_log_full-20260317170910.csv").is_file()
+    assert ROOT.name == "Bemanningsfil"
+
+
+def test_warehouse_registry_is_loaded_from_bemanning_package():
+    assert tuple(flows.FLOW_BY_ID) == REGISTRY_FLOW_IDS
+    assert len(flows.public_pool()) == 10
+    public_registry = flows.public_registry()
+    assert [flow["id"] for flow in public_registry] == list(REGISTRY_FLOW_IDS)
+    assert all("handler" not in flow for flow in public_registry)
+
+
+@pytest.mark.filterwarnings(
+    "ignore:Workbook contains no default style, apply openpyxl's default:UserWarning:openpyxl.styles.stylesheet"
+)
+@pytest.mark.parametrize("flow_id", LOCAL_DATA_FLOW_IDS)
+def test_warehouse_flows_run_against_local_fixture_data(flow_id: str):
+    files, params = _scenario_payloads()[flow_id]
+
+    result = flows.FLOW_BY_ID[flow_id]["handler"](dict(files), dict(params))
+    tables = {key: table for key, _label, table in result.get("tables", [])}
+
+    assert result.get("summary") == EXPECTED_SUMMARIES[flow_id]
+    assert {key: len(table) for key, table in tables.items()} == EXPECTED_TABLE_ROWS[flow_id]
+
+    for table_key, (column_index, expected_prefix) in EXPECTED_FIRST_VALUES.get(flow_id, {}).items():
+        assert _first_value(tables[table_key], column_index).startswith(expected_prefix)
+
+
+def test_source_has_no_technical_dependency_on_old_allocation_project():
+    forbidden = [
+        "projects/" + "allokering",
+        "projects\\" + "allokering",
+        "EmirKadr/" + "allokering",
+        "ALLOKERING" + "_ROOT",
+        str(Path("C:/Users/emikad/OneDrive - Dole Nordic AB/Skrivbordet/projects") / "allokering"),
+    ]
+    scanned_suffixes = {
+        ".bat",
+        ".css",
+        ".html",
+        ".ini",
+        ".iss",
+        ".js",
+        ".json",
+        ".md",
+        ".ps1",
+        ".py",
+        ".spec",
+        ".txt",
+        ".yaml",
+        ".yml",
+    }
+    skipped_dirs = {".git", ".pytest_cache", "artifacts", "build", "dist", "release", "tmp_screenshots"}
+    offenders: list[str] = []
+
+    for path in ROOT.rglob("*"):
+        if any(part in skipped_dirs for part in path.parts):
+            continue
+        if not path.is_file() or path.suffix.lower() not in scanned_suffixes:
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for needle in forbidden:
+            if needle in text:
+                offenders.append(f"{path.relative_to(ROOT)}: {needle}")
+
+    assert offenders == []
