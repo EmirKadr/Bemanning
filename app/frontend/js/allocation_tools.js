@@ -56,6 +56,8 @@ const allocationState = {
   lastBufferSignature: "",
 };
 
+let allocationPopoverDismissBound = false;
+
 function allocationEscape(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]
@@ -600,6 +602,61 @@ function bindResultActions(root) {
   });
 }
 
+function renderFlowChip(flow) {
+  const missing = missingForFlow(flow);
+  const ready = missing.length === 0;
+  const running = allocationState.busyId === flow.id;
+  const fileList = renderFlowFileList(flow);
+  const label = allocationEscape(flow.label);
+  return `
+    <div class="allocation-flow-chip ${ready ? "ready" : ""}" data-allocation-drop data-drop-scope="flow" data-flow-id="${allocationEscape(flow.id)}">
+      <div class="allocation-flow-chip-row">
+        <button type="button" class="allocation-flow-run" data-run-flow="${allocationEscape(flow.id)}" ${ready && !allocationState.busyId ? "" : "disabled"}>
+          ${running ? "Kör…" : label}
+        </button>
+        <button type="button" class="allocation-flow-info" data-flow-info="${allocationEscape(flow.id)}" aria-label="Visa information om ${label}">
+          <span aria-hidden="true">i</span>
+        </button>
+      </div>
+      <div class="allocation-flow-popover" data-flow-popover="${allocationEscape(flow.id)}" hidden>
+        <p>${allocationEscape(flow.description)}</p>
+        ${fileList || `<p>Inga filer krävs.</p>`}
+      </div>
+    </div>
+  `;
+}
+
+function closeFlowPopovers(root) {
+  root.querySelectorAll("[data-flow-popover]").forEach((popover) => { popover.hidden = true; });
+  root.querySelectorAll("[data-flow-info].active").forEach((button) => button.classList.remove("active"));
+}
+
+function bindFlowInfoToggles(root) {
+  root.querySelectorAll("[data-flow-info]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const popover = root.querySelector(`[data-flow-popover="${button.dataset.flowInfo}"]`);
+      const wasOpen = popover && !popover.hidden;
+      closeFlowPopovers(root);
+      if (popover && !wasOpen) {
+        popover.hidden = false;
+        button.classList.add("active");
+      }
+    });
+  });
+}
+
+function ensureFlowPopoverDismiss() {
+  if (allocationPopoverDismissBound) return;
+  allocationPopoverDismissBound = true;
+  document.addEventListener("click", (event) => {
+    const root = document.getElementById("allocationRoot");
+    if (!root) return;
+    if (event.target.closest("[data-flow-info]") || event.target.closest("[data-flow-popover]")) return;
+    closeFlowPopovers(root);
+  });
+}
+
 function renderCombinedView() {
   const flows = combinedAllocationFlows();
   const groups = [];
@@ -622,32 +679,21 @@ function renderCombinedView() {
       </section>
     ` : ""}
     <section class="allocation-panel" data-allocation-drop>
-      <div class="allocation-panel-head">
-        <h2>Körningar</h2>
-        ${anyFile ? `<label class="button-like" for="allocation-combined-files">Välj fler filer</label><input id="allocation-combined-files" type="file" multiple hidden />` : ""}
-      </div>
-      ${allocationState.status ? `<p class="allocation-status">${allocationEscape(allocationState.status)}</p>` : ""}
-      ${groups.map((group) => `
-        <div class="allocation-action-group">
-          <h3>${allocationEscape(group.name)}</h3>
-          <div class="allocation-action-grid">
-            ${group.flows.map((flow) => {
-              const missing = missingForFlow(flow);
-              const ready = missing.length === 0;
-              return `
-                <article class="allocation-action-card ${ready ? "ready" : ""}" data-allocation-drop data-drop-scope="flow" data-flow-id="${allocationEscape(flow.id)}">
-                  <h4>${allocationEscape(flow.label)}</h4>
-                  <p>${allocationEscape(flow.description)}</p>
-                  ${renderFlowFileList(flow)}
-                  <button type="button" class="primary" data-run-flow="${allocationEscape(flow.id)}" ${ready && !allocationState.busyId ? "" : "disabled"}>
-                    ${allocationState.busyId === flow.id ? "Kör..." : `Kör ${allocationEscape(flow.label)}`}
-                  </button>
-                </article>
-              `;
-            }).join("")}
-          </div>
+      ${anyFile ? `
+        <div class="allocation-panel-head allocation-panel-head--end">
+          <label class="button-like" for="allocation-combined-files">Välj fler filer</label>
+          <input id="allocation-combined-files" type="file" multiple hidden />
         </div>
-      `).join("")}
+      ` : ""}
+      ${allocationState.status ? `<p class="allocation-status">${allocationEscape(allocationState.status)}</p>` : ""}
+      <div class="allocation-board">
+        ${groups.map((group) => `
+          <div class="allocation-board-col">
+            <h3>${allocationEscape(group.name)}</h3>
+            ${group.flows.map((flow) => renderFlowChip(flow)).join("")}
+          </div>
+        `).join("")}
+      </div>
     </section>
     ${renderResultPanel(allocationState.result)}
   `);
@@ -665,19 +711,23 @@ function renderSoloFlowView(flowId) {
   const slots = slotsForFlow(flow);
   const missing = missingForFlow(flow);
   const ready = missing.length === 0 && !allocationState.busyId;
+  const compact = flowId === "eftersok";
   renderAllocationShell(`
     <section class="allocation-panel" data-allocation-drop data-drop-scope="flow" data-flow-id="${allocationEscape(flow.id)}">
-      <div class="allocation-panel-head">
-        <h2>${allocationEscape(flow.label)}</h2>
+      <div class="allocation-panel-head${compact ? " allocation-panel-head--end" : ""}">
+        ${compact ? "" : `<h2>${allocationEscape(flow.label)}</h2>`}
         ${slots.length ? `<label class="button-like" for="allocation-solo-files">Välj filer</label><input id="allocation-solo-files" type="file" multiple hidden />` : ""}
       </div>
-      <p class="allocation-muted">${allocationEscape(flow.description)}</p>
-      ${slots.length ? `<div class="allocation-file-grid compact">${allocationFileRows(slots)}</div>` : ""}
+      ${compact ? "" : `<p class="allocation-muted">${allocationEscape(flow.description)}</p>`}
+      ${compact || !slots.length ? "" : `<div class="allocation-file-grid compact">${allocationFileRows(slots)}</div>`}
       ${renderFieldInputs(flow)}
       <div class="allocation-run-row">
-        <button type="button" class="primary" data-run-flow="${allocationEscape(flow.id)}" ${ready ? "" : "disabled"}>
-          ${allocationState.busyId === flow.id ? "Kör..." : flow.id === "split-values" ? "Dela värden" : `Kör ${allocationEscape(flow.label)}`}
-        </button>
+        ${compact
+          ? renderFlowChip(flow)
+          : `<button type="button" class="primary" data-run-flow="${allocationEscape(flow.id)}" ${ready ? "" : "disabled"}>
+              ${allocationState.busyId === flow.id ? "Kör..." : flow.id === "split-values" ? "Dela värden" : `Kör ${allocationEscape(flow.label)}`}
+            </button>`
+        }
         <span>${allocationEscape(allocationState.status)}</span>
       </div>
       ${missing.length ? `<p class="allocation-muted">Saknas: ${missing.map((item) => allocationEscape(item.label)).join(", ")}</p>` : ""}
@@ -694,6 +744,7 @@ function bindRunButtons() {
   root.querySelectorAll("[data-run-flow]").forEach((button) => {
     button.addEventListener("click", () => runAllocationFlow(flowById(button.dataset.runFlow)));
   });
+  bindFlowInfoToggles(root);
   bindResultActions(root);
 }
 
@@ -724,6 +775,7 @@ async function initAllocationPage() {
   }
   allocationState.user = await initPage(allocationPageActiveName(allocationState.page), pageOptions);
   if (!allocationState.user) return;
+  ensureFlowPopoverDismiss();
   root.innerHTML = `<div class="section-title">${allocationEscape(allocationPrimaryTitle(allocationState.page))}</div><section class="allocation-panel"><p>Laddar...</p></section>`;
   try {
     allocationState.files = await loadStoredAllocationFiles();
