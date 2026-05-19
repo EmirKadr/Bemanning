@@ -234,6 +234,26 @@
     };
   }
 
+  function statusItems(status) {
+    const files = Object.values(status?.files || {});
+    const kpiSpec = SOURCE_BY_KEY.kpi || { key: "kpi", label: "KPI-Mål", required: true };
+    return [
+      ...files.map((file) => ({ ...file, permanent: false })),
+      {
+        key: "kpi",
+        label: kpiSpec.label,
+        required: true,
+        visible: true,
+        uploaded: Boolean(status?.kpi_loaded),
+        name: status?.kpi_loaded ? "Permanent målfil inlagd" : null,
+        modified_at: null,
+        size: null,
+        size_label: null,
+        permanent: true,
+      },
+    ];
+  }
+
   async function fileStatus() {
     const [files, serverStatus] = await Promise.all([
       loadFiles(),
@@ -243,26 +263,31 @@
   }
 
   function renderStatus(panel, status) {
-    const files = Object.values(status.files || {});
+    const files = statusItems(status);
     const filled = files.filter((file) => file.uploaded).length;
     const required = files.filter((file) => file.required).length;
-    panel.querySelector("#productivityUploadCount").textContent = `${filled}/${required} valda`;
-    panel.querySelector("#productivityFileSlots").innerHTML = files.map((file) => `
+    panel.querySelector("#productivityUploadCount").textContent = `${filled}/${required} inlagda`;
+    panel.querySelector("#productivityFileSlots").innerHTML = files.map((file) => {
+      const cls = file.uploaded ? "ok" : file.required ? "missing" : "optional";
+      const prefix = file.uploaded ? "✓" : file.required ? "✗" : "○";
+      return `
       <div class="productivity-file-slot ${file.uploaded ? "is-uploaded" : ""}">
         <div class="productivity-file-main">
-          <div class="productivity-file-label">${escapeHtml(file.label)}${file.required ? '<span class="req">*</span>' : ""}</div>
+          <div class="productivity-file-label">
+            <span class="allocation-file-tag ${cls}">${prefix} ${escapeHtml(file.label)}${file.required ? "" : " (valfri)"}</span>
+          </div>
           <div class="productivity-file-name">
             ${file.uploaded ? escapeHtml(file.name) : '<span class="muted">Ingen fil vald</span>'}
           </div>
-          ${file.uploaded ? `<div class="productivity-file-meta">${escapeHtml(file.size_label || "")}</div>` : ""}
+          ${file.uploaded && file.size_label ? `<div class="productivity-file-meta">${escapeHtml(file.size_label)}</div>` : ""}
         </div>
         <div class="productivity-file-actions">
-          <span class="status-pill ${file.uploaded ? "ok" : "none"}">${file.uploaded ? "Vald" : "Ej fil"}</span>
           <button type="button" class="btn-sm productivity-slot-upload" data-file-key="${escapeHtml(file.key)}">Välj</button>
-          <button type="button" class="btn-sm danger productivity-slot-clear" data-file-key="${escapeHtml(file.key)}" ${file.uploaded ? "" : "disabled"}>&times;</button>
+          <button type="button" class="btn-sm danger productivity-slot-clear" data-file-key="${escapeHtml(file.key)}" ${file.uploaded && !file.permanent ? "" : "disabled"}>&times;</button>
         </div>
       </div>
-    `).join("");
+    `;
+    }).join("");
 
     const uploadStatus = panel.querySelector("#productivityUploadStatus");
     uploadStatus.textContent = status.ready

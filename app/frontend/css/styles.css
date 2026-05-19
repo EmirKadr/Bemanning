@@ -513,6 +513,29 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   min-height: 20px;
 }
 
+.productivity-requirements {
+  max-width: 760px;
+}
+
+.productivity-requirements-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.productivity-requirements-head h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.productivity-requirements-head span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .productivity-upload-panel {
   position: relative;
   background: var(--surface);

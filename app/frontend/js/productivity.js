@@ -867,8 +867,67 @@ function renderFileStatus(status) {
   productivityFileStatus = status;
 }
 
+function productivityStatusItems(status) {
+  const files = Object.values(status?.files || {});
+  const kpiSpec = PRODUCTIVITY_SOURCE_BY_KEY.kpi || { label: "KPI-Mål" };
+  return [
+    ...files.map((file) => ({
+      key: file.key,
+      label: file.label,
+      required: file.required,
+      uploaded: file.uploaded,
+      name: file.name || "",
+      size_label: file.size_label || "",
+    })),
+    {
+      key: "kpi",
+      label: kpiSpec.label,
+      required: true,
+      uploaded: Boolean(status?.kpi_loaded),
+      name: status?.kpi_loaded ? "Permanent målfil inlagd" : "",
+      size_label: "",
+    },
+  ];
+}
+
+function renderProductivityFileRequirements(status) {
+  const target = document.getElementById("productivityFileRequirements");
+  if (!target) return;
+  if (!status || status.ready) {
+    target.innerHTML = "";
+    return;
+  }
+  const items = productivityStatusItems(status);
+  const uploaded = items.filter((item) => item.uploaded).length;
+  target.innerHTML = `
+    <section class="allocation-panel productivity-requirements">
+      <div class="productivity-requirements-head">
+        <div>
+          <h2>Underlag</h2>
+          <span>${uploaded}/${items.length} inlagda</span>
+        </div>
+        <a class="button-like primary" href="/uppladdningar.html">Öppna Uppladdningar</a>
+      </div>
+      <div class="allocation-flow-files">
+        ${items.map((item) => {
+          const cls = item.uploaded ? "ok" : "missing";
+          const prefix = item.uploaded ? "✓" : "✗";
+          const suffix = item.required ? "" : " (valfri)";
+          return `
+            <div class="allocation-flow-file ${item.uploaded ? "filled" : ""}">
+              <span class="allocation-file-tag ${cls}">${prefix} ${escapeHtml(item.label)}${suffix}</span>
+              <span>${item.uploaded ? escapeHtml([item.name, item.size_label].filter(Boolean).join(" · ")) : "Ingen fil"}</span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function clearReportContent() {
   productivityReport = null;
+  renderProductivityFileRequirements(null);
   document.getElementById("productivitySummary").innerHTML = "";
   document.getElementById("productivitySources").innerHTML = "";
   document.getElementById("productivityContent").innerHTML = "";
@@ -888,6 +947,7 @@ function setProductivityWaitingStatus(fileStatus) {
   document.getElementById("productivityStatus").textContent = fileStatus?.ready
     ? "Underlagen \u00e4r valda. Ber\u00e4knar produktivitet..."
     : "Saknar produktivitetsunderlag.";
+  renderProductivityFileRequirements(fileStatus);
 }
 
 async function initializeProductivityPage() {
@@ -934,6 +994,7 @@ async function fetchProductivityReport(dateValue = "") {
 
 function renderProductivityReport(report) {
   productivityReport = report;
+  renderProductivityFileRequirements(null);
   const dateInput = document.getElementById("productivityDate");
   if (productivityReport.date) dateInput.value = productivityReport.date;
   updateProductivityDateDisplay();

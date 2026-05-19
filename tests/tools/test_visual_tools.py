@@ -308,9 +308,15 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert "/api/productivity/files/raw" in productivity_uploads
     assert "productivityLocalFiles" in productivity
     assert "syncProductivityLocalFilesFromStore" in productivity
+    assert "renderProductivityFileRequirements" in productivity
+    assert 'id="productivityFileRequirements"' in productivity_html
     assert "window.productivityUploads.loadFiles()" in productivity
     assert "productivityUploads?.setupPanel" in allocation_tools
     assert "data-productivity-upload-panel" in allocation_tools
+    assert "statusItems" in productivity_uploads
+    assert "Permanent målfil inlagd" in productivity_uploads
+    assert "allocation-file-tag" in productivity_uploads
+    assert "allocation-file-tag" in productivity
     assert "/js/productivity_uploads.js" in productivity_html
     assert "/js/productivity_uploads.js" in uploads_html
     assert 'id="productivityUploadBtn"' not in productivity_html
