@@ -273,6 +273,8 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert "bemanning-sidebar-layout" in common
     assert "bemanning-role-view-access" in common
     assert "ROLE_VIEW_DEFAULT_ACCESS" in common
+    assert "ROLE_VIEW_IDS" in common
+    assert "new Set(ROLE_VIEW_IDS)" in common
     assert "roleViewAccessLevel" in common
     assert "refreshRoleViewAccess" in common
     assert 'api.get("/api/settings/role-access")' in common
@@ -286,6 +288,9 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert 'api.get("/api/settings/sidebar")' in common
     assert 'api.put("/api/settings/sidebar"' in common
     assert "renderSidebarNav" in common
+    assert "renderAllocationUploadUtility" in common
+    assert 'class="database-toggle${activeClass}"' in common
+    assert 'className: "sidebar-upload-link"' not in common
     assert "openSidebarEditor" in common
     assert "sidebar-subview" in common
     assert "parent_id" in common
@@ -383,7 +388,8 @@ def test_frontend_keeps_lager_and_artikelplacering_out_of_bemanning_and_bearbeta
     assert 'visible: canViewPage(user, "schedule")' in common
     assert 'id: "allocationProcess"' in common
     assert 'visible: canViewPage(user, "allocationProcess")' in common
-    assert 'id: "allocationUploads"' in common
+    assert '"allocationUploads",' in common
+    assert 'canViewPage(user, "allocationUploads")' in common
     assert 'initPage("schedule", { requirePlanningView: true, denyRedirect: "/overblick.html" })' in schedule
     assert "pageOptions.requireAllocationProcess = true" in allocation
     assert 'pageOptions.denyRedirect = "/dela.html"' in allocation
@@ -484,3 +490,4 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert ".database-toggle.uploading .upload-arrow" in styles
     assert "@keyframes uploadArrowRise" in styles
     assert ".database-toggle .upload-notice" in styles
+    assert ".sidebar-upload-link" not in styles

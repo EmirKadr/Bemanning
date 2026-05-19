@@ -58,7 +58,6 @@ const SIDEBAR_DEFAULT_LAYOUT = [
   { id: "schedule" },
   { id: "overview" },
   { id: "productivity" },
-  { id: "allocationUploads" },
   { id: "allocationProcess" },
   { id: "allocationSplit" },
   { id: "allocationTrace" },
@@ -66,6 +65,20 @@ const SIDEBAR_DEFAULT_LAYOUT = [
   { id: "stallen" },
   { id: "analytics" },
   { id: "users" },
+];
+
+const ROLE_VIEW_IDS = [
+  "schedule",
+  "overview",
+  "productivity",
+  "allocationUploads",
+  "allocationProcess",
+  "allocationSplit",
+  "allocationTrace",
+  "persons",
+  "stallen",
+  "analytics",
+  "users",
 ];
 
 const ROLE_VIEW_ROLES = [
@@ -329,7 +342,7 @@ function normalizeRoleViewAccess(access = {}) {
   const defaults = roleViewDefaultAccess();
   const normalized = roleViewDefaultAccess();
   const roles = new Set(ROLE_VIEW_ROLES.map((role) => role.value));
-  const views = new Set(SIDEBAR_DEFAULT_LAYOUT.map((item) => item.id));
+  const views = new Set(ROLE_VIEW_IDS);
   const incoming = access && typeof access === "object" ? access : {};
 
   for (const [role, roleAccess] of Object.entries(incoming)) {
@@ -449,20 +462,6 @@ function sidebarPageDefinitions(user, activePage) {
       icon: "📈",
       visible: canViewPage(user, "productivity"),
       active: activePage === "productivity",
-    },
-    {
-      id: "allocationUploads",
-      label: "Uppladdningar",
-      href: "/uppladdningar.html",
-      iconHtml: DATABASE_ICON,
-      visible: canViewPage(user, "allocationUploads"),
-      active: activePage === "allocationUploads",
-      linkId: "allocation-upload-link",
-      className: "sidebar-upload-link",
-      trailingHtml: `
-        <span class="upload-arrow" aria-hidden="true">↑</span>
-        <span class="upload-notice" id="allocation-upload-notice" hidden></span>
-      `,
     },
     {
       id: "allocationProcess",
@@ -637,6 +636,18 @@ function renderSidebarLink(page, { active = false, subview = false } = {}) {
       <span class="icon" aria-hidden="true">${icon}${page.trailingHtml || ""}</span>
       <span>${escapeHtml(page.label)}</span>
     </a>
+  `;
+}
+
+function renderAllocationUploadUtility(user, activePage) {
+  if (!canViewPage(user, "allocationUploads")) return "";
+  const activeClass = activePage === "allocationUploads" ? " active" : "";
+  return `
+        <a href="/uppladdningar.html" class="database-toggle${activeClass}" id="allocation-upload-link" title="Uppladdningar" aria-label="Uppladdningar">
+          ${DATABASE_ICON}
+          <span class="upload-arrow" aria-hidden="true">&uarr;</span>
+          <span class="upload-notice" id="allocation-upload-notice" hidden></span>
+        </a>
   `;
 }
 
@@ -935,6 +946,7 @@ function renderSidebar(user, activePage) {
       </button>
     `
     : "";
+  const uploadUtility = renderAllocationUploadUtility(user, activePage);
 
   sidebar.innerHTML = `
     <div class="sidebar-top-row">
@@ -951,6 +963,7 @@ function renderSidebar(user, activePage) {
     <div class="sidebar-footer">
       <div class="sidebar-utility">
         <button class="area-focus-toggle" id="area-focus-toggle" type="button" title="Områdesfokus" aria-label="Områdesfokus"></button>
+        ${uploadUtility}
         <button class="theme-toggle" id="theme-toggle" type="button"></button>
       </div>
       <div class="sidebar-bottom">
@@ -1150,6 +1163,7 @@ window.isAdminUser = isAdminUser;
 window.isReadOnlyUser = isReadOnlyUser;
 window.ROLE_VIEW_ROLES = ROLE_VIEW_ROLES;
 window.ROLE_VIEW_LEVELS = ROLE_VIEW_LEVELS;
+window.ROLE_VIEW_IDS = ROLE_VIEW_IDS;
 window.SIDEBAR_DEFAULT_LAYOUT = SIDEBAR_DEFAULT_LAYOUT;
 window.roleViewDefaultAccess = roleViewDefaultAccess;
 window.normalizeRoleViewAccess = normalizeRoleViewAccess;

@@ -425,8 +425,7 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   border-color: var(--accent-soft);
   color: var(--text-muted);
 }
-.database-toggle .upload-notice,
-.sidebar-upload-link .upload-notice {
+.database-toggle .upload-notice {
   position: absolute;
   top: -5px;
   right: -5px;
@@ -442,10 +441,8 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   font-weight: 800;
   box-shadow: 0 5px 14px rgba(22, 163, 74, .24);
 }
-.database-toggle .upload-notice[hidden],
-.sidebar-upload-link .upload-notice[hidden] { display: none; }
-.database-toggle .upload-arrow,
-.sidebar-upload-link .upload-arrow {
+.database-toggle .upload-notice[hidden] { display: none; }
+.database-toggle .upload-arrow {
   position: absolute;
   bottom: 4px;
   right: 6px;
@@ -456,8 +453,7 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   transform: translateY(9px);
   pointer-events: none;
 }
-.database-toggle.uploading .upload-arrow,
-.sidebar-upload-link.uploading .upload-arrow {
+.database-toggle.uploading .upload-arrow {
   animation: uploadArrowRise .72s linear infinite;
 }
 @keyframes uploadArrowRise {
