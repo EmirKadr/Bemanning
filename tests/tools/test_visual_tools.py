@@ -278,6 +278,12 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert "productivityLocalFiles" in productivity
     assert "buildProductivityReportFromLocalDataset" in productivity
     assert "prefetchAdjacentReports" in productivity
+    assert 'id="productivityPrevDate"' in productivity_html
+    assert 'id="productivityNextDate"' in productivity_html
+    assert "shiftProductivityDate(-1)" in productivity
+    assert "shiftProductivityDate(1)" in productivity
+    assert "availableProductivityDates" in productivity
+    assert ".productivity-date-nav" in styles
     assert "refreshProductivityBtn" not in productivity_html
 
     for html_path in frontend.glob("*.html"):

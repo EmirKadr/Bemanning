@@ -15,8 +15,12 @@
   <section class="controls">
     <button id="productivityUploadBtn" type="button">Välj CSV-filer</button>
     <input id="productivityUploadInput" type="file" accept=".csv,.txt" multiple hidden />
-    <label>Datum
-      <input id="productivityDate" type="date" />
+    <label class="productivity-date-field">Datum
+      <span class="date-nav productivity-date-nav">
+        <button id="productivityPrevDate" class="date-nav-btn" type="button" aria-label="Föregående datum" title="Föregående datum" disabled>‹</button>
+        <input id="productivityDate" type="date" />
+        <button id="productivityNextDate" class="date-nav-btn" type="button" aria-label="Nästa datum" title="Nästa datum" disabled>›</button>
+      </span>
     </label>
     <label>Block
       <select id="productivityGroupFilter">

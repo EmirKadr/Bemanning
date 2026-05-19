@@ -256,6 +256,60 @@ function addDays(isoDate, days) {
   return date.toISOString().slice(0, 10);
 }
 
+function availableProductivityDates() {
+  return Array.from(new Set(productivityReport?.available_dates || []))
+    .filter(Boolean)
+    .sort();
+}
+
+function currentProductivityDate() {
+  return document.getElementById("productivityDate")?.value || productivityReport?.date || "";
+}
+
+function updateProductivityDateNav() {
+  const prevButton = document.getElementById("productivityPrevDate");
+  const nextButton = document.getElementById("productivityNextDate");
+  if (!prevButton || !nextButton) return;
+  if (!productivityReport) {
+    prevButton.disabled = true;
+    nextButton.disabled = true;
+    return;
+  }
+
+  const dates = availableProductivityDates();
+  const current = currentProductivityDate();
+  if (dates.length) {
+    const index = dates.indexOf(current);
+    prevButton.disabled = index <= 0;
+    nextButton.disabled = index < 0 || index >= dates.length - 1;
+    return;
+  }
+
+  prevButton.disabled = !current;
+  nextButton.disabled = !current;
+}
+
+function adjacentProductivityDate(direction) {
+  const dates = availableProductivityDates();
+  const current = currentProductivityDate();
+  if (dates.length) {
+    const index = dates.indexOf(current);
+    if (index >= 0) return dates[index + direction] || "";
+    return direction < 0 ? dates[dates.length - 1] : dates[0];
+  }
+  return addDays(current, direction);
+}
+
+async function shiftProductivityDate(direction) {
+  const dateInput = document.getElementById("productivityDate");
+  if (!dateInput) return;
+  const nextDate = adjacentProductivityDate(direction);
+  if (!nextDate || nextDate === dateInput.value) return;
+  dateInput.value = nextDate;
+  updateProductivityDateNav();
+  await loadProductivity();
+}
+
 function formatFileSize(size) {
   if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   if (size >= 1024) return `${(size / 1024).toFixed(1)} kB`;
@@ -859,6 +913,7 @@ function clearReportContent() {
   document.getElementById("productivitySummary").innerHTML = "";
   document.getElementById("productivitySources").innerHTML = "";
   document.getElementById("productivityContent").innerHTML = "";
+  updateProductivityDateNav();
 }
 
 async function loadProductivityFileStatus() {
@@ -926,6 +981,7 @@ function renderProductivityReport(report) {
     dateInput.min = dates[0];
     dateInput.max = dates[dates.length - 1];
   }
+  updateProductivityDateNav();
   renderGroupFilter(productivityReport);
   renderSummary(productivityReport);
   renderSources(productivityReport);
@@ -1062,6 +1118,7 @@ async function loadProductivity() {
     document.getElementById("productivitySummary").innerHTML = "";
     document.getElementById("productivitySources").innerHTML = "";
     document.getElementById("productivityContent").innerHTML = "";
+    updateProductivityDateNav();
     status.textContent = error.message || "Kunde inte l\u00e4sa produktivitet.";
     showToast(status.textContent, "error", 7000);
   }
@@ -1189,6 +1246,8 @@ function setupUploadDropzone() {
     event.target.value = "";
   });
   document.getElementById("productivityDate").addEventListener("change", loadProductivity);
+  document.getElementById("productivityPrevDate").addEventListener("click", () => shiftProductivityDate(-1));
+  document.getElementById("productivityNextDate").addEventListener("click", () => shiftProductivityDate(1));
   document.getElementById("productivityGroupFilter").addEventListener("change", () => {
     productivityGroupFilterManual = true;
     renderContent();

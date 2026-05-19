@@ -854,6 +854,21 @@ table.productivity-table td.has-work {
   color: var(--text-muted);
 }
 .date-nav-btn:hover { color: var(--text); }
+.date-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.productivity-date-field {
+  align-items: center;
+}
+.productivity-date-nav {
+  gap: 6px;
+}
+.productivity-date-nav .date-nav-btn {
+  width: 28px;
+  height: 34px;
+  padding: 0;
+}
 
 button.icon-btn {
   padding: 6px 10px;
