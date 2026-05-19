@@ -1,0 +1,132 @@
+name: Merge community observations
+
+on:
+  push:
+    branches:
+      - data/community-observations
+    paths:
+      - 'warehouse_tools/vendor/lowfreqdata/buffertpall/observations_*.csv.gz'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: merge-observations
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out data branch
+        uses: actions/checkout@v4
+        with:
+          ref: data/community-observations
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install merge dependencies
+        run: pip install pandas
+
+      - name: Merge observations and rebuild artikel_max
+        run: |
+          python <<'PY'
+          import glob
+          import os
+          from pathlib import Path
+
+          import numpy as np
+          import pandas as pd
+
+          data_dir = Path('warehouse_tools/vendor/lowfreqdata/buffertpall')
+          observations_path = data_dir / 'observations.csv.gz'
+          artikel_max_path = data_dir / 'artikel_max.csv'
+          cols = ['artikelnummer', 'pallid', 'antal']
+
+          def read_observations(path: Path) -> pd.DataFrame:
+              if path.exists() and path.stat().st_size > 0:
+                  df = pd.read_csv(path, compression='gzip', dtype=str)
+                  for col in cols:
+                      if col not in df.columns:
+                          df[col] = ''
+                  return df[cols]
+              return pd.DataFrame(columns=cols)
+
+          def max_utan_outlier(group: pd.DataFrame) -> tuple[float, str]:
+              if len(group) > 2:
+                  q1, q3 = np.percentile(group['antal'], [25, 75])
+                  upper = q3 + 1.5 * (q3 - q1)
+                  filtered = group[group['antal'] <= upper]
+                  if not filtered.empty:
+                      row = filtered.loc[filtered['antal'].idxmax()]
+                      return float(row['antal']), str(row['pallid'])
+              row = group.loc[group['antal'].idxmax()]
+              return float(row['antal']), str(row['pallid'])
+
+          def rebuild_artikel_max(observations: pd.DataFrame, output_path: Path) -> int:
+              if observations.empty:
+                  pd.DataFrame(columns=['artikelnummer', 'max', 'pallid']).to_csv(
+                      output_path, index=False, encoding='utf-8-sig'
+                  )
+                  return 0
+
+              df = observations.copy()
+              df['antal'] = pd.to_numeric(df['antal'], errors='coerce')
+              df = df.dropna(subset=['artikelnummer', 'antal', 'pallid'])
+              df['artikelnummer'] = df['artikelnummer'].astype(str).str.strip()
+              df['pallid'] = df['pallid'].astype(str).str.strip()
+              df = df.drop_duplicates(subset='pallid').reset_index(drop=True)
+
+              rows = []
+              for article, group in df.groupby('artikelnummer'):
+                  max_value, pallet_id = max_utan_outlier(group)
+                  rows.append({'artikelnummer': article, 'max': max_value, 'pallid': pallet_id})
+
+              pd.DataFrame(rows, columns=['artikelnummer', 'max', 'pallid']).to_csv(
+                  output_path, index=False, encoding='utf-8-sig'
+              )
+              return len(rows)
+
+          data_dir.mkdir(parents=True, exist_ok=True)
+          frames = [read_observations(observations_path)]
+
+          user_files = sorted(glob.glob(str(data_dir / 'observations_*.csv.gz')))
+          for filename in user_files:
+              try:
+                  df = pd.read_csv(filename, compression='gzip', dtype=str)
+                  if all(col in df.columns for col in cols):
+                      frames.append(df[cols])
+                  else:
+                      print(f'Skipping {filename}: missing expected columns')
+              except Exception as exc:
+                  print(f'Skipping {filename}: {exc}')
+
+          merged = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=cols)
+          before = len(merged)
+          merged = merged.drop_duplicates(subset='pallid', keep='first')
+          after = len(merged)
+          merged.to_csv(observations_path, index=False, compression='gzip')
+          article_count = rebuild_artikel_max(merged, artikel_max_path)
+          print(f'Merged {len(user_files)} user files. Rows: {before} -> {after}. Artikel-max rows: {article_count}.')
+
+          for filename in user_files:
+              os.remove(filename)
+              print(f'Removed {filename}')
+          PY
+
+      - name: Commit merged data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A "warehouse_tools/vendor/lowfreqdata/buffertpall/"
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Merge user observations and rebuild artikel_max"
+            git push origin data/community-observations
+          fi

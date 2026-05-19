@@ -1,9 +1,11 @@
 from pathlib import Path
+import threading
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
+from . import allocation_bridge
 from .config import settings
 from .routers import (
     activities,
@@ -36,6 +38,23 @@ app.add_middleware(
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok", "environment": settings.ENVIRONMENT}
+
+
+def _sync_allocation_observations_background() -> None:
+    try:
+        engine_module, _flows_module = allocation_bridge.require_available()
+        engine_module.fetch_observations_from_github()
+    except Exception:
+        return
+
+
+@app.on_event("startup")
+def sync_allocation_observations_on_startup() -> None:
+    threading.Thread(
+        target=_sync_allocation_observations_background,
+        name="AllocationObservationsSync",
+        daemon=True,
+    ).start()
 
 
 app.include_router(auth.router)

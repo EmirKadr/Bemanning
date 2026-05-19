@@ -152,6 +152,22 @@ def test_testprotocol_documents_agent_test_tools():
         assert command in protocol
 
 
+def test_allocation_observations_github_sync_is_wired():
+    workflow = (ROOT / ".github" / "workflows" / "merge-observations.yml").read_text(encoding="utf-8")
+    main = (ROOT / "app" / "backend" / "main.py").read_text(encoding="utf-8")
+    engine = (ROOT / "warehouse_tools" / "vendor" / "allokering12.1.py").read_text(encoding="utf-8")
+
+    assert "data/community-observations" in workflow
+    assert "warehouse_tools/vendor/lowfreqdata/buffertpall/observations_*.csv.gz" in workflow
+    assert "warehouse_tools/vendor/lowfreqdata/buffertpall/" in workflow
+    assert "artikel_max.csv" in workflow
+    assert "np.percentile(group['antal'], [25, 75])" in workflow
+    assert "fetch_observations_from_github()" in main
+    assert "sync_allocation_observations_on_startup" in main
+    assert '"OBSERVATIONS_GITHUB_TOKEN"' in engine
+    assert '"BEMANNING_GITHUB_TOKEN"' in engine
+
+
 def test_app_migration_plan_documents_high_risk_workflows():
     plan = (ROOT / "APP_MIGRATION_PLAN.md").read_text(encoding="utf-8")
 
