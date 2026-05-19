@@ -746,17 +746,29 @@ def _add_section_event(
     event: dict[str, Any],
     sections: list[SectionSpec],
     section_buckets: Any,
-) -> None:
+) -> bool:
     timestamp = event.get("timestamp")
     if not isinstance(timestamp, datetime):
-        return
+        return False
     hour = timestamp.hour
     if hour not in HOURS:
-        return
+        return False
     user = str(event["user"])
+    matched = False
     for spec in sections:
         if spec.predicate(event):
             section_buckets[spec.id][user][hour] += 1
+            matched = True
+    return matched
+
+
+def _matches_productivity_section(event: dict[str, Any] | None, sections: list[SectionSpec]) -> bool:
+    if event is None:
+        return False
+    timestamp = event.get("timestamp")
+    if not isinstance(timestamp, datetime) or timestamp.hour not in HOURS:
+        return False
+    return any(spec.predicate(event) for spec in sections)
 
 
 def _rows_from_buckets(
@@ -904,21 +916,27 @@ def build_productivity_report_from_files(
 
     for lookup, values in _iter_csv_values(files["pick"]):
         raw_counts["pick"] += 1
-        timestamp = _timestamp(_cell(values, lookup, "Ändrad", "Andrad"))
-        if timestamp is not None:
-            dates_seen.add(timestamp.date())
+        event = _parse_pick_values(values, lookup)
+        if _matches_productivity_section(event, sections_by_source["pick"]):
+            event_date = _event_date(event)
+            if event_date is not None:
+                dates_seen.add(event_date)
 
     for lookup, values in _iter_csv_values(files["trans"]):
         raw_counts["trans"] += 1
-        timestamp = _timestamp(_cell(values, lookup, "Timestamp"))
-        if timestamp is not None:
-            dates_seen.add(timestamp.date())
+        event = _parse_trans_values(values, lookup)
+        if _matches_productivity_section(event, sections_by_source["trans"]):
+            event_date = _event_date(event)
+            if event_date is not None:
+                dates_seen.add(event_date)
 
     for lookup, values in _iter_csv_values(files["pallet"]):
         raw_counts["pallet"] += 1
-        timestamp = _timestamp(_cell(values, lookup, "Ändrad", "Andrad"))
-        if timestamp is not None:
-            dates_seen.add(timestamp.date())
+        event = _parse_pallet_values(values, lookup)
+        if _matches_productivity_section(event, sections_by_source["pallet"]):
+            event_date = _event_date(event)
+            if event_date is not None:
+                dates_seen.add(event_date)
 
     dates = sorted(dates_seen)
     if not dates:

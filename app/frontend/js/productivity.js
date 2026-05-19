@@ -550,19 +550,22 @@ function addDate(dataset, dateValue) {
 }
 
 function incrementSectionBucket(dataset, event, spec) {
-  if (!event.date || !PRODUCTIVITY_HOURS.includes(event.hour)) return;
+  if (!event.date || !PRODUCTIVITY_HOURS.includes(event.hour)) return false;
   const userBucket = ensureNested(dataset.sectionBuckets, event.date, spec.id, event.user);
   userBucket[event.hour] = (userBucket[event.hour] || 0) + 1;
+  return true;
 }
 
 function addSectionEvent(dataset, event, source) {
-  if (!event.date) return;
-  addDate(dataset, event.date);
+  if (!event.date) return false;
+  let matched = false;
   for (const spec of PRODUCTIVITY_SECTION_SPECS) {
     if (spec.source === source && spec.predicate(event)) {
-      incrementSectionBucket(dataset, event, spec);
+      matched = incrementSectionBucket(dataset, event, spec) || matched;
     }
   }
+  if (matched) addDate(dataset, event.date);
+  return matched;
 }
 
 function parsePickEvent(values, lookup) {
@@ -618,7 +621,6 @@ async function parseProductivityFile(dataset, key) {
     if (key === "pick") {
       const event = parsePickEvent(values, lookup);
       if (!event?.date) return;
-      addDate(dataset, event.date);
       const totals = ensureNested(dataset.pickTotals, event.date, event.user);
       totals.kolli = (totals.kolli || 0) + event.kolli;
       totals.vikt = (totals.vikt || 0) + event.vikt;
@@ -626,14 +628,12 @@ async function parseProductivityFile(dataset, key) {
     } else if (key === "trans") {
       const event = parseTransEvent(values, lookup);
       if (!event?.date) return;
-      addDate(dataset, event.date);
       const totals = ensureNested(dataset.transTotals, event.date, event.user);
       totals.antal = (totals.antal || 0) + event.antal;
       addSectionEvent(dataset, event, "trans");
     } else if (key === "pallet") {
       const event = parsePalletEvent(values, lookup);
       if (!event?.date) return;
-      addDate(dataset, event.date);
       addSectionEvent(dataset, event, "pallet");
     }
   });

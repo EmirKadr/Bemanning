@@ -1,10 +1,13 @@
 from pathlib import Path
 
+import pytest
+
 from app.backend.productivity_service import (
     build_productivity_file_status,
     build_productivity_report,
     build_productivity_session_file_status,
     classify_productivity_file,
+    ProductivitySourceError,
     read_productivity_targets,
     save_productivity_file,
     source_files_from_session_logs,
@@ -190,3 +193,42 @@ MG\tJKP\tOUTBOUND\tEcom_pack\tE - Handel pack\t0\t0\t2
     assert sections["gg_ecom_pack"]["rows"][0]["target_per_hour"] == 2
     assert sections["mg_ecom_pack"]["rows"][0]["user"] == "PACK2"
     assert sections["mg_ecom_pick"]["rows"][0]["user"] == "ECOM1"
+
+
+def test_productivity_available_dates_only_include_dates_with_section_rows(tmp_path):
+    write(
+        tmp_path / "v_ask_pick_log_full-20260518075529.csv",
+        """
+Zon\tPlockat\tAnvandare\tAndrad\tVikt\tBolag
+A\t3\tUSER1\t2026-05-18 08:10:00\t1,5\tGG
+""",
+    )
+    write(
+        tmp_path / "v_ask_trans_log-20260518075534.csv",
+        """
+Till\tAntal\tAnvandare\tTimestamp\tBolag
+XX100\t9\tDEC1\t2026-05-17 10:30:00\tGG
+""",
+    )
+    write(
+        tmp_path / "v_ask_palletloading_log-20260518075605.csv",
+        """
+Typ\tAnvandare\tAndrad\tBolag
+200\tPACK1\t2026-05-17 13:00:00\tGG
+""",
+    )
+    write(
+        tmp_path / "v_ask_kpi_target-20260518080915.csv",
+        """
+Bolag\tLager\tFlodesnamn\tProcessnamn\tBeskrivning\tRader\tKollin\tPallar
+GG\t404\tOUTBOUND\tManual_Pick\tManuellt plock\t10\t0\t0
+""",
+    )
+
+    report = build_productivity_report(tmp_path)
+
+    assert report["date"] == "2026-05-18"
+    assert report["available_dates"] == ["2026-05-18"]
+    assert report["summary"]["total_rows"] == 1
+    with pytest.raises(ProductivitySourceError, match="2026-05-17"):
+        build_productivity_report(tmp_path, report_date="2026-05-17")
