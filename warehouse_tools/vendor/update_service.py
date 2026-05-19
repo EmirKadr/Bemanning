@@ -7,8 +7,6 @@ import re
 import tempfile
 from typing import Callable, Optional
 
-import requests
-
 from app_info import APP_NAME, APP_VERSION, GITHUB_REPO
 
 
@@ -28,6 +26,14 @@ class UpdateInfo:
 
 class UpdateError(RuntimeError):
     """Raised when update metadata or installer download fails."""
+
+
+def _requests_module():
+    try:
+        import requests  # type: ignore
+    except ModuleNotFoundError as exc:
+        raise UpdateError("requests saknas för uppdateringskontroll.") from exc
+    return requests
 
 
 def _version_parts(version: str) -> tuple[int, ...]:
@@ -68,7 +74,13 @@ def check_for_update(
     session=None,
 ) -> Optional[UpdateInfo]:
     """Return update info when GitHub has a newer release, otherwise None."""
-    http = session or requests
+    request_errors: tuple[type[BaseException], ...] = (Exception,)
+    if session is None:
+        requests = _requests_module()
+        request_errors = (requests.RequestException,)
+        http = requests
+    else:
+        http = session
     url = f"https://api.github.com/repos/{repo}/releases/latest"
     try:
         response = http.get(
@@ -76,7 +88,7 @@ def check_for_update(
             headers={"Accept": "application/vnd.github+json"},
             timeout=timeout,
         )
-    except requests.RequestException as exc:
+    except request_errors as exc:
         raise UpdateError(str(exc)) from exc
 
     if getattr(response, "status_code", None) == 404:
@@ -84,7 +96,7 @@ def check_for_update(
     try:
         response.raise_for_status()
         data = response.json()
-    except (requests.RequestException, ValueError) as exc:
+    except (*request_errors, ValueError) as exc:
         raise UpdateError(str(exc)) from exc
 
     tag_name = str(data.get("tag_name") or "")
@@ -121,11 +133,17 @@ def download_update_installer(
     root.mkdir(parents=True, exist_ok=True)
     target = root / info.installer_name
 
-    http = session or requests
+    request_errors: tuple[type[BaseException], ...] = (Exception,)
+    if session is None:
+        requests = _requests_module()
+        request_errors = (requests.RequestException,)
+        http = requests
+    else:
+        http = session
     try:
         response = http.get(info.installer_url, stream=True, timeout=timeout)
         response.raise_for_status()
-    except requests.RequestException as exc:
+    except request_errors as exc:
         raise UpdateError(str(exc)) from exc
 
     total = int(response.headers.get("content-length") or 0)

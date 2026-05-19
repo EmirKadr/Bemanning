@@ -149,6 +149,37 @@ def test_allocation_bridge_imports_without_tkinter_on_headless_server():
     assert "12.1.5" in result.stdout
 
 
+def test_allocation_bridge_imports_without_requests_update_dependency():
+    env = dict(**os.environ, WAREHOUSE_TOOLS_FORCE_HEADLESS_TK="1")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import builtins\n"
+                "real_import = builtins.__import__\n"
+                "def guard(name, globals=None, locals=None, fromlist=(), level=0):\n"
+                "    if level == 0 and (name == 'requests' or name.startswith('requests.')):\n"
+                "        raise ModuleNotFoundError(\"No module named 'requests'\")\n"
+                "    return real_import(name, globals, locals, fromlist, level)\n"
+                "builtins.__import__ = guard\n"
+                "from backend import allocation_bridge as bridge\n"
+                "engine, flows = bridge.require_available()\n"
+                "print(engine.APP_VERSION, len(flows.FLOW_BY_ID))\n"
+            ),
+        ],
+        cwd=ROOT / "app",
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "12.1.5" in result.stdout
+
+
 def test_run_flow_handler_serializes_tables_and_keeps_session(monkeypatch):
     pd = pytest.importorskip("pandas")
     df = pd.DataFrame({"Artikel": ["A100", ""], "Antal": [1, 2]})
