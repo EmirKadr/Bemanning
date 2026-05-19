@@ -230,10 +230,14 @@ function deriveAllocationSlots(flows) {
   return keys.map((key) => ({ ...map.get(key), detect: [...map.get(key).detect] }));
 }
 
-function fallbackAllocationSlot(file, slots, droppedCount) {
+function fallbackAllocationSlot(file, slots, droppedCount, fallbackSlotKey = "") {
   const name = String(file.name || "").toLowerCase();
   const hinted = slots.find((slot) => (ALLOCATION_FILE_WORDS[slot.key] || []).some((word) => name.includes(word)));
   if (hinted) return hinted;
+  if (fallbackSlotKey && droppedCount === 1) {
+    const fallback = slots.find((slot) => slot.key === fallbackSlotKey);
+    if (fallback) return fallback;
+  }
   return droppedCount === 1 && slots.length === 1 ? slots[0] : null;
 }
 
@@ -243,7 +247,7 @@ async function detectAllocationFile(file) {
   return allocationPostForm(`${ALLOCATION_API}/detect`, fd);
 }
 
-async function routeAllocationFiles(files, slots) {
+async function routeAllocationFiles(files, slots, options = {}) {
   const dropped = [...(files || [])];
   if (!dropped.length) return;
   window.allocationUploadActivity?.start();
@@ -260,7 +264,7 @@ async function routeAllocationFiles(files, slots) {
       } catch (e) {
         target = null;
       }
-      if (!target) target = fallbackAllocationSlot(file, slots, dropped.length);
+      if (!target) target = fallbackAllocationSlot(file, slots, dropped.length, options.fallbackSlotKey || "");
       if (target) {
         await saveAllocationFile(target.key, file);
         assigned.push({ file, slot: target });
@@ -318,7 +322,7 @@ function allocationFileRows(slots) {
     const sizeLabel = allocationDisplaySizeLabel(entry, coreEntry);
     const inputId = `allocation-file-${slot.key}`;
     return `
-      <div class="allocation-file-slot ${displayEntry ? "filled" : ""}">
+      <div class="allocation-file-slot ${displayEntry ? "filled" : ""}" data-allocation-drop data-drop-slot="${allocationEscape(slot.key)}">
         <div>
           <h3>${allocationEscape(slot.label)}</h3>
           <p>${displayEntry ? `${allocationEscape(displayEntry.name)} ${sizeLabel ? `<span>${allocationEscape(sizeLabel)}</span>` : ""}` : "Ingen fil vald"}</p>
@@ -342,6 +346,14 @@ function renderAllocationShell(content) {
     ${content}
   `;
   bindAllocationCommonEvents(root);
+}
+
+function allocationDropSlotsForTarget(target) {
+  const flowScope = target.dataset.dropScope === "flow"
+    ? target
+    : target.closest("[data-drop-scope='flow']");
+  if (flowScope) return slotsForFlow(flowById(flowScope.dataset.flowId));
+  return currentAllocationSlots();
 }
 
 function bindAllocationCommonEvents(root) {
@@ -370,16 +382,22 @@ function bindAllocationCommonEvents(root) {
   dropTargets.forEach((target) => {
     target.addEventListener("dragover", (event) => {
       event.preventDefault();
+      event.stopPropagation();
       target.classList.add("drag-over");
     });
-    target.addEventListener("dragleave", () => target.classList.remove("drag-over"));
+    target.addEventListener("dragleave", (event) => {
+      event.stopPropagation();
+      target.classList.remove("drag-over");
+    });
     target.addEventListener("drop", async (event) => {
       event.preventDefault();
+      event.stopPropagation();
       target.classList.remove("drag-over");
-      const slots = target.dataset.dropScope === "flow"
-        ? slotsForFlow(flowById(target.dataset.flowId))
-        : currentAllocationSlots();
-      await routeAllocationFiles(event.dataTransfer?.files, slots);
+      await routeAllocationFiles(
+        event.dataTransfer?.files,
+        allocationDropSlotsForTarget(target),
+        { fallbackSlotKey: target.dataset.dropSlot || "" },
+      );
     });
   });
 }
@@ -617,7 +635,7 @@ function renderCombinedView() {
               const missing = missingForFlow(flow);
               const ready = missing.length === 0;
               return `
-                <article class="allocation-action-card ${ready ? "ready" : ""}">
+                <article class="allocation-action-card ${ready ? "ready" : ""}" data-allocation-drop data-drop-scope="flow" data-flow-id="${allocationEscape(flow.id)}">
                   <h4>${allocationEscape(flow.label)}</h4>
                   <p>${allocationEscape(flow.description)}</p>
                   ${renderFlowFileList(flow)}

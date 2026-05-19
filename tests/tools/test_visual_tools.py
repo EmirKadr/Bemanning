@@ -488,6 +488,11 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert "window.allocationUploadActivity?.start()" in allocation
     assert "window.allocationUploadActivity?.finish(assigned.length)" in allocation
     assert "allocationState.files = await loadStoredAllocationFiles()" in allocation
+    assert "allocationDropSlotsForTarget" in allocation
+    assert "data-drop-slot" in allocation
+    assert "fallbackSlotKey" in allocation
+    assert 'data-allocation-drop data-drop-scope="flow"' in allocation
+    assert "event.stopPropagation()" in allocation
     assert "Detalj Kundorder(alla)" in allocation
     assert "Detalj Kundorder(alla)" in catalog
     assert "Detalj Kundorder(alla)" in flows
@@ -512,3 +517,5 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert "@keyframes uploadArrowRise" in styles
     assert ".database-toggle .upload-notice" in styles
     assert ".sidebar-upload-link" not in styles
+    assert ".allocation-file-slot.drag-over" in styles
+    assert ".allocation-action-card.drag-over" in styles
