@@ -3,8 +3,13 @@ import io
 import pytest
 from fastapi import HTTPException
 from openpyxl import Workbook, load_workbook
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
-from app.backend.routers.persons import build_person_import_template_excel, parse_person_import_excel
+from app.backend.database import Base
+from app.backend.models import Person, User
+from app.backend.routers.persons import build_person_import_template_excel, create_person, parse_person_import_excel, update_person
+from app.backend.schemas import PersonCreate, PersonUpdate
 
 
 def workbook_bytes(rows):
@@ -86,3 +91,40 @@ def test_parse_person_import_excel_requires_name_header():
         parse_person_import_excel(workbook_bytes([["hemomr\u00e5de"], ["GG"]]))
 
     assert exc.value.status_code == 400
+
+
+@pytest.fixture()
+def person_db():
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+        Base.metadata.drop_all(engine)
+
+
+def test_create_person_rejects_duplicate_name(person_db):
+    admin = User(username="admin", role="admin", roles=["admin"], is_active=True)
+    person_db.add_all([admin, Person(name="Anna Andersson", competencies=[], is_active=True, sort_order=1)])
+    person_db.flush()
+
+    with pytest.raises(HTTPException) as exc:
+        create_person(PersonCreate(name=" anna andersson "), db=person_db, user=admin)
+
+    assert exc.value.status_code == 409
+
+
+def test_update_person_rejects_duplicate_name(person_db):
+    admin = User(username="admin", role="admin", roles=["admin"], is_active=True)
+    anna = Person(name="Anna Andersson", competencies=[], is_active=True, sort_order=1)
+    bo = Person(name="Bo Berg", competencies=[], is_active=True, sort_order=2)
+    person_db.add_all([admin, anna, bo])
+    person_db.flush()
+
+    with pytest.raises(HTTPException) as exc:
+        update_person(bo.id, PersonUpdate(name="Anna Andersson"), db=person_db, user=admin)
+
+    assert exc.value.status_code == 409

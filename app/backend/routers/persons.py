@@ -193,6 +193,18 @@ def _existing_person_names(db: Session) -> set[str]:
     return {_compact_key(name) for (name,) in db.query(Person.name).all()}
 
 
+def _find_name_conflict(db: Session, name: str, *, exclude_person_id: int | None = None) -> Person | None:
+    key = _compact_key(name)
+    if not key:
+        return None
+    for person in db.query(Person).all():
+        if exclude_person_id is not None and person.id == exclude_person_id:
+            continue
+        if _compact_key(person.name) == key:
+            return person
+    return None
+
+
 def _next_sort_order(db: Session) -> int:
     return int(db.query(func.max(Person.sort_order)).scalar() or 0) + 1
 
@@ -306,6 +318,8 @@ def create_person(
     db: Session = Depends(get_db),
     user: User = Depends(require_view_access("persons", "edit")),
 ) -> Person:
+    if _find_name_conflict(db, payload.name):
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Person med samma namn finns redan")
     person = Person(**payload.model_dump())
     db.add(person)
     db.flush()
@@ -341,6 +355,8 @@ def update_person(
     person = db.get(Person, person_id)
     if not person:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Person hittades inte")
+    if payload.name is not None and _find_name_conflict(db, payload.name, exclude_person_id=person_id):
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Person med samma namn finns redan")
     before = _person_snapshot(person)
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(person, key, value)

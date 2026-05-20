@@ -5,10 +5,11 @@ Körs automatiskt av Render vid varje deploy (se render.yaml).
 """
 from __future__ import annotations
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-from .models import Activity, Area, Person, User
+from .models import Activity, Area, Person, PersonScheduleTemplate, ScheduleCell, User
 from .security import hash_password
 
 
@@ -125,12 +126,36 @@ def seed_admin(db: Session) -> None:
         )
 
 
+def remove_duplicate_persons(db: Session) -> None:
+    keep_by_name: dict[str, int] = {}
+    duplicate_ids: list[int] = []
+    duplicate_people: list[Person] = []
+    for person in db.query(Person).order_by(Person.id).all():
+        key = person.name.strip().lower()
+        if key not in keep_by_name:
+            keep_by_name[key] = person.id
+            continue
+        duplicate_ids.append(person.id)
+        duplicate_people.append(person)
+
+    if not duplicate_ids:
+        return
+
+    db.query(ScheduleCell).filter(ScheduleCell.person_id.in_(duplicate_ids)).delete(synchronize_session=False)
+    db.query(PersonScheduleTemplate).filter(PersonScheduleTemplate.person_id.in_(duplicate_ids)).delete(
+        synchronize_session=False
+    )
+    db.query(Person).filter(Person.id.in_(duplicate_ids)).delete(synchronize_session=False)
+    for person in duplicate_people:
+        db.expunge(person)
+
+
 def seed_persons(db: Session, areas: dict[str, Area]) -> None:
     gg = areas["GG"].id
     gg_vm = db.query(Activity).filter_by(code="GG_VM").one_or_none()
     gg_vm_id = gg_vm.id if gg_vm else None
     for i, name in enumerate(PERSONS, start=1):
-        existing = db.query(Person).filter_by(name=name).one_or_none()
+        existing = db.query(Person).filter(func.lower(func.trim(Person.name)) == name.strip().lower()).one_or_none()
         if existing is None:
             db.add(Person(name=name, home_area_id=gg, home_activity_id=gg_vm_id, sort_order=i, competencies=[]))
         elif existing.home_area_id == gg and existing.home_activity_id is None:
@@ -163,6 +188,7 @@ def run() -> None:
         areas = seed_areas(db)
         seed_activities(db, areas)
         seed_admin(db)
+        remove_duplicate_persons(db)
         seed_persons(db, areas)
         backfill_home_activities(db)
         db.commit()
