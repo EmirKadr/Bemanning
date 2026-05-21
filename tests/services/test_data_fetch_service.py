@@ -10,6 +10,7 @@ import requests
 from app.backend import data_fetch_service as service
 from app.backend.config import settings
 from app.backend.external_data_client import ExternalDataClient, ExternalDataClientError
+from app.backend.models import AuditLog
 from app.backend.routers import data_fetch
 
 
@@ -32,6 +33,22 @@ SAMPLE_CATALOG = {
 
 def fake_user():
     return SimpleNamespace(id=1, username="emikad", display_name="Emir")
+
+
+class FakeAuditDb:
+    def __init__(self):
+        self.items = []
+        self.committed = False
+        self.rolled_back = False
+
+    def add(self, item):
+        self.items.append(item)
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        self.rolled_back = True
 
 
 def test_minimax_payload_never_contains_external_connection_details(monkeypatch):
@@ -89,6 +106,7 @@ def test_validate_plan_rejects_unknown_column():
 
 def test_run_data_fetch_uses_validated_llm_plan_and_projects_rows(monkeypatch):
     captured = {}
+    db = FakeAuditDb()
 
     class FakeExternalDataClient:
         def __init__(self, **kwargs):
@@ -130,6 +148,7 @@ def test_run_data_fetch_uses_validated_llm_plan_and_projects_rows(monkeypatch):
         data_fetch.run_data_fetch(
             data_fetch.DataFetchRunRequest(prompt="Hämta Aktivitetslogg där typ är korrigering"),
             current_user=fake_user(),
+            db=db,
         )
     )
 
@@ -146,6 +165,13 @@ def test_run_data_fetch_uses_validated_llm_plan_and_projects_rows(monkeypatch):
     ]
     assert result["session_id"]
     assert data_fetch.DATA_FETCH_SESSIONS[result["session_id"]]["user_key"] == "1"
+    assert db.committed is True
+    assert len(db.items) == 1
+    assert isinstance(db.items[0], AuditLog)
+    assert db.items[0].entity_type == "data_fetch"
+    assert db.items[0].action == "fetch_success"
+    assert db.items[0].new_value["view"] == "dblog_count_log"
+    assert db.items[0].new_value["total_rows"] == 2
 
 
 def test_excel_export_session_is_bound_to_user():
@@ -237,6 +263,8 @@ def test_external_data_client_wraps_connection_errors():
 
 
 def test_run_data_fetch_returns_logged_external_error(monkeypatch):
+    db = FakeAuditDb()
+
     class FailingExternalDataClient:
         def __init__(self, **_kwargs):
             pass
@@ -266,6 +294,7 @@ def test_run_data_fetch_returns_logged_external_error(monkeypatch):
                     }
                 ),
                 current_user=fake_user(),
+                db=db,
             )
         )
 
@@ -273,3 +302,9 @@ def test_run_data_fetch_returns_logged_external_error(monkeypatch):
     assert exc_info.value.detail["message"] == "Extern datakälla kunde inte nås."
     assert exc_info.value.detail["view"] == "dblog_count_log"
     assert exc_info.value.detail["error_id"]
+    assert db.committed is True
+    assert len(db.items) == 1
+    assert db.items[0].entity_type == "data_fetch"
+    assert db.items[0].action == "fetch_failed"
+    assert db.items[0].new_value["status_code"] == 502
+    assert db.items[0].new_value["error_id"] == exc_info.value.detail["error_id"]

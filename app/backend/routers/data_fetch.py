@@ -9,8 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from openpyxl import Workbook
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from ..audit import log as audit_log
 from ..config import settings
 from ..data_fetch_service import (
     DataFetchConfigError,
@@ -25,7 +27,7 @@ from ..data_fetch_service import (
     project_rows,
     validate_plan_payload,
 )
-from ..deps import require_view_access
+from ..deps import get_db, require_view_access
 from ..models import User
 from ..external_data_client import ExternalDataClient, ExternalDataClientError
 from .assistant import _call_minimax
@@ -115,6 +117,34 @@ def _data_fetch_error_detail(message: str, error_id: str, plan: dict) -> dict:
         "view": plan.get("view"),
         "view_label": plan.get("view_label"),
     }
+
+
+def _audit_data_fetch(
+    db: Session,
+    user: User,
+    action: str,
+    plan: dict,
+    payload: dict,
+) -> None:
+    try:
+        audit_log(
+            db,
+            "data_fetch",
+            0,
+            action,
+            None,
+            {
+                "view": plan.get("view"),
+                "view_label": plan.get("view_label"),
+                "filters": _filter_summary(plan.get("filters")),
+                **payload,
+            },
+            getattr(user, "id", None),
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Could not write data fetch audit event action=%s", action)
 
 
 async def _plan_from_prompt(prompt: str) -> dict:
@@ -242,6 +272,7 @@ async def plan_data_fetch(
 async def run_data_fetch(
     payload: DataFetchRunRequest,
     current_user: User = Depends(require_view_access("dataFetch", "view")),
+    db: Session = Depends(get_db),
 ) -> dict:
     if payload.plan:
         plan = _validate_submitted_plan(payload.plan)
@@ -256,10 +287,33 @@ async def run_data_fetch(
     error_id = uuid4().hex[:10]
     try:
         rows = await run_in_threadpool(_fetch_rows, plan, error_id)
-    except HTTPException:
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
+        _audit_data_fetch(
+            db,
+            current_user,
+            "fetch_failed",
+            plan,
+            {
+                "error_id": detail.get("error_id") or error_id,
+                "status_code": exc.status_code,
+                "message": detail.get("message") or str(exc.detail),
+            },
+        )
         raise
     except Exception as exc:
         logger.exception("Data fetch failed unexpectedly error_id=%s view=%s", error_id, plan.get("view"))
+        _audit_data_fetch(
+            db,
+            current_user,
+            "fetch_failed",
+            plan,
+            {
+                "error_id": error_id,
+                "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "message": "Oväntat serverfel i datahämtning.",
+            },
+        )
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=_data_fetch_error_detail(
@@ -279,6 +333,17 @@ async def run_data_fetch(
         "rows": projected_rows,
         "total_rows": len(rows),
     }
+    _audit_data_fetch(
+        db,
+        current_user,
+        "fetch_success",
+        plan,
+        {
+            "total_rows": len(rows),
+            "shown_rows": len(projected_rows),
+            "truncated": len(rows) > len(projected_rows),
+        },
+    )
     return {
         "plan": plan,
         "columns": columns,

@@ -11,6 +11,7 @@ const ENTITY_LABELS = {
   activity: "Aktivitet",
   area: "Område",
   user: "Användare",
+  data_fetch: "Hämta data",
 };
 
 function escapeHtml(value) {
@@ -97,6 +98,9 @@ function objectSummary(entry) {
     const weekday = snapshot.weekday != null ? `Dag ${snapshot.weekday}` : `Mall #${entry.entity_id}`;
     return weekday;
   }
+  if (entry.entity_type === "data_fetch") {
+    return snapshot.view_label || snapshot.view || "Hämta data";
+  }
   return `${entityLabel(entry.entity_type)} #${entry.entity_id}`;
 }
 
@@ -112,6 +116,14 @@ function detailSummary(entry) {
   if (entry.entity_type === "person_schedule_template") {
     if (snapshot.is_off) return `Dag ${snapshot.weekday}: ledig`;
     return `Dag ${snapshot.weekday}: ${snapshot.start_hour ?? "-"}-${snapshot.end_hour ?? "-"}`;
+  }
+  if (entry.entity_type === "data_fetch") {
+    const parts = [];
+    if (snapshot.message) parts.push(String(snapshot.message));
+    if (snapshot.status_code) parts.push(`HTTP ${snapshot.status_code}`);
+    if (snapshot.error_id) parts.push(`Fel-id ${snapshot.error_id}`);
+    if (snapshot.total_rows != null) parts.push(`${snapshot.total_rows} rader`);
+    return parts.join(" | ") || "Hämta data";
   }
   return summarizeChanges(entry.old_value, entry.new_value);
 }
