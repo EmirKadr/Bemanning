@@ -2,6 +2,7 @@ import re
 
 import pytest
 
+from tools.terminology_contracts import assert_no_forbidden_terms_in_text, role_access_required_terms
 from tools import visual_smoke
 
 
@@ -80,5 +81,23 @@ def test_direct_activity_page_never_renders_legacy_label(local_activity_server, 
         page.goto(f"{local_activity_server}/aktiviteter.html", wait_until="networkidle")
 
         assert_activity_ui_is_canonical(page)
+    finally:
+        context.close()
+
+
+def test_role_access_modal_follows_terminology_contracts(local_activity_server, chromium_browser):
+    context = chromium_browser.new_context(locale="sv-SE")
+    page = context.new_page()
+    try:
+        login_admin(page, local_activity_server)
+        page.goto(f"{local_activity_server}/anvandare.html", wait_until="networkidle")
+        page.wait_for_selector("#users-body", timeout=15000)
+        page.click("#role-view-access")
+        page.wait_for_selector(".role-access-modal", timeout=15000)
+
+        modal_text = page.locator(".role-access-modal").inner_text(timeout=15000)
+        for expected in role_access_required_terms():
+            assert expected in modal_text
+        assert_no_forbidden_terms_in_text(modal_text, context="role access modal")
     finally:
         context.close()

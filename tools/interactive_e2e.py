@@ -16,6 +16,7 @@ from typing import Callable
 
 from openpyxl import Workbook
 
+from tools.terminology_contracts import assert_no_forbidden_terms_in_text, role_access_required_terms
 from tools import visual_smoke
 
 
@@ -54,6 +55,10 @@ WEB_WORKFLOW_STEPS = (
     "overview_person_activity",
     "overview_edit",
     "history_filter",
+    "role_access_click_cycle",
+    "role_access_view_level",
+    "role_access_edit_level",
+    "role_access_none_level",
     "viewer_read_only",
     "role_access_guards",
 )
@@ -163,6 +168,7 @@ class InteractiveRun:
         self.edit_schedule()
         self.exercise_overview()
         self.exercise_history()
+        self.exercise_role_access_settings()
         self.exercise_viewer_and_guards()
         return self.results
 
@@ -535,6 +541,117 @@ class InteractiveRun:
         self.page.click("#refreshAuditBtn")
         self.page.wait_for_timeout(700)
         self.record("history_filter", screenshot=self.screenshot("24-history-filtered"))
+
+    def open_role_access_modal(self) -> None:
+        self.goto("/anvandare.html", "#users-body")
+        self.page.click("#role-view-access")
+        self.page.wait_for_selector("#role-access-table .role-access-toggle", timeout=15000)
+
+    def assert_role_access_modal_uses_canonical_labels(self) -> None:
+        text = self.page.locator(".role-access-modal").inner_text(timeout=15000)
+        for expected in role_access_required_terms():
+            if expected not in text:
+                raise AssertionError(f"Role access modal is missing {expected}")
+        assert_no_forbidden_terms_in_text(text, context="role access modal")
+
+    def role_access_toggle(self, role: str, view_id: str):
+        return self.page.locator(f'.role-access-toggle[data-role="{role}"][data-view="{view_id}"]')
+
+    def assert_role_access_state(self, role: str, view_id: str, level: str, label: str) -> None:
+        toggle = self.role_access_toggle(role, view_id)
+        toggle.wait_for(state="visible", timeout=15000)
+        actual_level = toggle.get_attribute("data-level")
+        actual_label = toggle.inner_text().strip()
+        if actual_level != level or actual_label != label:
+            raise AssertionError(
+                f"Expected {role}/{view_id} to be {level} ({label}), got {actual_level} ({actual_label})"
+            )
+
+    def set_role_access_level(self, role: str, view_id: str, level: str) -> None:
+        toggle = self.role_access_toggle(role, view_id)
+        toggle.wait_for(state="visible", timeout=15000)
+        for _ in range(4):
+            if toggle.get_attribute("data-level") == level:
+                return
+            toggle.click()
+            self.page.wait_for_timeout(100)
+        actual = toggle.get_attribute("data-level")
+        raise AssertionError(f"Could not set {role}/{view_id} to {level}; current level is {actual}")
+
+    def save_role_access_modal(self) -> None:
+        self.click_and_expect_api("#role-access-save", "/api/settings/role-access", "PUT")
+        self.page.wait_for_selector(".modal-backdrop", state="detached", timeout=15000)
+
+    def restore_role_access_defaults(self) -> None:
+        self.open_role_access_modal()
+        self.page.click("#role-access-defaults")
+        self.save_role_access_modal()
+        self.record("role_access_defaults_restored", screenshot=self.screenshot("25-role-access-defaults-restored"))
+
+    def exercise_role_access_settings(self) -> None:
+        self.open_role_access_modal()
+        self.assert_role_access_modal_uses_canonical_labels()
+        self.page.click("#role-access-defaults")
+        self.assert_role_access_state("viewer", "persons", "none", "Ingen")
+        self.role_access_toggle("viewer", "persons").click()
+        self.assert_role_access_state("viewer", "persons", "view", "Visa")
+        self.role_access_toggle("viewer", "persons").click()
+        self.assert_role_access_state("viewer", "persons", "edit", "Redigera")
+        self.role_access_toggle("viewer", "persons").click()
+        self.assert_role_access_state("viewer", "persons", "none", "Ingen")
+        self.record("role_access_click_cycle", screenshot=self.screenshot("25-role-access-click-cycle"))
+
+        self.set_role_access_level("viewer", "persons", "view")
+        self.save_role_access_modal()
+        self.logout()
+        self.login("visual_viewer", visual_smoke.VISUAL_PASSWORD)
+        self.page.goto(self.url("/personer.html"), wait_until="networkidle")
+        self.page.wait_for_url("**/personer.html", timeout=15000)
+        self.page.wait_for_selector("#persons-body tr", timeout=15000)
+        self.page.wait_for_function("document.querySelector('#new-person')?.hidden === true", timeout=15000)
+        if self.page.locator("#new-person").is_visible():
+            raise AssertionError("Viewer with view access should not see the new-person button")
+        if self.page.locator("#persons-body button[data-delete]").count() != 0:
+            raise AssertionError("Viewer with view access should not see delete buttons")
+        if self.page.locator("#persons-body td.editable").count() != 0:
+            raise AssertionError("Viewer with view access should not get editable person cells")
+        self.record("role_access_view_level", screenshot=self.screenshot("26-role-access-view-level"))
+
+        self.logout()
+        self.login("admin", "admin123")
+        self.open_role_access_modal()
+        self.set_role_access_level("viewer", "persons", "edit")
+        self.save_role_access_modal()
+        self.logout()
+        self.login("visual_viewer", visual_smoke.VISUAL_PASSWORD)
+        self.page.goto(self.url("/personer.html"), wait_until="networkidle")
+        self.page.wait_for_url("**/personer.html", timeout=15000)
+        self.page.wait_for_selector("#persons-body tr", timeout=15000)
+        self.page.wait_for_function("document.querySelector('#new-person')?.hidden === false", timeout=15000)
+        if not self.page.locator("#new-person").is_visible():
+            raise AssertionError("Viewer with edit access should see the new-person button")
+        if self.page.locator("#persons-body button[data-delete]").count() == 0:
+            raise AssertionError("Viewer with edit access should see delete buttons")
+        if self.page.locator("#persons-body td.editable").count() == 0:
+            raise AssertionError("Viewer with edit access should get editable person cells")
+        self.record("role_access_edit_level", screenshot=self.screenshot("27-role-access-edit-level"))
+
+        self.logout()
+        self.login("admin", "admin123")
+        self.open_role_access_modal()
+        self.set_role_access_level("viewer", "persons", "none")
+        self.save_role_access_modal()
+        self.logout()
+        self.login("visual_viewer", visual_smoke.VISUAL_PASSWORD)
+        self.page.goto(self.url("/personer.html"), wait_until="networkidle")
+        self.page.wait_for_selector("#scheduleTable", timeout=15000)
+        if self.page.url.endswith("/personer.html"):
+            raise AssertionError("Viewer with no persons access should be redirected away from persons")
+        self.record("role_access_none_level", screenshot=self.screenshot("28-role-access-none-level"))
+
+        self.logout()
+        self.login("admin", "admin123")
+        self.restore_role_access_defaults()
 
     def exercise_viewer_and_guards(self) -> None:
         self.logout()

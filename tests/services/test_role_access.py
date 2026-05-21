@@ -102,3 +102,33 @@ def test_role_view_access_can_grant_and_revoke_feature_permissions():
     assert can_access_view(leader, {"leader": {"roleAccess": "edit"}}, "roleAccess", "edit")
     assert not can_access_view(viewer, {}, "personImport", "edit")
     assert role_view_access_level(viewer, {"viewer": {"users": "view"}}, "users") == "view"
+
+
+def test_role_view_access_levels_match_view_and_edit_contract():
+    viewer = make_user("viewer")
+
+    access = {"viewer": {"persons": "none"}}
+    assert role_view_access_level(viewer, access, "persons") == "none"
+    assert not can_access_view(viewer, access, "persons", "view")
+    assert not can_access_view(viewer, access, "persons", "edit")
+
+    access = {"viewer": {"persons": "view"}}
+    assert role_view_access_level(viewer, access, "persons") == "view"
+    assert can_access_view(viewer, access, "persons", "view")
+    assert not can_access_view(viewer, access, "persons", "edit")
+
+    access = {"viewer": {"persons": "edit"}}
+    assert role_view_access_level(viewer, access, "persons") == "edit"
+    assert can_access_view(viewer, access, "persons", "view")
+    assert can_access_view(viewer, access, "persons", "edit")
+
+
+def test_role_view_access_uses_strongest_role_when_user_has_multiple_roles():
+    user = make_user("viewer", roles=["viewer", "leader"])
+    access = {
+        "viewer": {"persons": "none"},
+        "leader": {"persons": "edit"},
+    }
+
+    assert role_view_access_level(user, access, "persons") == "edit"
+    assert can_access_view(user, access, "persons", "edit")

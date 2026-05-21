@@ -59,6 +59,7 @@ def test_visual_smoke_covers_critical_scenarios():
         "aktiviteter-import-hjalp",
         "aktiviteter-redigera-aktivitet-modal",
         "anvandare-redigera-anvandare-modal",
+        "anvandare-vybehorigheter-modal",
         "historik-filter",
         "viewer-nekad-personer",
         "viewer-nekad-produktivitet",
@@ -103,6 +104,10 @@ def test_interactive_e2e_covers_mutating_workflows():
         "overview_person_activity",
         "overview_edit",
         "history_filter",
+        "role_access_click_cycle",
+        "role_access_view_level",
+        "role_access_edit_level",
+        "role_access_none_level",
         "viewer_read_only",
         "role_access_guards",
     }.issubset(set(interactive_e2e.WEB_WORKFLOW_STEPS))
@@ -134,11 +139,11 @@ def test_visual_smoke_has_handler_for_every_state_action():
     assert configured_actions <= handled_actions
 
 
-def test_visual_smoke_fails_if_legacy_activity_label_is_rendered():
+def test_visual_smoke_fails_if_forbidden_terminology_is_rendered():
     source = inspect.getsource(visual_smoke._capture_for_role)
 
-    assert hasattr(visual_smoke, "assert_no_legacy_activity_labels")
-    assert "assert_no_legacy_activity_labels(page)" in source
+    assert hasattr(visual_smoke, "assert_no_forbidden_terminology")
+    assert "assert_no_forbidden_terminology(page)" in source
 
 
 def test_visual_smoke_can_capture_through_desktop_local_proxy():
@@ -384,6 +389,9 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert 'api.get("/api/settings/sidebar")' in common
     assert 'api.put("/api/settings/sidebar"' in common
     assert "renderSidebarNav" in common
+    assert "function sidebarRoleLabel" in common
+    assert 'role === "super_user"' in common
+    assert 'class="sidebar-role"' in common
     assert "renderAllocationUploadUtility" in common
     assert "renderLogUtility" in common
     assert 'id="log-toggle"' in common
@@ -405,12 +413,14 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert "THEME_ICONS" in common
     assert ':root[data-theme="dark"]' in styles
     assert ".theme-toggle" in styles
+    assert "[hidden] { display: none !important; }" in styles
     assert ".log-toggle" in styles
     assert ".log-sidebar" in styles
     assert ".log-sidebar[hidden]" in styles
     assert ".log-sidebar-close" in styles
     assert ".sidebar-heading" in styles
     assert ".sidebar-subviews" in styles
+    assert ".sidebar-bottom .sidebar-role" in styles
     assert ".sidebar-editor-row" in styles
     assert ".sidebar-editor-move button svg" in styles
     assert ".role-access-table" in styles
@@ -735,6 +745,12 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert "data-download-csv" in allocation
     assert "api.download(`${ALLOCATION_API}/download/" in allocation
     assert 'href="${ALLOCATION_API}/download/' not in allocation
+    assert 'class="allocation-copy-column"' in allocation
+    assert 'data-copy-column="${index}"' in allocation
+    assert "/table-column/" in allocation
+    assert "writeClipboardText" in allocation
+    assert 'document.execCommand("copy")' in allocation
+    assert "Kolumn kopierad" in allocation
 
     assert ".database-toggle.uploading .upload-arrow" in styles
     assert "@keyframes uploadArrowRise" in styles
@@ -743,3 +759,5 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert ".sidebar-upload-link" not in styles
     assert ".allocation-file-slot.drag-over" in styles
     assert ".allocation-flow-chip.drag-over .allocation-flow-chip-row" in styles
+    assert ".allocation-copy-column" in styles
+    assert "text-decoration: none;" in styles

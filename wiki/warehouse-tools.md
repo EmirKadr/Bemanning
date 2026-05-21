@@ -31,6 +31,10 @@ Kort svar: Lagerverktygen ar fyra vyer ovanpa `warehouse_tools`: Uppladdningar f
 
 ## Bearbeta-floden
 
+Bearbeta ar en egen sidebar-vy (`bearbeta.html`). Den ska inte beskrivas som en flik inne i Dela eller Harleda. Om anvandaren inte ser Bearbeta i menyn beror det normalt pa att rollen saknar `allocationProcess` i vyatkomst eller att anvandaren inte ar Super User. Vanliga lagerroller ser som standard Uppladdningar, Dela och Harleda.
+
+Att andra `allocationProcess` eller `Vybehorigheter` kraver admin-/Super User-atkomst till Anvandare/installningar. En vanlig anvandare ska kontakta admin eller Super User, inte sjalv ga till Vybehorigheter.
+
 | Flode | Kraver | Resultat |
 | --- | --- | --- |
 | Allokering | Detalj Kundorder, Buffertpallar; valfritt Saldo, Item option, Ej inlagrade | Resultat, near-miss, refill, pallplatser |
@@ -84,6 +88,7 @@ API: `POST /api/allokering/flow/eftersok`.
 | "Varfor ar flodesknappen gra?" | Kravda filer eller textfalt saknas, eller ett annat flode kor. Klicka `i` for att se krav. |
 | "Varfor hamnar filen i fel ruta?" | Automatisk detektion bygger pa filnamn/header. Anvand Välj pa exakt slot for att styra. |
 | "Varfor kan jag inte Bearbeta men kan Harleda?" | Lagerroller utan processbehorighet far bara sjalvservicefloden som Eftersok och Dela. |
+| "Varfor ser jag inte Bearbeta i menyn?" | Rollen saknar normalt `allocationProcess` eller Super User. Be admin/Super User kontrollera roll och Vybehorigheter. |
 | "Varfor oppnas inte Excel?" | Funktionen kraver lokal desktop/OS-stod och servern maste ha kvar resultat-sessionen. Testa Ladda ner CSV. |
 | "Vad betyder artikel_max karnfil?" | `artikel_max.csv` kan finnas som intern karnfil aven om anvandaren inte laddat upp den. |
 
@@ -95,4 +100,3 @@ API: `POST /api/allokering/flow/eftersok`.
 - `../warehouse_tools/catalog.py`
 - `../warehouse_tools/flows.py`
 - `../../ALLOKERING_FILKUNSKAP.md`
-

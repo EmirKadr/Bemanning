@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 from .bootstrap_local import main as bootstrap_local
-from .sync_live_to_local import sync_from_env
+from .sync_live_to_local import LocalSyncError, sync_from_env
 
 
 def main() -> None:
-    if sync_from_env():
-        return
+    try:
+        if sync_from_env():
+            return
+    except LocalSyncError as exc:
+        raise SystemExit(str(exc)) from exc
 
     print("Ingen LIVE_DATABASE_URL satt. Skapar/synkar lokal seed-databas.")
     bootstrap_local()

@@ -31,6 +31,10 @@ TABLE_COPY_ORDER = (
 )
 
 
+class LocalSyncError(RuntimeError):
+    """Raised when the local SQLite preview database cannot be refreshed."""
+
+
 def _sqlite_database_path(database_url: str) -> Path:
     url = make_url(database_url)
     if not url.drivername.startswith("sqlite"):
@@ -126,7 +130,16 @@ def sync_database(source_database_url: str, target_database_url: str) -> dict[st
         source_engine.dispose()
         target_engine.dispose()
 
-    temp_path.replace(target_path)
+    try:
+        temp_path.replace(target_path)
+    except PermissionError as exc:
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+        raise LocalSyncError(
+            "Kunde inte ersatta app/bemanning_local.db eftersom den anvands av en annan process. "
+            "Stang alla gamla start_local.bat/uvicorn-terminaler och stang localhost:8000-fliken, "
+            "vanta nagra sekunder och starta sedan igen."
+        ) from exc
     return stats
 
 

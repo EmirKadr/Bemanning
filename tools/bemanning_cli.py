@@ -43,6 +43,8 @@ ROUTES: tuple[ApiRoute, ...] = (
     ApiRoute("auth.logout", "POST", "/api/auth/logout", "Logga ut"),
     ApiRoute("auth.me", "GET", "/api/auth/me", "Aktuell användare"),
     ApiRoute("auth.set_password", "POST", "/api/auth/set-password", "Sätt första lösenord"),
+    ApiRoute("assistant.chat", "POST", "/api/assistant/chat", "Fråga apphjälpen"),
+    ApiRoute("assistant.clear", "POST", "/api/assistant/clear", "Rensa apphjälpens dialogkvot"),
     ApiRoute("allocation.health", "GET", "/api/allokering/health", "Lagerverktyg health"),
     ApiRoute("allocation.flows", "GET", "/api/allokering/flows", "Lista lagerverktygsflöden"),
     ApiRoute("allocation.pool", "GET", "/api/allokering/pool", "Lista lagerverktygens uppladdningsslots"),

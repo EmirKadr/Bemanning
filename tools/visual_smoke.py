@@ -21,6 +21,8 @@ from typing import Iterable
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from tools.terminology_contracts import assert_no_forbidden_terms_in_text
+
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT_ROOT = ROOT / "artifacts" / "visual"
@@ -99,6 +101,7 @@ STATES: tuple[VisualState, ...] = (
     VisualState("aktiviteter-redigera-aktivitet-modal", "/aktiviteter.html", "#acts-body button[data-edit]", "activity_edit_modal"),
     VisualState("anvandare-ny-anvandare-modal", "/anvandare.html", "#new-user", "click_new_user"),
     VisualState("anvandare-redigera-anvandare-modal", "/anvandare.html", "#users-body button[data-edit]", "user_edit_modal"),
+    VisualState("anvandare-vybehorigheter-modal", "/anvandare.html", "#role-view-access", "role_access_modal"),
     VisualState("historik-filter", "/historik.html", "#auditBody", "analytics_filter", ("admin",)),
     VisualState("viewer-nekad-personer", "/personer.html", "#scheduleTable", "noop", ("viewer",)),
     VisualState("viewer-nekad-aktiviteter", "/aktiviteter.html", "#scheduleTable", "noop", ("viewer",)),
@@ -246,12 +249,14 @@ def _wait_for_table_rows(page, selector: str) -> None:
     page.wait_for_timeout(300)
 
 
-def assert_no_legacy_activity_labels(page) -> None:
+def assert_no_forbidden_terminology(page) -> None:
     title = page.title()
     body_text = page.locator("body").inner_text(timeout=15000)
-    legacy_label = "St" + "\u00e4llen"
-    if legacy_label in title or legacy_label in body_text:
-        raise AssertionError("Legacy activity label is visible in the rendered UI")
+    assert_no_forbidden_terms_in_text(f"{title}\n{body_text}", context=f"rendered UI at {page.url}")
+
+
+def assert_no_legacy_activity_labels(page) -> None:
+    assert_no_forbidden_terminology(page)
 
 
 def _login(page, base_url: str, role: str) -> None:
@@ -353,6 +358,10 @@ def _apply_state(page, state: VisualState) -> None:
         page.locator("#users-body button[data-edit]").first.click()
         page.wait_for_selector(".modal-backdrop .modal", timeout=15000)
         return
+    if state.action == "role_access_modal":
+        page.click("#role-view-access")
+        page.wait_for_selector(".role-access-modal", timeout=15000)
+        return
     if state.action == "analytics_filter":
         page.select_option("#periodSelect", "all")
         page.fill("#actionFilter", "visual_seed")
@@ -375,7 +384,7 @@ def _capture_for_role(context, base_url: str, output_dir: Path, role: str, viewp
                 continue
             page.goto(_page_url(base_url, target.path), wait_until="networkidle")
             _wait_for_page(page, target.wait_for)
-            assert_no_legacy_activity_labels(page)
+            assert_no_forbidden_terminology(page)
             screenshot_path = output_dir / f"{_safe_name(viewport.name, role, target.name)}.png"
             _screenshot(page, screenshot_path)
             artifacts.append(
@@ -394,7 +403,7 @@ def _capture_for_role(context, base_url: str, output_dir: Path, role: str, viewp
                 page.goto(_page_url(base_url, state.path), wait_until="networkidle")
                 _wait_for_page(page, state.wait_for)
                 _apply_state(page, state)
-                assert_no_legacy_activity_labels(page)
+                assert_no_forbidden_terminology(page)
                 screenshot_path = output_dir / f"{_safe_name(viewport.name, role, state.name)}.png"
                 _screenshot(page, screenshot_path)
                 artifacts.append(

@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     EXCEL_API_TOKEN: str = ""
     PRODUCTIVITY_REFERENCE_DIR: str = ""
     PRODUCTIVITY_DATA_DIR: str = ""
+    MINIMAX_API_KEY: str = ""
+    MINIMAX_API_URL: str = "https://api.minimax.io/v1/chat/completions"
+    MINIMAX_MODEL: str = "MiniMax-M2.7"
+    MINIMAX_MAX_TOKENS: int = 700
+    MINIMAX_TIMEOUT_SECONDS: int = 30
 
     @property
     def is_production(self) -> bool:

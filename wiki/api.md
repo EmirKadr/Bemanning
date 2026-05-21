@@ -16,6 +16,8 @@ Kort svar: `API_ROUTES.md` ar kontraktslistan och testas mot FastAPI-appen via `
 - `POST /api/auth/logout` - logga ut.
 - `GET /api/auth/me` - aktuell anvandare och roller.
 - `POST /api/auth/set-password` - satt forsta losenord.
+- `POST /api/assistant/chat` - skickar hela apphjalpsdialogen och aktuell sida till MiniMax via backend.
+- `POST /api/assistant/clear` - nollstaller apphjalpens serverkvot i aktuell session.
 
 ## Bemanning och oversikt
 
@@ -64,4 +66,3 @@ python -m tools.bemanning_cli api GET /api/health
 - `../API_ROUTES.md`
 - `../tools/bemanning_cli.py`
 - `../tests/tools/test_bemanning_cli.py`
-

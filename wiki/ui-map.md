@@ -13,10 +13,11 @@ Kort svar: de flesta sidor delar sidebar, omradesfokus, tema, logg och auth-guar
 
 | Kontroll | Var | Vem ser/far | Vad hander | Vanliga fel/fragor |
 | --- | --- | --- | --- | --- |
-| Sidebar-lankar | Vanster meny | Filtreras per vybehorighet | Navigerar till Bemanning, Oversikt, Produktivitet, Bearbeta, Dela, Harleda, Personer, Aktiviteter, Historik, Anvandare | Om en vy saknas har rollen troligen `none` for vyn. Kontrollera `Vybehorigheter`. |
+| Sidebar-lankar | Vanster meny | Filtreras per vybehorighet | Navigerar till Bemanning, Oversikt, Produktivitet, Bearbeta, Dela, Harleda, Personer, Aktiviteter, Historik, Anvandare | Om en vy saknas har rollen troligen `none` for vyn. Be admin/Super User kontrollera `Vybehorigheter`; vanlig anvandare kan ofta inte gora det sjalv. |
 | Hamburgare | Sidebar topp | Alla inloggade | Faller ihop/oppnar sidebar och sparar `sidebar-collapsed` i `localStorage` | Om menyn ser "for liten" ut ar den troligen hopfallen. |
 | Redigera meny | Sidebar topp, pennikon | Anvandare med edit pa `sidebarLayout` | Oppnar modal dar global menyordning, rubriker och undervyer kan andras | Andringen galler alla efter sparning. |
 | Omradesfokus | Sidebar footer | Alla inloggade | Växlar MG, GG, AS, EH och Alla. Paverkar sortering/standardfilter i flera vyer | Om "fel" omrade visas kan fokus ligga pa annat omrade an forvantat. |
+| Apphjalp/pratbubblor | Sidebar footer, direkt under omradesfokus/infinity | Alla inloggade | Oppnar/stanger en liten chattpanel. Dialog, oppet lage och utkast sparas i aktuell session. | Max 10 lyckade fragor per session. `Rensa dialog` nollstaller dialog och kvot. Se [Apphjalp och LLM-chatt](app-chat.md). |
 | Logg | Sidebar footer | Alla inloggade | Oppnar sidopanel med app-logg for t.ex. observations-uppdatering | Tom logg betyder bara att inget har loggats i aktuell session. |
 | Uppladdningar/databasikon | Sidebar utility | Roller med `allocationUploads` | Genvag till `uppladdningar.html`; visar badge nar filer lagts in | Hogerklick pa ikonen visar "Rensa filer". |
 | Tema | Sidebar footer | Alla inloggade | Växlar ljust/morkt tema och sparar `bemanning-theme` | Tema ar lokalt for webblasaren/desktopprofilen. |
@@ -53,4 +54,3 @@ Kort svar: de flesta sidor delar sidebar, omradesfokus, tema, logg och auth-guar
 - `../app/frontend/js/common.js`
 - `../app/frontend/js/api.js`
 - `../app/frontend/*.html`
-

@@ -32,6 +32,10 @@ Kort svar: Bemanning ar en FastAPI/vanilla-JS webbapp och PyQt-baserad Windows-a
 
 ## Chat- och felsokningsstod
 
+- [Anvandarhandbok](user-guide.md) - hur man anvander programmet roll for roll och vy for vy.
+- [Anvandarhandelser](user-events.md) - allt anvandaren kan se: laddning, tomma lagen, disabled knappar, confirm, toastar och redirect.
+- [Felkoder och felmeddelanden](error-reference.md) - HTTP-koder, vanliga serverfel, klientfel och vad de betyder.
+- [Apphjalp och LLM-chatt](app-chat.md) - pratbubbelknappen, sessionsdialog, 10-fragorsgrans och MiniMax-konfiguration.
 - [Felsokning och framtida LLM-chat](troubleshooting-chat.md) - fragor/svar och symptom till rotorsak.
 - [Kallmanifest](sources.md) - vilka filer som anvandes nar wikin skapades.
 - [Logg](log.md) - append-only historik over wikiarbete.
@@ -39,4 +43,3 @@ Kort svar: Bemanning ar en FastAPI/vanilla-JS webbapp och PyQt-baserad Windows-a
 ## Underhallsregel
 
 Las [Wiki-agentregler](AGENTS.md) innan du uppdaterar wikin. Nar kod eller produktbeteende andras ska relevanta sidor och `log.md` uppdateras i samma arbete.
-

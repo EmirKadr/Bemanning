@@ -32,6 +32,8 @@ Användar-API:t är bakåtkompatibelt med `role`, men nya klienter kan skicka
 | `auth.logout` | `POST` | `/api/auth/logout` | Logga ut |
 | `auth.me` | `GET` | `/api/auth/me` | Aktuell användare |
 | `auth.set_password` | `POST` | `/api/auth/set-password` | Sätt första lösenord |
+| `assistant.chat` | `POST` | `/api/assistant/chat` | Fråga apphjälpen |
+| `assistant.clear` | `POST` | `/api/assistant/clear` | Rensa apphjälpens dialogkvot |
 | `allocation.health` | `GET` | `/api/allokering/health` | Lagerverktyg health |
 | `allocation.flows` | `GET` | `/api/allokering/flows` | Lista lagerverktygsflöden |
 | `allocation.pool` | `GET` | `/api/allokering/pool` | Lista lagerverktygens uppladdningsslots |

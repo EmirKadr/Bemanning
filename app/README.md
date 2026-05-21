@@ -14,6 +14,8 @@ Webbaserad ersättning för Excel-bemanningsfilen. Arbetsledare planerar bemanni
 - **Multi-user-säkerhet** – varje cell har en versionskolumn. Två arbetsledare kan jobba samtidigt; om samma cell ändras visas ett meddelande och dagen läses om.
 - **Historik förberedd** – alla ändringar loggas i `audit_log` (historik-vy byggs i v1.1).
 
+- **Apphjälp** – sessionssparad chatt i sidomenyn som använder projektwikin och MiniMax via backend.
+
 ## Stack
 
 - **Backend:** Python 3 + FastAPI + SQLAlchemy 2 + Alembic
@@ -35,6 +37,20 @@ centrala Render-hostade appen i ett eget skrivbordsfonster.
 Desktop-klienten innehaller ingen lokal databas och ingen lokal FastAPI-server i
 steg 1. All affarslogik, auth och delad data ligger fortsatt i den centrala
 Render-miljon.
+
+## Apphjälp / MiniMax
+
+Chattknappen i sidomenyn fungerar när backend har en MiniMax-nyckel. Sätt `MINIMAX_API_KEY` i `.env` lokalt eller som hemlig miljövariabel på Render. Standardmodellen är `MiniMax-M2.7` och endpointen är `https://api.minimax.io/v1/chat/completions`.
+
+
+
+
+Bygg den privata vy-/kolumnkatalogen lokalt med:
+
+```powershell
+python tools/build_nowaste_catalog.py
+```
+
 
 ## Default-inlogg
 

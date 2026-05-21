@@ -34,6 +34,10 @@ Kort svar: inloggning ar sessionsbaserad. Roller styr vad anvandaren ser och far
 
 `common.js` och backendens `require_view_access` anvander samma koncept: varje roll kan ha `none`, `view` eller `edit` per vy. Super user kan fa extra vyer beroende pa installning och serverregler.
 
+Viktigt for support/chat: att "kontrollera Vybehorigheter" ar inte en atgard en vanlig anvandare kan gora sjalv. Knappen `Vybehorigheter` finns pa Anvandare-sidan och kraver atkomst till skyddade admin/installningsvyer. Svara darfor: "Be en admin eller Super User kontrollera Vybehorigheter", inte "ga till Vybehorigheter" om anvandaren sjalv saknar den atkomsten.
+
+Apphjalpens LLM-prompt far en begransad supportkontext om inloggad anvandare: roll, roller, Super User-status, omrade och effektiva vybehorigheter per vy (`edit`, `view`, `none`). Den kontexten ska anvandas for direkta svar om saknade menyer/knappar. Känslig information som losenord, hash, sessioncookies, API-nycklar och tokens skickas inte.
+
 Vyer som kan styras:
 
 - `schedule`, `overview`, `productivity`
@@ -58,7 +62,7 @@ Om anvandaren bara har `view`:
 - Knappen syns men fungerar inte: anvandaren har `view`, inte `edit`.
 - Importknapp ar dold: importvyn saknar edit-atkomst.
 - Historik/Produktivitet nekas: kraver super user/vyatkomst.
-- Bearbeta nekas for lagerroller: bara sjalvservicefloden ar tillatna utan processbehorighet.
+- Bearbeta saknas eller nekas: `allocationProcess` saknas i vyatkomst eller anvandaren ar inte Super User. Lagerroller har som standard Uppladdningar, Dela och Harleda, men inte Bearbeta.
 
 ## Kallor
 
@@ -67,4 +71,3 @@ Om anvandaren bara har `view`:
 - `../app/frontend/js/common.js`
 - `../app/frontend/js/users.js`
 - `../APP_MIGRATION_PLAN.md`
-

@@ -175,7 +175,7 @@ Det testar bland annat:
 - Logga in som admin.
 - Skapa och redigera anvandare, inklusive roll och område.
 - Andra installningscheckbox och aktivera/inaktivera anvandare.
-- Skapa och redigera stalle/aktivitet.
+- Skapa och redigera aktivitet.
 - Ta bort aktivitet och verifiera att den försvinner.
 - Skapa person, redigera namn inline och andra veckomall.
 - Vaxla person mellan fast schemamall och timmis utan att rakna timmis som ledig.

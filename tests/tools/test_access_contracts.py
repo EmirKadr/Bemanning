@@ -8,6 +8,7 @@ from app.backend.user_access import (
     ROLE_VIEW_ID_ALIASES,
     ROLE_VIEW_IDS,
 )
+from tools.terminology_contracts import forbidden_terms_in_text, role_access_required_terms
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -46,6 +47,11 @@ def extract_ids_from_object_array(source: str, const_name: str) -> list[str]:
     return re.findall(r'\bid:\s*"([^"]+)"', block)
 
 
+def extract_labels_from_object_array(source: str, const_name: str) -> list[str]:
+    block = extract_const_block(source, const_name, "[", "]")
+    return re.findall(r'\blabel:\s*"([^"]+)"', block)
+
+
 def extract_values_from_object_array(source: str, const_name: str) -> list[str]:
     block = extract_const_block(source, const_name, "[", "]")
     return re.findall(r'\bvalue:\s*"([^"]+)"', block)
@@ -76,6 +82,16 @@ def test_backend_frontend_and_user_admin_view_ids_match():
     assert "activities" in common_view_ids
     assert "stallen" not in common_view_ids
     assert "stallenImport" not in common_view_ids
+
+
+def test_user_admin_role_access_labels_follow_terminology_contracts():
+    users = read_frontend("js/users.js")
+    labels = extract_labels_from_object_array(users, "VIEW_ACCESS_OPTIONS")
+    label_text = "\n".join(labels)
+
+    for expected in role_access_required_terms():
+        assert expected in labels
+    assert forbidden_terms_in_text(label_text) == []
 
 
 def test_sidebar_layout_only_uses_known_canonical_views():

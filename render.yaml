@@ -25,5 +25,9 @@ services:
         value: emikad,mikhal
       - key: EXCEL_API_TOKEN
         generateValue: true
+      - key: MINIMAX_API_KEY
+        sync: false
+      - key: MINIMAX_MODEL
+        value: MiniMax-M2.7
       - key: PYTHON_VERSION
         value: 3.12.7

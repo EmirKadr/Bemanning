@@ -18,21 +18,25 @@ Kort svar: nar en anvandare fragar "varfor funkar inte X?" ska chatten oversatta
 5. Finns toast/felmeddelande?
 6. Galler det webb eller Windows-app?
 7. Om filimport: vad heter filen och vilka rubriker har den?
+8. Om API/statuskod syns: sla upp den i [Felkoder och felmeddelanden](error-reference.md).
 
 ## Symptom till rotorsak
 
 | Symptom | Trolig rotorsak | Svar/atgard |
 | --- | --- | --- |
-| Vy saknas i menyn | Rollens vyatkomst ar `none` | Be admin/super user kontrollera Anvandare -> Vybehorigheter. |
+| Vy saknas i menyn | Rollens vyatkomst ar `none` | Be admin/Super User kontrollera Anvandare -> Vybehorigheter. Skriv inte att anvandaren sjalv ska gora det om de saknar adminatkomst. |
 | Knapp for import saknas | Importvyn saknar edit-atkomst | Kontrollera `personImport`, `activityImport` eller `userImport`. |
 | Cell i Bemanning gar inte att andra | Read-only, cell-las, konflikt eller saknad edit-roll | Kontrollera toast; admin kan passera cell-las, viewer kan aldrig redigera. |
 | "Cellen andrades av nagon annan" | Versionskonflikt | Serverns senaste varde vann; gor andringen igen efter omladdning. |
 | Undo/redo fungerar inte | Tom stack eller fel dag | Undo/redo ar lokal och knuten till dagen/perioden dar andringen gjordes. |
 | Produktivitet visar inte rapport | Saknade lokala loggar eller KPI-mal | Lagg in Plocklogg, Translogg, Palllastningslogg och KPI-mal. |
 | Lagerflode ar disabled | Kravda filer/falt saknas | Klicka `i` pa flodet eller se filtaggar med kryss. |
+| Bearbeta saknas | Rollen saknar `allocationProcess` eller Super User | Bearbeta ar egen vy. Be admin/Super User kontrollera roll och Vybehorigheter. Vanlig lagerroll ser oftast Dela/Harleda men inte Bearbeta. |
 | Fil hamnar inte i ratt slot | Filnamn/header matchar inte detektion | Anvand Välj pa specifik slot eller kontrollera filens rubriker. |
 | Anvandare maste skapa losenord | Kontot saknar password_hash/must_change_password | Ga via `set-password.html`; losenord minst 8 tecken. |
 | Kan inte inaktivera admin | Sista aktiva admin skyddas | Skapa/aktivera annan admin forst. |
+| Apphjalpen svarar inte | MiniMax-nyckel saknas, timeout, 10-fragorskvot eller session saknas | Las feltexten i chattpanelen. Vid kvot: `Rensa dialog`. Vid `MINIMAX_API_KEY`: admin konfigurerar servern. |
+| Apphjalpen minns gamla fragor | Dialogen skickas med for foljdfragor och sparas i sessionen | Klicka `Rensa dialog` om sammanhanget ska starta om. |
 | Desktop visar gammalt/annat beteende | Cachad lokal frontend/proxy eller inte uppdaterad build | Testa webben, desktop-proxy och version; jamfor mot `APP_MIGRATION_PLAN.md`. |
 
 ## Rekommenderade chattsvar
@@ -55,6 +59,10 @@ Testa samma anvandare och samma data i webben. Om webben fungerar men Windows in
 
 ## Sidor att lasa for djupare svar
 
+- [Anvandarhandbok](user-guide.md)
+- [Anvandarhandelser](user-events.md)
+- [Felkoder och felmeddelanden](error-reference.md)
+- [Apphjalp och LLM-chatt](app-chat.md)
 - [UI-karta och alla kontroller](ui-map.md)
 - [Bemanning dagsschema](bemanning-schedule.md)
 - [Oversikt](overview-page.md)
@@ -63,4 +71,3 @@ Testa samma anvandare och samma data i webben. Om webben fungerar men Windows in
 - [Anvandare och installningar](users-settings.md)
 - [Produktivitet](productivity.md)
 - [Lagerverktyg](warehouse-tools.md)
-

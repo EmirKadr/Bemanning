@@ -98,6 +98,22 @@ const LOG_ICON = `
   </svg>
 `;
 
+const ASSISTANT_CHAT_ICON = `
+  <svg class="assistant-chat-icon" viewBox="-2 -2 38 36" aria-hidden="true">
+    <path fill="currentColor" opacity=".58" d="M12.5 12.2c-5.2 0-9.4 3.2-9.4 7.3 0 1.9.9 3.6 2.5 5l-1 4.2 4.2-2.1c1.1.3 2.4.5 3.7.5 5.2 0 9.4-3.4 9.4-7.5s-4.2-7.4-9.4-7.4Z"></path>
+    <path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="M10.7 12.2C11.7 7.4 16.3 4 21.6 4c6.1 0 10.9 4.1 10.9 9.2 0 2.4-1.1 4.6-2.9 6.2l1.2 4.9-4.9-2.3c-1.3.4-2.8.6-4.3.6"></path>
+  </svg>
+`;
+
+const ASSISTANT_CHAT_STORAGE_KEY = "bemanning-assistant-chat";
+const ASSISTANT_CHAT_OPEN_KEY = "bemanning-assistant-chat-open";
+const ASSISTANT_CHAT_COUNT_KEY = "bemanning-assistant-chat-count";
+const ASSISTANT_CHAT_DRAFT_KEY = "bemanning-assistant-chat-draft";
+const ASSISTANT_CHAT_VERSION_KEY = "bemanning-assistant-chat-version";
+const ASSISTANT_CHAT_STORAGE_VERSION = "2";
+const ASSISTANT_CHAT_MAX_QUESTIONS = 10;
+let assistantChatPending = false;
+
 const SIDEBAR_MOVE_UP_ICON = `
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="m6 15 6-6 6 6"></path>
@@ -415,6 +431,121 @@ function escapeHtml(value) {
   );
 }
 
+function renderAssistantInlineMarkdown(value) {
+  let html = escapeHtml(value);
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  return html;
+}
+
+function isMarkdownTableLine(line) {
+  return /^\s*\|.*\|\s*$/.test(line);
+}
+
+function isMarkdownTableSeparator(line) {
+  return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+}
+
+function markdownTableCells(line) {
+  return String(line || "")
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
+function renderAssistantMarkdownTable(lines) {
+  const rows = lines
+    .filter((line) => !isMarkdownTableSeparator(line))
+    .map(markdownTableCells)
+    .filter((row) => row.length);
+  if (!rows.length) return "";
+  const header = rows[0];
+  const body = rows.slice(1);
+  return `
+    <div class="assistant-chat-table-wrap">
+      <table class="assistant-chat-table">
+        <thead>
+          <tr>${header.map((cell) => `<th>${renderAssistantInlineMarkdown(cell)}</th>`).join("")}</tr>
+        </thead>
+        <tbody>
+          ${body.map((row) => `
+            <tr>${row.map((cell) => `<td>${renderAssistantInlineMarkdown(cell)}</td>`).join("")}</tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderAssistantMarkdown(content) {
+  const lines = String(content || "").replace(/\r\n/g, "\n").trim().split("\n");
+  const html = [];
+  let listType = "";
+
+  const closeList = () => {
+    if (!listType) return;
+    html.push(`</${listType}>`);
+    listType = "";
+  };
+
+  const openList = (type) => {
+    if (listType === type) return;
+    closeList();
+    listType = type;
+    html.push(`<${type}>`);
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed) {
+      closeList();
+      continue;
+    }
+
+    if (isMarkdownTableLine(line)) {
+      const tableLines = [];
+      while (index < lines.length && isMarkdownTableLine(lines[index])) {
+        tableLines.push(lines[index]);
+        index += 1;
+      }
+      index -= 1;
+      closeList();
+      html.push(renderAssistantMarkdownTable(tableLines));
+      continue;
+    }
+
+    const heading = trimmed.match(/^#{1,4}\s+(.+)$/);
+    if (heading) {
+      closeList();
+      html.push(`<p class="assistant-chat-heading">${renderAssistantInlineMarkdown(heading[1])}</p>`);
+      continue;
+    }
+
+    const bullet = trimmed.match(/^[-*]\s+(.+)$/);
+    if (bullet) {
+      openList("ul");
+      html.push(`<li>${renderAssistantInlineMarkdown(bullet[1])}</li>`);
+      continue;
+    }
+
+    const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (numbered) {
+      openList("ol");
+      html.push(`<li>${renderAssistantInlineMarkdown(numbered[1])}</li>`);
+      continue;
+    }
+
+    closeList();
+    html.push(`<p>${renderAssistantInlineMarkdown(trimmed)}</p>`);
+  }
+
+  closeList();
+  return html.join("");
+}
+
 function renderAppLogEntries() {
   const body = document.querySelector("#log-sidebar .log-sidebar-body");
   if (!body) return;
@@ -446,6 +577,17 @@ function appendAppLog(message, kind = "info", title = "System") {
 function userRoles(user) {
   const rawRoles = Array.isArray(user?.roles) && user.roles.length ? user.roles : [user?.role];
   return [...new Set(rawRoles.map((role) => String(role || "").trim()).filter(Boolean))];
+}
+
+function roleDisplayName(role) {
+  if (role === "super_user") return "Super User";
+  return ROLE_VIEW_ROLES.find((option) => option.value === role)?.label || role;
+}
+
+function sidebarRoleLabel(user) {
+  const labels = userRoles(user).map(roleDisplayName);
+  if (user?.is_super_user && !labels.includes("Super User")) labels.unshift("Super User");
+  return [...new Set(labels)].join(", ");
 }
 
 function roleViewDefaultAccess() {
@@ -823,6 +965,292 @@ function initLogSidebarToggle() {
     const panel = document.getElementById("log-sidebar");
     setLogSidebarOpen(panel?.hidden);
   });
+}
+
+function renderAssistantUtility() {
+  return `
+        <button class="assistant-toggle" id="assistant-toggle" type="button" title="Apphjälp" aria-label="Öppna apphjälp" aria-controls="assistant-chat-panel" aria-expanded="false">
+          ${ASSISTANT_CHAT_ICON}
+        </button>
+  `;
+}
+
+function safeSessionGet(key) {
+  try {
+    return sessionStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
+}
+
+function safeSessionSet(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch (e) {}
+}
+
+function safeSessionRemove(key) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch (e) {}
+}
+
+function clearAssistantLocalSession(options = {}) {
+  safeSessionRemove(ASSISTANT_CHAT_STORAGE_KEY);
+  if (!options.keepOpenState) safeSessionRemove(ASSISTANT_CHAT_OPEN_KEY);
+  safeSessionRemove(ASSISTANT_CHAT_COUNT_KEY);
+  safeSessionRemove(ASSISTANT_CHAT_DRAFT_KEY);
+  if (!options.keepStorageVersion) safeSessionRemove(ASSISTANT_CHAT_VERSION_KEY);
+  assistantChatPending = false;
+}
+
+function ensureAssistantLocalSessionVersion() {
+  if (safeSessionGet(ASSISTANT_CHAT_VERSION_KEY) === ASSISTANT_CHAT_STORAGE_VERSION) return;
+  clearAssistantLocalSession();
+  safeSessionSet(ASSISTANT_CHAT_VERSION_KEY, ASSISTANT_CHAT_STORAGE_VERSION);
+}
+
+function normalizeAssistantMessages(value) {
+  return (Array.isArray(value) ? value : [])
+    .filter((message) => message && (message.role === "user" || message.role === "assistant"))
+    .map((message) => ({
+      role: message.role,
+      content: String(message.content || "").trim().slice(0, 4000),
+    }))
+    .filter((message) => message.content)
+    .slice(-21);
+}
+
+function readAssistantMessages() {
+  try {
+    return normalizeAssistantMessages(JSON.parse(safeSessionGet(ASSISTANT_CHAT_STORAGE_KEY) || "[]"));
+  } catch (e) {
+    return [];
+  }
+}
+
+function writeAssistantMessages(messages) {
+  safeSessionSet(ASSISTANT_CHAT_STORAGE_KEY, JSON.stringify(normalizeAssistantMessages(messages)));
+}
+
+function readAssistantQuestionCount() {
+  const raw = safeSessionGet(ASSISTANT_CHAT_COUNT_KEY);
+  const parsed = Number(raw);
+  if (Number.isFinite(parsed) && parsed >= 0) return Math.min(ASSISTANT_CHAT_MAX_QUESTIONS, parsed);
+  return Math.min(
+    ASSISTANT_CHAT_MAX_QUESTIONS,
+    readAssistantMessages().filter((message) => message.role === "user").length
+  );
+}
+
+function writeAssistantQuestionCount(count) {
+  const safeCount = Math.max(0, Math.min(ASSISTANT_CHAT_MAX_QUESTIONS, Number(count) || 0));
+  safeSessionSet(ASSISTANT_CHAT_COUNT_KEY, String(safeCount));
+  return safeCount;
+}
+
+function isAssistantChatOpen() {
+  return safeSessionGet(ASSISTANT_CHAT_OPEN_KEY) === "1";
+}
+
+function writeAssistantChatOpen(open) {
+  safeSessionSet(ASSISTANT_CHAT_OPEN_KEY, open ? "1" : "0");
+}
+
+function assistantFriendlyError(error) {
+  if (error?.status === 429) {
+    return "Du har använt 10 frågor i den här sessionen. Klicka Rensa dialog för att börja om.";
+  }
+  if (error?.status === 500 && error?.body?.detail) {
+    return String(error.body.detail);
+  }
+  if (error?.status === 502 && error?.body?.detail) {
+    return String(error.body.detail);
+  }
+  if (error?.status === 503) {
+    return error.message || "Appchatten är inte konfigurerad på servern ännu.";
+  }
+  if (error?.status === 504) {
+    return "MiniMax svarade inte i tid. Prova igen om en stund.";
+  }
+  if (error?.status === 0) {
+    return "Jag kan inte nå servern just nu. Kontrollera att appen är öppnad via rätt adress och att backend är igång.";
+  }
+  return error?.message || "Jag kunde inte hämta ett svar just nu.";
+}
+
+function renderAssistantMessages() {
+  const list = document.getElementById("assistant-chat-messages");
+  const counter = document.getElementById("assistant-chat-counter");
+  const send = document.getElementById("assistant-chat-send");
+  const statusEl = document.getElementById("assistant-chat-status");
+  if (!list) return;
+
+  const messages = readAssistantMessages();
+  const used = readAssistantQuestionCount();
+  if (counter) counter.textContent = `${used}/${ASSISTANT_CHAT_MAX_QUESTIONS} frågor i sessionen`;
+  if (send) send.disabled = used >= ASSISTANT_CHAT_MAX_QUESTIONS || assistantChatPending;
+  if (statusEl) {
+    if (used >= ASSISTANT_CHAT_MAX_QUESTIONS) statusEl.textContent = "Max nått. Rensa dialog för att fortsätta.";
+    else if (!assistantChatPending) statusEl.textContent = "";
+  }
+
+  if (!messages.length) {
+    list.innerHTML = `
+      <div class="assistant-chat-empty">
+        Fråga om knappar, feltexter, behörigheter, import, schema, produktivitet eller lagerverktyg.
+      </div>
+    `;
+    return;
+  }
+  list.innerHTML = messages.map((message) => `
+    <div class="assistant-chat-message ${message.role}">
+      ${message.role === "assistant" ? renderAssistantMarkdown(message.content) : escapeHtml(message.content).replace(/\n/g, "<br>")}
+    </div>
+  `).join("");
+  if (assistantChatPending) {
+    list.insertAdjacentHTML("beforeend", `
+      <div class="assistant-chat-message assistant assistant-chat-loading" aria-label="Apphjälpen hämtar svar">
+        <span class="assistant-chat-spinner" aria-hidden="true"></span>
+        <span>Hämtar svar</span>
+      </div>
+    `);
+  }
+  list.scrollTop = list.scrollHeight;
+}
+
+function setAssistantChatPending(pending) {
+  assistantChatPending = Boolean(pending);
+  const send = document.getElementById("assistant-chat-send");
+  const textarea = document.getElementById("assistant-chat-input");
+  const statusEl = document.getElementById("assistant-chat-status");
+  if (send) {
+    send.disabled = assistantChatPending || readAssistantQuestionCount() >= ASSISTANT_CHAT_MAX_QUESTIONS;
+    send.textContent = pending ? "Skickar..." : "Skicka";
+  }
+  if (textarea) textarea.disabled = assistantChatPending;
+  if (statusEl) statusEl.textContent = assistantChatPending ? "Hämtar svar..." : "";
+  renderAssistantMessages();
+}
+
+function setAssistantChatOpen(open) {
+  const panel = document.getElementById("assistant-chat-panel");
+  const toggle = document.getElementById("assistant-toggle");
+  if (!panel) return;
+  panel.hidden = !open;
+  panel.classList.toggle("is-open", open);
+  toggle?.classList.toggle("active", open);
+  toggle?.setAttribute("aria-expanded", open ? "true" : "false");
+  toggle?.setAttribute("aria-label", open ? "Stäng apphjälp" : "Öppna apphjälp");
+  writeAssistantChatOpen(open);
+  if (open) {
+    renderAssistantMessages();
+    setTimeout(() => document.getElementById("assistant-chat-input")?.focus(), 0);
+  }
+}
+
+async function clearAssistantChat() {
+  clearAssistantLocalSession({ keepOpenState: true, keepStorageVersion: true });
+  const input = document.getElementById("assistant-chat-input");
+  if (input) input.value = "";
+  try {
+    await api.post("/api/assistant/clear", {});
+  } catch (error) {
+    showToast(error.message || "Dialogen rensades lokalt, men serverkvoten kunde inte nollställas.", "warn", 7000);
+  }
+  renderAssistantMessages();
+}
+
+async function submitAssistantQuestion(event) {
+  event.preventDefault();
+  const input = document.getElementById("assistant-chat-input");
+  const statusEl = document.getElementById("assistant-chat-status");
+  const question = String(input?.value || "").trim();
+  if (!question) return;
+  if (readAssistantQuestionCount() >= ASSISTANT_CHAT_MAX_QUESTIONS) {
+    if (statusEl) statusEl.textContent = "Max 10 frågor. Rensa dialog för att börja om.";
+    return;
+  }
+
+  const messages = readAssistantMessages();
+  messages.push({ role: "user", content: question });
+  writeAssistantMessages(messages);
+  safeSessionRemove(ASSISTANT_CHAT_DRAFT_KEY);
+  if (input) input.value = "";
+  renderAssistantMessages();
+  setAssistantChatPending(true);
+
+  try {
+    const response = await api.post("/api/assistant/chat", {
+      messages: readAssistantMessages(),
+      page_path: window.location.pathname || "",
+    });
+    const nextMessages = readAssistantMessages();
+    nextMessages.push({ role: "assistant", content: response?.answer || "Jag fick inget textinnehåll tillbaka." });
+    writeAssistantMessages(nextMessages);
+    if (typeof response?.remaining_questions === "number") {
+      writeAssistantQuestionCount(ASSISTANT_CHAT_MAX_QUESTIONS - response.remaining_questions);
+    } else {
+      writeAssistantQuestionCount(readAssistantQuestionCount() + 1);
+    }
+  } catch (error) {
+    const nextMessages = readAssistantMessages();
+    nextMessages.push({ role: "assistant", content: assistantFriendlyError(error) });
+    writeAssistantMessages(nextMessages);
+    if (error?.status === 429) writeAssistantQuestionCount(ASSISTANT_CHAT_MAX_QUESTIONS);
+    showToast(error.message || "Kunde inte hämta chattsvar.", "error", 7000);
+  } finally {
+    setAssistantChatPending(false);
+    renderAssistantMessages();
+    document.getElementById("assistant-chat-input")?.focus();
+  }
+}
+
+function ensureAssistantChatPanel(app) {
+  if (!app) return;
+  ensureAssistantLocalSessionVersion();
+  let panel = document.getElementById("assistant-chat-panel");
+  if (!panel) {
+    panel = document.createElement("aside");
+    panel.id = "assistant-chat-panel";
+    panel.className = "assistant-chat-panel";
+    app.appendChild(panel);
+  }
+  panel.hidden = !isAssistantChatOpen();
+  panel.innerHTML = `
+    <div class="assistant-chat-head">
+      <div>
+        <h2>Apphjälp</h2>
+        <div class="assistant-chat-counter" id="assistant-chat-counter">0/${ASSISTANT_CHAT_MAX_QUESTIONS} frågor i sessionen</div>
+      </div>
+      <button type="button" class="assistant-chat-clear" id="assistant-chat-clear">Rensa dialog</button>
+    </div>
+    <div class="assistant-chat-messages" id="assistant-chat-messages" role="log" aria-live="polite"></div>
+    <form class="assistant-chat-form" id="assistant-chat-form">
+      <textarea id="assistant-chat-input" rows="2" maxlength="1200" placeholder="Ställ en fråga om appen...">${escapeHtml(safeSessionGet(ASSISTANT_CHAT_DRAFT_KEY) || "")}</textarea>
+      <div class="assistant-chat-actions">
+        <span class="assistant-chat-status" id="assistant-chat-status" aria-live="polite"></span>
+        <button type="submit" class="primary" id="assistant-chat-send">Skicka</button>
+      </div>
+    </form>
+  `;
+  panel.querySelector("#assistant-chat-form")?.addEventListener("submit", submitAssistantQuestion);
+  panel.querySelector("#assistant-chat-clear")?.addEventListener("click", () => {
+    void clearAssistantChat();
+  });
+  panel.querySelector("#assistant-chat-input")?.addEventListener("input", (event) => {
+    safeSessionSet(ASSISTANT_CHAT_DRAFT_KEY, event.target.value);
+  });
+  renderAssistantMessages();
+}
+
+function initAssistantChatToggle() {
+  const toggle = document.getElementById("assistant-toggle");
+  if (!toggle) return;
+  toggle.addEventListener("click", () => {
+    setAssistantChatOpen(!isAssistantChatOpen());
+  });
+  setAssistantChatOpen(isAssistantChatOpen());
 }
 
 function renderSidebarNav(user, activePage) {
@@ -1334,6 +1762,9 @@ function renderSidebar(user, activePage) {
     : "";
   const uploadUtility = renderAllocationUploadUtility(user, activePage);
   const logUtility = renderLogUtility();
+  const assistantUtility = renderAssistantUtility();
+  const userName = user?.display_name || user?.username || "";
+  const roleLabel = sidebarRoleLabel(user);
 
   sidebar.innerHTML = `
     <div class="sidebar-top-row">
@@ -1350,6 +1781,7 @@ function renderSidebar(user, activePage) {
     <div class="sidebar-footer">
       <div class="sidebar-utility">
         <button class="area-focus-toggle" id="area-focus-toggle" type="button" title="Områdesfokus" aria-label="Områdesfokus"></button>
+        ${assistantUtility}
         ${logUtility}
         ${uploadUtility}
         <button class="theme-toggle" id="theme-toggle" type="button"></button>
@@ -1357,7 +1789,8 @@ function renderSidebar(user, activePage) {
       <div class="sidebar-bottom">
         <div class="avatar">${initials(user?.display_name || user?.username)}</div>
         <div>
-          <div class="who">${user?.display_name || user?.username || ""}</div>
+          <div class="who">${escapeHtml(userName)}</div>
+          ${roleLabel ? `<div class="sidebar-role">${escapeHtml(roleLabel)}</div>` : ""}
           <a href="#" class="logout" id="logout-link">Logga ut</a>
         </div>
       </div>
@@ -1368,6 +1801,8 @@ function renderSidebar(user, activePage) {
   initThemeToggle();
   ensureLogSidebar(app);
   initLogSidebarToggle();
+  ensureAssistantChatPanel(app);
+  initAssistantChatToggle();
   updateAllocationUploadIndicator();
   document.body.classList.add("sidebar-hydrated");
   const allocationUploadLink = document.getElementById("allocation-upload-link");
@@ -1385,6 +1820,7 @@ function renderSidebar(user, activePage) {
     logout.addEventListener("click", async (e) => {
       e.preventDefault();
       await api.post("/api/auth/logout");
+      clearAssistantLocalSession();
       clearCachedSidebarUser();
       window.location.href = "/login.html";
     });

@@ -761,7 +761,11 @@ function renderResultTable(sessionId, entry) {
       </div>
       <div class="table-wrap allocation-table-wrap">
         <table>
-          <thead><tr>${(table.columns || []).map((column) => `<th>${allocationEscape(column)}</th>`).join("")}</tr></thead>
+          <thead><tr>${(table.columns || []).map((column, index) => `
+            <th>
+              <button type="button" class="allocation-copy-column" data-copy-column="${index}" data-copy-key="${allocationEscape(entry.key)}" data-copy-label="${allocationEscape(column)}">Kopiera</button>
+            </th>
+          `).join("")}</tr></thead>
           <tbody>
             ${(table.rows || []).slice(0, 100).map((row) => `<tr>${row.map((cell) => `<td>${allocationEscape(cell)}</td>`).join("")}</tr>`).join("")}
           </tbody>
@@ -772,7 +776,45 @@ function renderResultTable(sessionId, entry) {
   `;
 }
 
+async function writeClipboardText(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (error) {
+      // Fallback nedan hanterar webblÃ¤sare som visar sidan utan clipboard-rÃ¤ttighet.
+    }
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("Urklipp kunde inte anvÃ¤ndas.");
+}
+
 function bindResultActions(root) {
+  root.querySelectorAll("[data-copy-column]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        const sessionId = allocationState.result?.data?.session_id;
+        const key = button.dataset.copyKey;
+        const columnIndex = button.dataset.copyColumn;
+        if (!sessionId || !key || columnIndex == null) throw new Error("Resultatet kunde inte hittas.");
+        const data = await allocationJson(
+          `${ALLOCATION_API}/table-column/${encodeURIComponent(sessionId)}/${encodeURIComponent(key)}/${encodeURIComponent(columnIndex)}`,
+        );
+        await writeClipboardText(data.text || "");
+        showToast("Kolumn kopierad", "success", 2000);
+      } catch (error) {
+        showToast(error.message || "Kunde inte kopiera kolumnen.", "error", 7000);
+      }
+    });
+  });
   root.querySelectorAll("[data-open-excel]").forEach((button) => {
     button.addEventListener("click", async () => {
       try {

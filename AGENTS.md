@@ -79,6 +79,24 @@ Agenten ska inte lamna ett nytt beteende utan teststod om det gar att testa
 rimligt med befintlig teststack. Om nagot inte gar att automatisera ska agenten
 skriva tydligt vad som testats manuellt och varfor automatiskt test saknas.
 
+Tester ska tankas fran tva perspektiv:
+
+- anvandarperspektiv: ett test ska, nar det ar rimligt, klicka eller kora samma
+  flode som en riktig anvandare och verifiera synligt resultat
+- utvecklarperspektiv: ett test ska ocksa skydda kontrakt, regler, dataformat,
+  behorigheter, API-svar eller andra interna antaganden som gor felet latt att
+  hitta tidigt
+
+Nar en andring byter namn, begrepp, menyval, roll, vy eller annat sprak i
+produkten ska agenten inte skriva ett engangstest for bara den texten. Lagg eller
+uppdatera i stallet ett ateranvandbart kontrakt, till exempel i
+`tools/terminology_contracts.py`, och lat bade statiska tester och renderade
+UI-tester anvanda samma kontrakt.
+
+Nar beteende tas bort eller byts ut ska agenten aktivt leta efter gamla tester
+som bara skyddar det borttagna beteendet. Sadana tester ska tas bort eller
+skrivas om, sa testsviten inte tvingar kvar gammal produktlogik av misstag.
+
 ## Beslutsregel
 
 Om en uppgift verkar bara namna `app/` eller bara `desktop/`, men andringen
