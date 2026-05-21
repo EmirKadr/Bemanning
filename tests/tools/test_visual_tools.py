@@ -388,6 +388,9 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert "SIDEBAR_MOVE_UP_ICON" in common
     assert "SIDEBAR_MOVE_DOWN_ICON" in common
     assert "LOG_ICON" in common
+    assert 'id="assistant-chat-input"' in common
+    assert "event.shiftKey" in common
+    assert "requestSubmit()" in common
     assert 'api.get("/api/settings/sidebar")' in common
     assert 'api.put("/api/settings/sidebar"' in common
     assert "renderSidebarNav" in common

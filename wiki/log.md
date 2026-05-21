@@ -68,3 +68,7 @@ Katalogen `data/external_data_catalog.json` bedomdes inte vara hemlig och ska co
 ## [2026-05-21] support | Stoppa lokal server
 
 Lade till `stop_local.bat` for att stanga gamla lokala `start_local.bat`/uvicorn-processer och frigora port `8000` nar `app/bemanning_local.db` ar last. Uppdaterade README och anvandarhandelser med kommandot.
+
+## [2026-05-21] polish | Enter skickar apphjalp
+
+Apphjalpens textfalt skickar nu fragan med Enter. `Shift+Enter` finns kvar for ny rad, och frontend ignorerar extra submit medan ett svar redan hamtas.

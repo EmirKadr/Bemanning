@@ -22,6 +22,7 @@ Kort svar: denna sida listar vad anvandaren kan se eller raka ut for: redirect, 
 | Sidebar kollapsas | Bara ikoner syns | Anvandaren klickade hamburgare | Klicka hamburgare igen. |
 | Omradesfokus andras | Listor/filter prioriterar annat omrade | MG/GG/AS/EH/Alla toggle | Vaxla fokus nere i sidebar. |
 | Apphjalp oppnas/stangs | Liten chattpanel visas eller doljs | Anvandaren klickar pratbubbelikonen under omradesfokus | Panelen kan vara oppen medan anvandaren navigerar. |
+| Apphjalp skickar fraga | Fragan laggs i dialogen och svar hamtas | Anvandaren trycker Enter i textfaltet eller klickar `Skicka` | `Shift+Enter` ger ny rad om anvandaren vill skriva flera rader. |
 
 ## Login och losenord
 

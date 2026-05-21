@@ -1173,6 +1173,7 @@ async function clearAssistantChat() {
 
 async function submitAssistantQuestion(event) {
   event.preventDefault();
+  if (assistantChatPending) return;
   const input = document.getElementById("assistant-chat-input");
   const statusEl = document.getElementById("assistant-chat-status");
   const question = String(input?.value || "").trim();
@@ -1250,6 +1251,11 @@ function ensureAssistantChatPanel(app) {
   });
   panel.querySelector("#assistant-chat-input")?.addEventListener("input", (event) => {
     safeSessionSet(ASSISTANT_CHAT_DRAFT_KEY, event.target.value);
+  });
+  panel.querySelector("#assistant-chat-input")?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    panel.querySelector("#assistant-chat-form")?.requestSubmit();
   });
   renderAssistantMessages();
 }

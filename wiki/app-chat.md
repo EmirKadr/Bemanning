@@ -13,7 +13,7 @@ Kort svar: Apphjalpen ar en liten chattpanel i sidomenyn. Knappen sitter direkt 
 
 1. Anvandaren klickar pratbubbelikonen under infinity-/omradesfokusknappen i sidebar.
 2. En liten panel med rubriken `Apphjalp` oppnas utan modal-backdrop. Resten av appen gar fortfarande att anvanda.
-3. Anvandaren skriver en fraga i textfaltet och klickar `Skicka`.
+3. Anvandaren skriver en fraga i textfaltet och klickar `Skicka` eller trycker Enter. `Shift+Enter` ger ny rad.
 4. Frontend visar en liten rund laddningsanimation i chattflodet och skickar hela dialogen till `POST /api/assistant/chat`, tillsammans med aktuell `page_path`.
 5. Backend bygger en systemprompt med wikiutdrag och skickar fragan till MiniMax.
 6. Svaret laggs in i dialogen och sparas i `sessionStorage`.
@@ -25,7 +25,7 @@ Kort svar: Apphjalpen ar en liten chattpanel i sidomenyn. Knappen sitter direkt 
 | Kontroll | Var | Vem far | Vad hander | API/kod | Vanliga fel |
 | --- | --- | --- | --- | --- | --- |
 | Apphjalp/pratbubblor | Sidebar utility, under omradesfokus/infinity | Alla inloggade anvandare | Vaxlar panelen oppen/stangd och sparar oppet lage i sessionen | `common.js`, `assistant-toggle` | Om knappen saknas ar sidan inte skyddad/inloggad eller `common.js` laddades inte. |
-| Textfalt | Chattpanelens botten | Alla inloggade | Sparar utkast i sessionen och skickar bara icke-tom text | `assistant-chat-input` | Tom fraga skickas inte. Max 1200 tecken i UI, max 4000 per rad i API. |
+| Textfalt | Chattpanelens botten | Alla inloggade | Sparar utkast i sessionen. Enter skickar fragan, `Shift+Enter` ger ny rad | `assistant-chat-input` | Tom fraga skickas inte. Max 1200 tecken i UI, max 4000 per rad i API. |
 | Skicka | Chattpanelen | Alla inloggade under kvoten | Skickar hela dialogen plus aktuell sida till backend | `POST /api/assistant/chat` | Disabled vid pagaende fraga eller nar 10 fragor ar anvanda. |
 | Rensa dialog | Chattpanelen | Alla inloggade | Rensar lokal dialog, utkast och frageraknare; nollstaller serverns sessionskvot | `POST /api/assistant/clear` | Om servern inte nas rensas UI lokalt men kvoten kan finnas kvar pa servern tills sessionen byts. |
 
