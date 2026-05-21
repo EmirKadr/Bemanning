@@ -127,11 +127,18 @@ async function loadDataFetchHealth() {
     const apiText = result.api_configured
       ? " API är konfigurerat."
       : ` API saknar: ${missingApi.length ? missingApi.join(", ") : "miljövärden"}.`;
-    health.classList.toggle("error-text", !result.ok);
-    health.textContent = `Katalog: ${catalog.views || 0} vyer, ${catalog.columns || 0} kolumner.`
-      + apiText
-      + (result.minimax_configured ? " MiniMax är konfigurerat." : " MiniMax saknar API-nyckel.")
-      + (result.message ? ` ${result.message}` : "");
+    if (result.ok) {
+      health.hidden = true;
+      health.textContent = "";
+      health.classList.remove("error-text");
+    } else {
+      health.hidden = false;
+      health.classList.add("error-text");
+      health.textContent = `Katalog: ${catalog.views || 0} vyer, ${catalog.columns || 0} kolumner.`
+        + apiText
+        + (result.minimax_configured ? " MiniMax är konfigurerat." : " MiniMax saknar API-nyckel.")
+        + (result.message ? ` ${result.message}` : "");
+    }
     dataFetchSetBusy(false);
   } catch (error) {
     dataFetchState.catalogReady = false;
@@ -139,6 +146,7 @@ async function loadDataFetchHealth() {
     dataFetchState.minimaxReady = false;
     renderDataFetchPlan(null);
     renderDataFetchResult(null);
+    health.hidden = false;
     health.textContent = error.message || "Kunde inte kontrollera datahämtning.";
     health.classList.add("error-text");
     dataFetchSetBusy(false, "Ingen AI-fråga skickades.");
