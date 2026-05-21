@@ -44,6 +44,9 @@ miljövariabler och skickas aldrig till modellen.
 - `GET /api/query-data/health` använder inte MiniMax. Om katalog, API-env eller
   MiniMax-nyckel saknas rapporterar den status till UI:t så `Tolka med MiniMax`
   och `Hämta data` kan spärras innan någon AI-fråga eller extern API-fråga skickas.
+- Om extern datahämtning misslyckas loggar backend `error_id`, vy och filterstruktur
+  i serverloggen utan URL:er eller hemligheter. Frontend visar samma fel-id i
+  Hämta data-panelen så felet går att hitta i Render-loggarna.
 
 ## Teknisk modell
 
@@ -70,6 +73,9 @@ Svar: Knappen spärras när katalogen saknas eller när `MINIMAX_API_KEY` inte �
 
 Fråga: Varför går det inte att klicka på Hämta data?
 Svar: Knappen kräver en godkänd plan och att den externa datakällan är konfigurerad med alla obligatoriska `DATA_SOURCE_*`-värden i servermiljön: bas-URL, API-nyckel, klientvärde, headernamn för nyckel/klient och endpointmall. Health-raden visar exakt vilka variabelnamn som saknas.
+
+Fråga: Varför fick jag HTTP 500/502 när planen såg rätt ut?
+Svar: Planen kan vara korrekt men externa datakällan kan ändå neka, stänga anslutningen, vara nere eller svara med fel. Vid sådana fel visar Hämta data ett fel-id. Leta på samma fel-id i Render-loggarna för att se vilken vy som kördes och om felet var nätåtkomst, endpointmall eller HTTP-status från datakällan.
 
 Fråga: Varför stoppas en MiniMax-plan?
 Svar: Backend accepterar bara vyer, kolumner och filteroperatorer som finns i katalogen. Om modellen hittar på något stoppas körningen innan extern datakälla anropas.

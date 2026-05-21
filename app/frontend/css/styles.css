@@ -2523,6 +2523,20 @@ tr.filter-row input {
   font-size: 13px;
 }
 
+.data-fetch-status.error {
+  display: grid;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: var(--danger);
+  padding: 10px 12px;
+}
+
+.data-fetch-status.error span {
+  color: var(--text-muted);
+}
+
 .data-fetch-column-list {
   display: flex;
   flex-wrap: wrap;

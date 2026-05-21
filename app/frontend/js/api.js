@@ -21,6 +21,21 @@ function connectionError(path, originalError) {
   return err;
 }
 
+function errorMessageFromBody(body, status) {
+  const detail = body?.detail ?? body?.error;
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object") {
+    if (typeof detail.message === "string") return detail.message;
+    try {
+      return JSON.stringify(detail);
+    } catch (_error) {
+      return `HTTP ${status}`;
+    }
+  }
+  if (typeof body === "string" && body.trim()) return body;
+  return `HTTP ${status}`;
+}
+
 async function request(path, options = {}) {
   const { headers = {}, ...rest } = options;
   const isFormData = typeof FormData !== "undefined" && rest.body instanceof FormData;
@@ -57,7 +72,7 @@ async function request(path, options = {}) {
   }
 
   if (!resp.ok) {
-    const err = new Error(body?.detail || body?.error || `HTTP ${resp.status}`);
+    const err = new Error(errorMessageFromBody(body, resp.status));
     err.status = resp.status;
     err.body = body;
     throw err;
@@ -91,7 +106,7 @@ async function download(path, fallbackFilename = "download") {
   const ct = resp.headers.get("content-type") || "";
   if (!resp.ok) {
     const body = ct.includes("application/json") ? await resp.json() : await resp.text();
-    const err = new Error(body?.detail || body?.error || `HTTP ${resp.status}`);
+    const err = new Error(errorMessageFromBody(body, resp.status));
     err.status = resp.status;
     err.body = body;
     throw err;

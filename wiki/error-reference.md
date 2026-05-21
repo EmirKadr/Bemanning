@@ -129,6 +129,8 @@ Kort svar: frontend visar oftast serverns `detail` direkt. I chatten ska statusk
 | 403 | "Sidan kraver behorighet" | Rollen saknar `dataFetch` | Be admin/Super User kontrollera Vybehorigheter. |
 | 404 | "Resultatet hittades inte..." | Export-sessionen saknas | Kor datahamtningen igen. |
 | 502 | "Extern datakälla kunde inte nås." | Extern datakälla svarade med fel eller kunde inte nas | Kontrollera serverns `DATA_SOURCE_*`-miljovarden och API-status. |
+| 502 | "Extern datakälla svarade med HTTP ..." | Extern datakälla nekade eller failade anropet | Använd fel-id i Hämta data-panelen och sök samma id i Render-loggen. |
+| 500 | "Datahämtningen stoppades..." | Oväntat backendfel i datahämtningen | Använd fel-id i Hämta data-panelen och sök samma id i Render-loggen. |
 | 503 | "Extern datakatalog saknas..." | Katalogfil/env saknas | Kontrollera att `data/external_data_catalog.json` ar deployad eller satt katalog som env-override. |
 | 503 | "Saknar DATA_SOURCE_..." | Ett eller flera externa API-env saknas i servermiljon | Satt alla `DATA_SOURCE_*`-varden som health-raden listar i Render/env. Provider-specifik endpointmall, headernamn, URL och nycklar ska inte ligga i git. |
 | 503 | "Datahamtning saknar MINIMAX_API_KEY..." | MiniMax-nyckel saknas | Satt `MINIMAX_API_KEY` i servermiljon. |

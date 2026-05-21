@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import logging
 import tempfile
 from uuid import uuid4
 
@@ -31,6 +32,7 @@ from .assistant import _call_minimax
 
 
 router = APIRouter(prefix="/api/query-data", tags=["query-data"])
+logger = logging.getLogger(__name__)
 
 
 class DataFetchPromptRequest(BaseModel):
@@ -98,6 +100,23 @@ def _api_client_or_503() -> ExternalDataClient:
     )
 
 
+def _filter_summary(filters: list[dict] | None) -> list[dict]:
+    return [
+        {"id": item.get("id") or item.get("field"), "operator": item.get("operator")}
+        for item in (filters or [])
+        if isinstance(item, dict)
+    ]
+
+
+def _data_fetch_error_detail(message: str, error_id: str, plan: dict) -> dict:
+    return {
+        "message": message,
+        "error_id": error_id,
+        "view": plan.get("view"),
+        "view_label": plan.get("view_label"),
+    }
+
+
 async def _plan_from_prompt(prompt: str) -> dict:
     if not settings.MINIMAX_API_KEY.strip():
         raise HTTPException(
@@ -122,7 +141,7 @@ def _validate_submitted_plan(plan: dict) -> dict:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-def _fetch_rows(plan: dict) -> list[dict]:
+def _fetch_rows(plan: dict, error_id: str) -> list[dict]:
     client = _api_client_or_503()
     try:
         return client.fetch_data(
@@ -131,7 +150,17 @@ def _fetch_rows(plan: dict) -> list[dict]:
             identifiers=plan.get("identifiers") or None,
         )
     except ExternalDataClientError as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        logger.warning(
+            "Data fetch external request failed error_id=%s view=%s filters=%s reason=%s",
+            error_id,
+            plan.get("view"),
+            _filter_summary(plan.get("filters")),
+            exc,
+        )
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail=_data_fetch_error_detail(str(exc), error_id, plan),
+        ) from exc
 
 
 def _safe_cell(value) -> str | int | float | bool | None:
@@ -224,7 +253,21 @@ async def run_data_fetch(
     if plan.get("status") == "needs_clarification":
         return {"plan": plan, "columns": [], "rows": [], "total_rows": 0, "session_id": None}
 
-    rows = await run_in_threadpool(_fetch_rows, plan)
+    error_id = uuid4().hex[:10]
+    try:
+        rows = await run_in_threadpool(_fetch_rows, plan, error_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Data fetch failed unexpectedly error_id=%s view=%s", error_id, plan.get("view"))
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=_data_fetch_error_detail(
+                "Datahämtningen stoppades av ett oväntat serverfel. Använd fel-id:t för att hitta loggen.",
+                error_id,
+                plan,
+            ),
+        ) from exc
     max_rows = _max_rows(payload.max_rows)
     projected_rows = project_rows(rows, plan["output_columns"], max_rows)
     columns = columns_for_response(plan)

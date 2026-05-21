@@ -19,6 +19,41 @@ function dataFetchValueText(value) {
   return String(value ?? "");
 }
 
+function dataFetchErrorDetail(error, fallback) {
+  const detail = error?.body?.detail;
+  if (detail && typeof detail === "object") {
+    return {
+      message: detail.message || error.message || fallback,
+      errorId: detail.error_id || "",
+      view: detail.view || "",
+      viewLabel: detail.view_label || "",
+      status: error.status || "",
+    };
+  }
+  return {
+    message: error?.message || fallback,
+    errorId: "",
+    view: "",
+    viewLabel: "",
+    status: error?.status || "",
+  };
+}
+
+function renderDataFetchError(error, fallback) {
+  const status = document.getElementById("dataFetchStatus");
+  const detail = dataFetchErrorDetail(error, fallback);
+  const meta = [
+    detail.status ? `HTTP ${detail.status}` : "",
+    detail.errorId ? `Fel-id ${detail.errorId}` : "",
+    detail.view ? `Vy ${detail.view}` : "",
+  ].filter(Boolean).join(" · ");
+  status.classList.add("error");
+  status.innerHTML = `
+    <strong>${dataFetchEscape(detail.message)}</strong>
+    ${meta ? `<span>${dataFetchEscape(meta)}</span>` : ""}
+  `;
+}
+
 function dataFetchSetBusy(active, text = "") {
   dataFetchState.busy = Boolean(active);
   document.getElementById("dataFetchPlan").disabled =
@@ -29,7 +64,9 @@ function dataFetchSetBusy(active, text = "") {
       || !dataFetchState.apiReady
       || dataFetchState.plan?.status !== "ok";
   document.getElementById("dataFetchReloadCatalog").disabled = dataFetchState.busy;
-  document.getElementById("dataFetchStatus").textContent = text;
+  const status = document.getElementById("dataFetchStatus");
+  status.classList.remove("error");
+  status.textContent = text;
 }
 
 function dataFetchMaxRows() {
@@ -191,6 +228,7 @@ async function runDataFetch() {
     dataFetchSetBusy(false, "Data hämtad.");
   } catch (error) {
     dataFetchSetBusy(false, "");
+    renderDataFetchError(error, "Kunde inte hämta data.");
     showToast(error.message || "Kunde inte hämta data.", "error", 8000);
   }
 }

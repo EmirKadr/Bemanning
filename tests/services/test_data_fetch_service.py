@@ -5,9 +5,11 @@ from types import SimpleNamespace
 from fastapi import HTTPException
 from openpyxl import load_workbook
 import pytest
+import requests
 
 from app.backend import data_fetch_service as service
 from app.backend.config import settings
+from app.backend.external_data_client import ExternalDataClient, ExternalDataClientError
 from app.backend.routers import data_fetch
 
 
@@ -213,3 +215,61 @@ def test_api_client_reports_exact_missing_settings(monkeypatch):
     assert "DATA_SOURCE_API_CLIENT_HEADER" in detail
     assert "DATA_SOURCE_API_BASE_URL" not in detail
     assert "DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE" not in detail
+
+
+def test_external_data_client_wraps_connection_errors():
+    class BrokenSession:
+        headers = {}
+
+        def post(self, *_args, **_kwargs):
+            raise requests.ConnectionError("connection reset")
+
+    client = ExternalDataClient(
+        base_url="https://secret.example/api/",
+        view_data_path_template="views/{view}/data",
+        session=BrokenSession(),
+    )
+
+    with pytest.raises(ExternalDataClientError) as exc_info:
+        client.fetch_data("dblog_count_log")
+
+    assert "Extern datakälla kunde inte nås" in str(exc_info.value)
+
+
+def test_run_data_fetch_returns_logged_external_error(monkeypatch):
+    class FailingExternalDataClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        def fetch_data(self, *_args, **_kwargs):
+            raise ExternalDataClientError("Extern datakälla kunde inte nås.")
+
+    monkeypatch.setattr(settings, "DATA_SOURCE_CATALOG_JSON", json.dumps(SAMPLE_CATALOG))
+    monkeypatch.setattr(settings, "DATA_SOURCE_API_BASE_URL", "https://secret.example/api/")
+    monkeypatch.setattr(settings, "DATA_SOURCE_API_KEY", "secret-key")
+    monkeypatch.setattr(settings, "DATA_SOURCE_API_CLIENT", "secret-client")
+    monkeypatch.setattr(settings, "DATA_SOURCE_API_KEY_HEADER", "secret-key-header")
+    monkeypatch.setattr(settings, "DATA_SOURCE_API_CLIENT_HEADER", "secret-client-header")
+    monkeypatch.setattr(settings, "DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE", "secret/path/{view}/data")
+    service.clear_catalog_cache()
+    monkeypatch.setattr(data_fetch, "ExternalDataClient", FailingExternalDataClient)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            data_fetch.run_data_fetch(
+                data_fetch.DataFetchRunRequest(
+                    plan={
+                        "status": "ok",
+                        "view": "dblog_count_log",
+                        "output_columns": ["type", "item_num"],
+                        "filters": [{"field": "type", "operator": "EQ", "value": "korrigering"}],
+                    }
+                ),
+                current_user=fake_user(),
+            )
+        )
+
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.detail["message"] == "Extern datakälla kunde inte nås."
+    assert exc_info.value.detail["view"] == "dblog_count_log"
+    assert exc_info.value.detail["error_id"]

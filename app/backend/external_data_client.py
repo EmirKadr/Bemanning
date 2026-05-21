@@ -53,11 +53,16 @@ class ExternalDataClient:
         }
         path = self._view_data_path(view)
 
-        response = self.session.post(
-            self._url(path),
-            json=payload,
-            timeout=self.timeout,
-        )
+        try:
+            response = self.session.post(
+                self._url(path),
+                json=payload,
+                timeout=self.timeout,
+            )
+        except requests.RequestException as exc:
+            raise ExternalDataClientError(
+                "Extern datakälla kunde inte nås. Kontrollera API-URL, nätåtkomst och datakällans status."
+            ) from exc
         return self._rows(response)
 
     @staticmethod
@@ -98,7 +103,12 @@ class ExternalDataClient:
     def _view_data_path(self, view: str) -> str:
         if not self.view_data_path_template:
             raise ExternalDataClientError("Extern datakälla saknar sökvägsmall.")
-        return self.view_data_path_template.format(view=view)
+        try:
+            return self.view_data_path_template.format(view=view)
+        except (KeyError, IndexError, ValueError) as exc:
+            raise ExternalDataClientError(
+                "Extern datakällas sökvägsmall kunde inte byggas. Kontrollera DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE."
+            ) from exc
 
     @staticmethod
     def _identifiers_to_payload(
@@ -117,9 +127,12 @@ class ExternalDataClient:
     def _rows(response: requests.Response) -> list[dict[str, Any]]:
         try:
             response.raise_for_status()
+        except requests.HTTPError as exc:
+            status_code = getattr(exc.response, "status_code", None) or response.status_code
+            raise ExternalDataClientError(f"Extern datakälla svarade med HTTP {status_code}.") from exc
+
+        try:
             body = response.json()
-        except requests.RequestException as exc:
-            raise ExternalDataClientError("Extern datakälla kunde inte nås.") from exc
         except ValueError as exc:
             raise ExternalDataClientError("Extern datakälla returnerade ogiltig JSON.") from exc
 
