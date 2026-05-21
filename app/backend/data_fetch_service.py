@@ -163,10 +163,7 @@ def _catalog_source() -> tuple[str, str]:
     if not path.is_absolute():
         path = ROOT_DIR / path
     if not path.is_file():
-        raise DataFetchConfigError(
-            "Extern datakatalog saknas. Skapa data/external_data_catalog.json med "
-            "tools/build_external_data_catalog.py eller sätt DATA_SOURCE_CATALOG_JSON/DATA_SOURCE_CATALOG_PATH."
-        )
+        raise DataFetchConfigError("Extern datakatalog saknas i servermiljön.")
     try:
         return str(path), path.read_text(encoding="utf-8")
     except OSError as exc:

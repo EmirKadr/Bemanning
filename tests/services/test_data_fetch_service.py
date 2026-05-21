@@ -178,3 +178,18 @@ def test_excel_export_writes_data_and_metadata(tmp_path):
     assert workbook["Data"]["A1"].value == "Typ"
     assert workbook["Data"]["B2"].value == "A1"
     assert workbook["Fråga"]["B2"].value == "dblog_count_log"
+
+
+def test_health_reports_missing_catalog_without_spending_ai(monkeypatch):
+    monkeypatch.setattr(data_fetch, "load_catalog", lambda: (_ for _ in ()).throw(service.DataFetchConfigError("saknas")))
+    monkeypatch.setattr(settings, "DATA_SOURCE_API_BASE_URL", "")
+    monkeypatch.setattr(settings, "DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE", "")
+    monkeypatch.setattr(settings, "MINIMAX_API_KEY", "minimax-key")
+
+    result = data_fetch.data_fetch_health(fake_user())
+
+    assert result["ok"] is False
+    assert result["catalog_configured"] is False
+    assert result["api_configured"] is False
+    assert result["minimax_configured"] is True
+    assert result["catalog"] == {"views": 0, "columns": 0}

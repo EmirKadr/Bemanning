@@ -20,6 +20,45 @@ Det finns en LLM-underhallen projektwiki i `wiki/`.
   felmeddelanden ska relevant wiki-sida och `wiki/log.md` uppdateras i samma
   arbetsinsats.
 
+## Hemligheter, commits och pushar
+
+`AGENTS.md` ska vara kvar i git. Den ar till for att framtida agenter och
+utvecklare ska se reglerna innan de gor commits. Att gitignora den vore
+overdrivet och skulle gora skyddet svagare. Skriv reglerna generiskt; lagg aldrig
+riktiga nycklar, privata URL:er, headernamn, endpointmallar, kataloginnehall eller
+kund-/lagerdata i `AGENTS.md`.
+
+Fore varje commit och push ska agenten kontrollera att inga hemligheter eller
+privata data foljer med:
+
+- Kor `git status --short` och granska alla staged och unstaged filer.
+- Kor `git status --short --ignored app/.env data private-data` nar andringen
+  ror API, import/export, datahamtning eller miljokonfiguration.
+- Kor `git diff --cached --name-only` och stoppa om listan innehaller `.env`,
+  lokala databaser, genererade kataloger, privata Excel/CSV-underlag eller andra
+  filer som bara ska finnas lokalt.
+- Sok staged diffen efter hemlighetsmonster och gamla provider-detaljer innan
+  push. Minst kontrollera ord som `API_KEY`, `SECRET`, `TOKEN`, `PASSWORD`,
+  `PRIVATE`, samt provider-specifika namn, URL:er, headernamn och endpointmallar.
+- `.env.example`, README, wiki och `render.yaml` far bara innehalla tomma eller
+  generiska variabelnamn och `sync: false` for hemligheter. De far inte innehalla
+  riktiga varden eller leverantorens privata API-kontrakt.
+- Backend ska lasa privata anslutningsdetaljer fran miljo variabler eller
+  driftens secret store. Frontend far aldrig prata direkt med privata externa API:er.
+- Genererade kataloger och privata dataunderlag ska vara ignorerade i git. Om en
+  sadan fil behovs i drift ska den laggas som secret, env-varde eller separat
+  privat fil, inte commitas.
+- Om en hemlighet redan har blivit staged: avbryt committen, unstagea filen och
+  flytta vardet till `.env` eller Render/secret store.
+- Om en hemlighet redan har pushats: pusha inte mer ovanpa i panik. Skriv tydligt
+  till Emir att nyckeln maste roteras och att historiken kan behova saneras.
+  Historikradering eller force-push far bara goras efter uttrycklig instruktion.
+
+Nar Hämta data eller andra externa datafloden andras ska kod och dokumentation
+fortsatta anvanda generiska namn som `DATA_SOURCE_*`, `external_data_client` och
+`/api/query-data`. Provider-specifika sokvagar, headernamn och riktiga kataloger
+ska stanna i lokala ignorerade filer eller i driftens secrets.
+
 ## Huvudregel: strikt funktionsparitet
 
 Alla agenter som arbetar i detta repo ska utga fran att:

@@ -41,6 +41,9 @@ miljövariabler och skickas aldrig till modellen.
 - MiniMax-prompten byggs av `data_fetch_service.py` och innehåller bara användarens prompt, tillåtna operatorer, kandidatvyer, kolumn-id:n och kolumnnamn.
 - MiniMax får inte URL, endpoint-bas, headernamn, API-token, sessioncookie eller databasinfo.
 - Backend validerar alltid att vald vy och alla filter-/utdatakolumner finns i katalogen innan API-anropet körs.
+- `GET /api/query-data/health` använder inte MiniMax. Om katalog, API-env eller
+  MiniMax-nyckel saknas rapporterar den status till UI:t så `Tolka med MiniMax`
+  och `Hämta data` kan spärras innan någon AI-fråga eller extern API-fråga skickas.
 
 ## Teknisk modell
 
@@ -60,7 +63,13 @@ Fråga: Får MiniMax se API-länken?
 Svar: Nej. Backend skickar bara vy-/kolumnstruktur och JSON-formatet som modellen ska returnera. URL, endpointmall, headernamn och nycklar läses från serverns miljövariabler när API-anropet körs.
 
 Fråga: Varför säger den att katalog saknas?
-Svar: Servern hittar inte `data/external_data_catalog.json` och har inte `DATA_SOURCE_CATALOG_JSON`. Bygg katalogen lokalt med `python tools/build_external_data_catalog.py --views <views.xlsx> --columns <columns.xlsx>` eller sätt katalogen som hemligt miljövärde/fil i drift.
+Svar: Servern hittar inte `data/external_data_catalog.json` och har inte `DATA_SOURCE_CATALOG_JSON`. Bygg katalogen lokalt med `python tools/build_external_data_catalog.py --views <views.xlsx> --columns <columns.xlsx>` eller sätt katalogen som hemligt miljövärde/fil i drift. Detta fel skapar ingen MiniMax-usage.
+
+Fråga: Varför går det inte att klicka på Tolka med MiniMax?
+Svar: Knappen spärras när katalogen saknas eller när `MINIMAX_API_KEY` inte är satt. Då skickas ingen AI-fråga och ingen MiniMax-usage skapas.
+
+Fråga: Varför går det inte att klicka på Hämta data?
+Svar: Knappen kräver en godkänd plan och att den externa datakällan är konfigurerad med `DATA_SOURCE_API_BASE_URL` och `DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE` i servermiljön.
 
 Fråga: Varför stoppas en MiniMax-plan?
 Svar: Backend accepterar bara vyer, kolumner och filteroperatorer som finns i katalogen. Om modellen hittar på något stoppas körningen innan extern datakälla anropas.

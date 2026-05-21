@@ -2,6 +2,9 @@ const dataFetchState = {
   plan: null,
   result: null,
   busy: false,
+  catalogReady: false,
+  apiReady: false,
+  minimaxReady: false,
 };
 
 function dataFetchEscape(value) {
@@ -18,8 +21,13 @@ function dataFetchValueText(value) {
 
 function dataFetchSetBusy(active, text = "") {
   dataFetchState.busy = Boolean(active);
-  document.getElementById("dataFetchPlan").disabled = dataFetchState.busy;
-  document.getElementById("dataFetchRun").disabled = dataFetchState.busy || dataFetchState.plan?.status !== "ok";
+  document.getElementById("dataFetchPlan").disabled =
+    dataFetchState.busy || !dataFetchState.catalogReady || !dataFetchState.minimaxReady;
+  document.getElementById("dataFetchRun").disabled =
+    dataFetchState.busy
+      || !dataFetchState.catalogReady
+      || !dataFetchState.apiReady
+      || dataFetchState.plan?.status !== "ok";
   document.getElementById("dataFetchReloadCatalog").disabled = dataFetchState.busy;
   document.getElementById("dataFetchStatus").textContent = text;
 }
@@ -32,7 +40,8 @@ function dataFetchMaxRows() {
 function renderDataFetchPlan(plan) {
   const panel = document.getElementById("dataFetchPlanPanel");
   dataFetchState.plan = plan;
-  document.getElementById("dataFetchRun").disabled = dataFetchState.busy || plan?.status !== "ok";
+  document.getElementById("dataFetchRun").disabled =
+    dataFetchState.busy || !dataFetchState.catalogReady || plan?.status !== "ok";
   if (!plan) {
     panel.hidden = true;
     panel.innerHTML = "";
@@ -111,15 +120,36 @@ async function loadDataFetchHealth() {
   try {
     const result = await api.get("/api/query-data/health");
     const catalog = result.catalog || {};
+    dataFetchState.catalogReady = Boolean(result.catalog_configured);
+    dataFetchState.apiReady = Boolean(result.api_configured);
+    dataFetchState.minimaxReady = Boolean(result.minimax_configured);
+    health.classList.toggle("error-text", !result.ok);
     health.textContent = `Katalog: ${catalog.views || 0} vyer, ${catalog.columns || 0} kolumner.`
-      + (result.api_configured ? " API är konfigurerat." : " API saknar miljövärden.");
+      + (result.api_configured ? " API är konfigurerat." : " API saknar miljövärden.")
+      + (result.minimax_configured ? " MiniMax är konfigurerat." : " MiniMax saknar API-nyckel.")
+      + (result.message ? ` ${result.message}` : "");
+    dataFetchSetBusy(false);
   } catch (error) {
+    dataFetchState.catalogReady = false;
+    dataFetchState.apiReady = false;
+    dataFetchState.minimaxReady = false;
+    renderDataFetchPlan(null);
+    renderDataFetchResult(null);
     health.textContent = error.message || "Kunde inte kontrollera datahämtning.";
     health.classList.add("error-text");
+    dataFetchSetBusy(false, "Ingen AI-fråga skickades.");
   }
 }
 
 async function planDataFetch() {
+  if (!dataFetchState.catalogReady) {
+    showToast("Katalogen saknas. Ingen AI-fråga skickades.", "warn", 6000);
+    return;
+  }
+  if (!dataFetchState.minimaxReady) {
+    showToast("MiniMax saknar API-nyckel. Ingen AI-fråga skickades.", "warn", 6000);
+    return;
+  }
   const prompt = document.getElementById("dataFetchPrompt").value.trim();
   if (!prompt) {
     showToast("Skriv vad du vill hämta först.", "warn");
@@ -138,7 +168,7 @@ async function planDataFetch() {
 }
 
 async function runDataFetch() {
-  if (!dataFetchState.plan || dataFetchState.plan.status !== "ok") return;
+  if (!dataFetchState.catalogReady || !dataFetchState.apiReady || !dataFetchState.plan || dataFetchState.plan.status !== "ok") return;
   dataFetchSetBusy(true, "Hämtar data...");
   try {
     const result = await api.post("/api/query-data/run", {

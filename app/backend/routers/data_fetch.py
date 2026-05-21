@@ -154,15 +154,28 @@ def _write_excel(session: dict) -> str:
 def data_fetch_health(
     _: User = Depends(require_view_access("dataFetch", "view")),
 ) -> dict:
-    catalog = _catalog_or_503()
+    try:
+        catalog = load_catalog()
+        catalog_ready = True
+        catalog_info = catalog_summary(catalog)
+        message = ""
+    except DataFetchConfigError as exc:
+        catalog_ready = False
+        catalog_info = {"views": 0, "columns": 0}
+        message = str(exc)
+
+    api_configured = bool(
+        settings.DATA_SOURCE_API_BASE_URL.strip()
+        and settings.DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE.strip()
+    )
+    minimax_configured = bool(settings.MINIMAX_API_KEY.strip())
     return {
-        "ok": True,
-        "catalog": catalog_summary(catalog),
-        "api_configured": bool(
-            settings.DATA_SOURCE_API_BASE_URL.strip()
-            and settings.DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE.strip()
-        ),
-        "minimax_configured": bool(settings.MINIMAX_API_KEY.strip()),
+        "ok": catalog_ready and api_configured and minimax_configured,
+        "catalog": catalog_info,
+        "catalog_configured": catalog_ready,
+        "api_configured": api_configured,
+        "minimax_configured": minimax_configured,
+        "message": message,
     }
 
 

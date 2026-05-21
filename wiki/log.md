@@ -57,6 +57,10 @@ Lade till `Hamta data` som skyddad vy och API-flode for promptstyrd extern datae
 
 Bytte Hämta data-flodet till generiska `DATA_SOURCE_*`-miljovariabler, neutral API-route `/api/query-data`, generisk klient `external_data_client.py` och katalogfil `data/external_data_catalog.json`. Endpointmall och headernamn ligger nu i env i stallet for kod/wiki, och dokumentationen beskriver bara extern datakalla.
 
+## [2026-05-21] fix | Spärrar Hämta data utan konfiguration
+
+Hämta data-health returnerar nu status utan att kasta 503 nar katalog/env saknas. Frontend spärrar `Tolka med MiniMax` och `Hämta data` tills katalog, MiniMax och extern API-konfiguration finns, sa saknad katalog inte kan skapa AI-usage eller en missvisande arbetsyta.
+
 ## [2026-05-21] support | Stoppa lokal server
 
 Lade till `stop_local.bat` for att stanga gamla lokala `start_local.bat`/uvicorn-processer och frigora port `8000` nar `app/bemanning_local.db` ar last. Uppdaterade README och anvandarhandelser med kommandot.
