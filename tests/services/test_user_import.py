@@ -25,14 +25,14 @@ def test_build_user_import_template_excel_has_expected_headers():
         "anv\u00e4ndarnamn (obligatorisk)",
         "namn (frivillig)",
         "roller (obligatorisk)",
-        "avdelning (frivillig)",
+        "omr\u00e5de (frivillig)",
     ]
 
 
 def test_parse_user_import_excel_accepts_template_headers_and_swedish_roles():
     content = workbook_bytes(
         [
-            ["anv\u00e4ndarnamn (obligatorisk)", "namn (frivillig)", "roll (obligatorisk)", "avdelning (frivillig)"],
+            ["anv\u00e4ndarnamn (obligatorisk)", "namn (frivillig)", "roll (obligatorisk)", "omr\u00e5de (frivillig)"],
             ["anna", "Anna Andersson", "arbetsledare", ""],
             ["petra", "Petra Bemanning", "bemanningsansvarig", ""],
             ["bo", "Bo Berg", "administrat\u00f6r", "GG"],

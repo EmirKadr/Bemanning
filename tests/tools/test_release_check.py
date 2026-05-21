@@ -39,6 +39,16 @@ def test_release_check_accepts_complete_package(tmp_path):
     assert errors == []
 
 
+def test_release_check_requires_every_frontend_file():
+    required = set(REQUIRED_PACKAGE_FILES)
+
+    assert "_internal/app/frontend/aktiviteter.html" in required
+    assert "_internal/app/frontend/stallen.html" in required
+    assert "_internal/app/frontend/js/activities.js" in required
+    assert "_internal/app/frontend/js/common.js" in required
+    assert "_internal/app/frontend/css/styles.css" in required
+
+
 def test_release_check_reports_missing_frontend_in_zip(tmp_path):
     release_dir = make_release(
         tmp_path,
@@ -53,4 +63,3 @@ def test_release_check_reports_missing_frontend_in_zip(tmp_path):
     )
 
     assert "Saknar fil i zip: _internal/app/frontend/js/productivity.js" in errors
-

@@ -8,7 +8,13 @@ from sqlalchemy.orm import sessionmaker
 
 from app.backend.database import Base
 from app.backend.models import Person, User
-from app.backend.routers.persons import build_person_import_template_excel, create_person, parse_person_import_excel, update_person
+from app.backend.routers.persons import (
+    build_person_import_template_excel,
+    create_person,
+    delete_person,
+    parse_person_import_excel,
+    update_person,
+)
 from app.backend.schemas import PersonCreate, PersonUpdate
 
 
@@ -29,7 +35,7 @@ def test_build_person_import_template_excel_has_expected_headers():
     assert [sheet["A1"].value, sheet["B1"].value, sheet["C1"].value, sheet["D1"].value] == [
         "namn (obligatorisk)",
         "hemomr\u00e5de (frivillig)",
-        "huvudst\u00e4lle (frivillig)",
+        "huvudaktivitet (frivillig)",
         "sortering (frivillig)",
     ]
 
@@ -38,7 +44,7 @@ def test_parse_person_import_excel_accepts_name_only():
     rows, errors = parse_person_import_excel(
         workbook_bytes(
             [
-                ["namn", "hemomr\u00e5de", "huvudst\u00e4lle", "sortering"],
+                ["namn", "hemomr\u00e5de", "huvudaktivitet", "sortering"],
                 ["Anna Andersson", None, None, None],
             ]
         )
@@ -117,18 +123,29 @@ def test_create_person_rejects_duplicate_name(person_db):
     assert exc.value.status_code == 409
 
 
-def test_create_person_reactivates_inactive_duplicate_name(person_db):
+def test_create_person_rejects_inactive_duplicate_name(person_db):
     admin = User(username="admin", role="admin", roles=["admin"], is_active=True)
     inactive = Person(name="Anton Holmqvist", competencies=[], is_active=False, sort_order=17)
     person_db.add_all([admin, inactive])
     person_db.flush()
 
-    result = create_person(PersonCreate(name="Anton Holmqvist", sort_order=3), db=person_db, user=admin)
+    with pytest.raises(HTTPException) as exc:
+        create_person(PersonCreate(name="Anton Holmqvist", sort_order=3), db=person_db, user=admin)
 
-    assert result.id == inactive.id
-    assert result.is_active is True
-    assert result.sort_order == 3
+    assert exc.value.status_code == 409
+    assert inactive.is_active is False
     assert person_db.query(Person).filter(Person.name == "Anton Holmqvist").count() == 1
+
+
+def test_delete_person_removes_person(person_db):
+    admin = User(username="admin", role="admin", roles=["admin"], is_active=True)
+    person = Person(name="Bo Berg", competencies=[], is_active=False, sort_order=17)
+    person_db.add_all([admin, person])
+    person_db.flush()
+
+    delete_person(person.id, db=person_db, user=admin)
+
+    assert person_db.get(Person, person.id) is None
 
 
 def test_update_person_rejects_duplicate_name(person_db):

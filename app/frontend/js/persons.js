@@ -6,7 +6,10 @@ let persons = [];
 let currentUser = null;
 let sortKey = "sort_order";
 let sortAsc = true;
-const filters = { name: "", home_area: "", home_activity: "", is_active: "", sort_order: "" };
+const filters = { name: "", home_area: "", home_activity: "", sort_order: "" };
+const personUndoStack = [];
+const PERSON_UNDO_LIMIT = 50;
+let personUndoBusy = false;
 
 async function loadInitial() {
   const [a, act] = await Promise.all([
@@ -43,7 +46,6 @@ function passesFilter(p) {
   if (!match(p.name, filters.name)) return false;
   if (!match(areaName(p.home_area_id), filters.home_area)) return false;
   if (!match(activityLabel(p.home_activity_id), filters.home_activity)) return false;
-  if (!match(p.is_active ? "ja" : "nej", filters.is_active)) return false;
   if (!match(p.sort_order, filters.sort_order)) return false;
   return true;
 }
@@ -53,7 +55,6 @@ function sortKeyValue(p) {
     case "name": return (p.name || "").toLowerCase();
     case "home_area": return areaName(p.home_area_id).toLowerCase();
     case "home_activity": return activityLabel(p.home_activity_id).toLowerCase();
-    case "is_active": return p.is_active ? 1 : 0;
     case "sort_order": return p.sort_order;
     default: return 0;
   }
@@ -63,11 +64,71 @@ function sortKeyValue(p) {
 // ---- Inline edit-helpers ----
 async function savePersonField(personId, payload) {
   try {
-    await api.put(`/api/persons/${personId}`, payload);
+    return await api.put(`/api/persons/${personId}`, payload);
   } catch (e) {
     showToast(e.message || "Kunde inte spara", "error");
     throw e;
   }
+}
+
+function snapshotPerson(person) {
+  return {
+    id: person.id,
+    name: person.name,
+    home_area_id: person.home_area_id ?? null,
+    home_activity_id: person.home_activity_id ?? null,
+    competencies: Array.isArray(person.competencies) ? [...person.competencies] : [],
+    comment: person.comment ?? null,
+    has_fixed_schedule: person.has_fixed_schedule !== false,
+    sort_order: Number(person.sort_order) || 0,
+  };
+}
+
+function personPayloadFromSnapshot(person) {
+  return {
+    name: person.name,
+    home_area_id: person.home_area_id,
+    home_activity_id: person.home_activity_id,
+    competencies: Array.isArray(person.competencies) ? [...person.competencies] : [],
+    comment: person.comment,
+    has_fixed_schedule: person.has_fixed_schedule,
+    sort_order: person.sort_order,
+  };
+}
+
+function pushPersonUndo(label, before) {
+  if (!before || personUndoBusy) return;
+  personUndoStack.push({ label, before });
+  if (personUndoStack.length > PERSON_UNDO_LIMIT) personUndoStack.shift();
+}
+
+async function undoLastPersonAction() {
+  if (personUndoBusy) return;
+  const action = personUndoStack.pop();
+  if (!action) return;
+
+  personUndoBusy = true;
+  try {
+    await api.put(`/api/persons/${action.before.id}`, personPayloadFromSnapshot(action.before));
+    showToast(`Ångrade ${action.label}`, "success", 2500);
+    await loadPersons();
+  } catch (error) {
+    personUndoStack.push(action);
+    showToast(error.message || "Kunde inte ångra", "error", 7000);
+  } finally {
+    personUndoBusy = false;
+  }
+}
+
+function installPersonUndoShortcut() {
+  document.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+    if (e.key.toLowerCase() !== "z") return;
+    if (e.target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
+    if (document.querySelector(".modal-backdrop")) return;
+    e.preventDefault();
+    void undoLastPersonAction();
+  });
 }
 
 function editText(td, person, field, currentValue) {
@@ -86,10 +147,13 @@ function editText(td, person, field, currentValue) {
   const finish = async (commit) => {
     if (done) return; done = true;
     td.classList.remove("editing");
-    if (commit && input.value !== currentValue) {
+    const newValue = input.value.trim();
+    if (commit && newValue !== (currentValue || "")) {
       try {
-        await savePersonField(person.id, { [field]: input.value.trim() });
-        person[field] = input.value.trim();
+        const before = snapshotPerson(person);
+        await savePersonField(person.id, { [field]: newValue });
+        pushPersonUndo("namn", before);
+        person[field] = newValue;
       } catch (e) {}
     }
     await loadPersons();
@@ -120,7 +184,11 @@ function editNumber(td, person, field, currentValue) {
     td.classList.remove("editing");
     const num = Number(input.value) || 0;
     if (commit && num !== currentValue) {
-      try { await savePersonField(person.id, { [field]: num }); } catch (e) {}
+      try {
+        const before = snapshotPerson(person);
+        await savePersonField(person.id, { [field]: num });
+        pushPersonUndo("sortering", before);
+      } catch (e) {}
     }
     await loadPersons();
   };
@@ -149,7 +217,11 @@ function editSelect(td, person, field, currentId, options, getId, getLabel) {
     td.classList.remove("editing");
     const newId = select.value ? Number(select.value) : null;
     if (commit && newId !== currentId) {
-      try { await savePersonField(person.id, { [field]: newId }); } catch (e) {}
+      try {
+        const before = snapshotPerson(person);
+        await savePersonField(person.id, { [field]: newId });
+        pushPersonUndo(field === "home_area_id" ? "hemområde" : "huvudaktivitet", before);
+      } catch (e) {}
     }
     await loadPersons();
   };
@@ -198,7 +270,7 @@ function renderRows() {
     );
     tr.appendChild(tdArea);
 
-    // Huvudställe
+    // Huvudaktivitet
     const tdAct = document.createElement("td");
     if (canEditPersons) tdAct.className = "editable";
     if (p.home_activity_id) tdAct.style.background = activityColor(p.home_activity_id);
@@ -213,18 +285,6 @@ function renderRows() {
     );
     tr.appendChild(tdAct);
 
-    // Aktiv (toggle)
-    const tdActive = document.createElement("td");
-    if (canEditPersons) tdActive.className = "editable";
-    tdActive.textContent = p.is_active ? "Ja" : "Nej";
-    if (canEditPersons) tdActive.addEventListener("click", async () => {
-      try {
-        await savePersonField(p.id, { is_active: !p.is_active });
-        await loadPersons();
-      } catch (e) {}
-    });
-    tr.appendChild(tdActive);
-
     // Sortering
     const tdSort = document.createElement("td");
     if (canEditPersons) tdSort.className = "editable";
@@ -232,11 +292,11 @@ function renderRows() {
     if (canEditPersons) tdSort.addEventListener("click", () => editNumber(tdSort, p, "sort_order", p.sort_order));
     tr.appendChild(tdSort);
 
-    // Åtgärder (Schema + Inaktivera)
+    // Åtgärder
     const tdActions = document.createElement("td");
     tdActions.innerHTML = `
       <button data-schedule="${p.id}">Schema</button>
-      ${canEditPersons && p.is_active ? `<button data-delete="${p.id}" class="danger">Inaktivera</button>` : ""}
+      ${canEditPersons ? `<button data-delete="${p.id}" class="danger">Ta bort</button>` : ""}
     `;
     tr.appendChild(tdActions);
 
@@ -244,12 +304,17 @@ function renderRows() {
   });
 
   if (canEditPersons) {
-    tbody.querySelectorAll("button[data-delete]").forEach((b) =>
-      b.addEventListener("click", async (e) => {
+    tbody.querySelectorAll("button[data-delete]").forEach((button) =>
+      button.addEventListener("click", async (e) => {
         e.stopPropagation();
-        if (!confirm("Inaktivera person?")) return;
-        await api.del(`/api/persons/${b.dataset.delete}`);
-        await loadPersons();
+        const person = persons.find((item) => item.id === Number(button.dataset.delete));
+        if (!person || !confirm("Ta bort personen permanent?")) return;
+        try {
+          await api.del(`/api/persons/${person.id}`);
+          await loadPersons();
+        } catch (error) {
+          showToast(error.message || "Kunde inte ta bort personen", "error", 7000);
+        }
       })
     );
   }
@@ -268,8 +333,7 @@ function renderRows() {
 
 
 async function loadPersons() {
-  const includeInactive = document.getElementById("show-inactive").checked;
-  persons = await api.get(`/api/persons?include_inactive=${includeInactive}`);
+  persons = await api.get("/api/persons");
   renderRows();
 }
 
@@ -387,14 +451,13 @@ function openModal(person) {
         <option value="">(inget)</option>
         ${areas.map((a) => `<option value="${a.id}" ${person?.home_area_id === a.id ? "selected" : ""}>${escapeHtml(a.name)}</option>`).join("")}
       </select>
-      <label>Huvudställe</label>
+      <label>Huvudaktivitet</label>
       <select id="m-activity">
         <option value="">(inget)</option>
         ${activities.map((a) => `<option value="${a.id}" ${person?.home_activity_id === a.id ? "selected" : ""}>${escapeHtml(a.label)}</option>`).join("")}
       </select>
       <label>Sortering</label>
       <input id="m-sort" type="number" value="${person?.sort_order ?? 0}" />
-      <label class="modal-checkbox"><input id="m-active" type="checkbox" ${person?.is_active !== false ? "checked" : ""} /> Aktiv</label>
       <div class="actions">
         <button id="m-cancel">Avbryt</button>
         <button class="primary" id="m-save">Spara</button>
@@ -409,12 +472,16 @@ function openModal(person) {
       home_area_id: document.getElementById("m-area").value ? Number(document.getElementById("m-area").value) : null,
       home_activity_id: document.getElementById("m-activity").value ? Number(document.getElementById("m-activity").value) : null,
       sort_order: Number(document.getElementById("m-sort").value) || 0,
-      is_active: document.getElementById("m-active").checked,
     };
     if (!payload.name) { showToast("Namn krävs", "error"); return; }
     try {
-      if (isEdit) await api.put(`/api/persons/${person.id}`, payload);
-      else await api.post("/api/persons", payload);
+      if (isEdit) {
+        const before = snapshotPerson(person);
+        await api.put(`/api/persons/${person.id}`, payload);
+        pushPersonUndo("personändring", before);
+      } else {
+        await api.post("/api/persons", payload);
+      }
       backdrop.remove();
       await loadPersons();
     } catch (e) { showToast(e.message, "error"); }
@@ -453,7 +520,7 @@ async function openScheduleModal(person) {
   backdrop.innerHTML = `
     <div class="modal" style="min-width: 480px;">
       <h2>Veckomall för ${escapeHtml(person.name)}</h2>
-      <p class="note">Mallen används av Översikt + visar huvudställe som bas i bemanningen.</p>
+      <p class="note">Mallen används av Översikt och visar huvudaktivitet som bas i bemanningen.</p>
       <label class="modal-checkbox">
         <input id="sch-hourly" type="checkbox" ${isHourlyWorker ? "checked" : ""} />
         Timmis - ingen fast schemamall
@@ -549,10 +616,10 @@ function updateRowDisabled(row) {
   await loadInitial();
   await loadPersons();
   setupImportControls();
+  installPersonUndoShortcut();
   const newPersonButton = document.getElementById("new-person");
   newPersonButton.hidden = !canEditPage(currentUser, "persons");
   if (canEditPage(currentUser, "persons")) newPersonButton.addEventListener("click", () => openModal(null));
-  document.getElementById("show-inactive").addEventListener("change", loadPersons);
   window.addEventListener("bemanning:areaFocusChanged", () => renderRows());
 
   document.querySelectorAll("tr.filter-row input").forEach((inp) => {

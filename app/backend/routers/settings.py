@@ -19,7 +19,7 @@ from ..settings_service import (
     set_lock_foreign_schedule_cells,
     set_sidebar_layout,
 )
-from ..user_access import BASE_ROLES, ROLE_ACCESS_LEVEL_RANK, ROLE_VIEW_IDS
+from ..user_access import BASE_ROLES, ROLE_ACCESS_LEVEL_RANK, ROLE_VIEW_IDS, normalize_role_view_id
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -46,12 +46,12 @@ def _clean_sidebar_layout(payload: SidebarLayoutUpdate) -> list[dict]:
     seen: set[str] = set()
     cleaned: list[dict] = []
     for item in payload.items:
-        item_id = item.id.strip()
+        item_id = normalize_role_view_id(item.id)
         if not item_id or item_id in seen:
             continue
         seen.add(item_id)
         heading = item.heading.strip()[:80]
-        parent_id = item.parent_id.strip() if item.parent_id else None
+        parent_id = normalize_role_view_id(item.parent_id) if item.parent_id else None
         cleaned.append({
             "id": item_id,
             "heading": heading,
@@ -83,7 +83,7 @@ def _clean_role_view_access(payload: RoleViewAccessUpdate) -> dict[str, dict[str
             continue
         role_views: dict[str, str] = {}
         for view_id, level in views.items():
-            view_key = view_id.strip()
+            view_key = normalize_role_view_id(view_id)
             level_key = level.strip()
             if view_key not in ROLE_VIEW_ACCESS_VIEWS or level_key not in ROLE_VIEW_ACCESS_LEVELS:
                 continue

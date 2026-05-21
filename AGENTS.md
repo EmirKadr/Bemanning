@@ -9,6 +9,17 @@ Detta repo innehaller tva forstaklassiga klienter for samma produkt:
 
 De ska utvecklas som **en och samma produkt**, inte som tva separata varianter.
 
+## Projektwiki
+
+Det finns en LLM-underhallen projektwiki i `wiki/`.
+
+- Las `wiki/index.md` tidigt nar du behover forsta projektet, anvandarfloden,
+  knappar, behorigheter, API:er eller felsokning.
+- Folj `wiki/AGENTS.md` nar du uppdaterar wikin.
+- Nar en kodandring paverkar produktbeteende, knappar, vyer, roller, API eller
+  felmeddelanden ska relevant wiki-sida och `wiki/log.md` uppdateras i samma
+  arbetsinsats.
+
 ## Huvudregel: strikt funktionsparitet
 
 Alla agenter som arbetar i detta repo ska utga fran att:

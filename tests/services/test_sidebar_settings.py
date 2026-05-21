@@ -57,14 +57,14 @@ def test_sidebar_router_cleans_layout_before_saving():
             SidebarLayoutItem(id="schedule", heading="  Planering  "),
             SidebarLayoutItem(id="overview", parent_id="schedule"),
             SidebarLayoutItem(id="overview", heading="Dubblett"),
-            SidebarLayoutItem(id="persons", parent_id="stallen"),
+            SidebarLayoutItem(id="persons", parent_id="activities"),
             SidebarLayoutItem(id="stallen", parent_id="persons"),
             SidebarLayoutItem(id="ghost", parent_id="schedule"),
         ])
 
         result = settings_router.update_sidebar_settings(payload, session, admin)
 
-        assert [item.id for item in result.items] == ["schedule", "overview", "persons", "stallen", "ghost"]
+        assert [item.id for item in result.items] == ["schedule", "overview", "persons", "activities", "ghost"]
         assert result.items[0].heading == "Planering"
         assert result.items[1].parent_id == "schedule"
         assert result.items[2].parent_id is None
@@ -105,7 +105,7 @@ def test_role_view_access_router_cleans_unknown_roles_views_and_levels():
         admin = User(id=7, username="root", role="admin", roles=["super_user"], is_active=True)
         payload = RoleViewAccessUpdate(access={
             "viewer": {"schedule": "view", "users": "edit", "ghost": "edit"},
-            "leader": {"overview": "edit", "stallen": "delete", "personImport": "edit"},
+            "leader": {"overview": "edit", "stallen": "delete", "personImport": "edit", "activityImport": "view"},
             "admin": {"roleAccess": "edit", "sidebarLayout": "edit", "appSettings": "edit"},
             "unknown": {"schedule": "edit"},
         })
@@ -114,7 +114,7 @@ def test_role_view_access_router_cleans_unknown_roles_views_and_levels():
 
         assert result.access == {
             "viewer": {"schedule": "view", "users": "edit"},
-            "leader": {"overview": "edit", "personImport": "edit"},
+            "leader": {"overview": "edit", "personImport": "edit", "activityImport": "view"},
             "admin": {"roleAccess": "edit", "sidebarLayout": "edit", "appSettings": "edit"},
         }
     finally:

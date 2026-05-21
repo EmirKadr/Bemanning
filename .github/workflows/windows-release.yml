@@ -21,6 +21,34 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r app/requirements.txt -r requirements-dev.txt
+          python -m playwright install chromium
+
+      - name: Run pytest
+        env:
+          QT_QPA_PLATFORM: offscreen
+          BEMANNING_DISABLE_UPDATE_CHECK: "1"
+          SECRET_KEY: test-secret
+          SUPER_USER_USERNAMES: admin,emikad,mikhal
+          EXCEL_API_TOKEN: test-token
+        run: python -m pytest
+
+      - name: Check frontend JavaScript syntax
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path app\frontend\js -Filter *.js | ForEach-Object { node --check $_.FullName }
+
+      - name: Run desktop smoke test
+        run: python desktop\main.py --smoke-test
+
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 

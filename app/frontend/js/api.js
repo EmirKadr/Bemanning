@@ -9,16 +9,33 @@ function isAuthPath(path) {
   );
 }
 
+function connectionError(path, originalError) {
+  const protocol = window.location?.protocol || "";
+  const message = protocol === "file:"
+    ? "Appen måste öppnas via servern, inte direkt från fil. Öppna https://stigamo.nu eller starta lokal testmiljö."
+    : "Kunde inte ansluta till servern. Kontrollera att appen öppnas via rätt adress och att backend är igång.";
+  const err = new Error(message);
+  err.status = 0;
+  err.path = path;
+  err.originalError = originalError;
+  return err;
+}
+
 async function request(path, options = {}) {
   const { headers = {}, ...rest } = options;
   const isFormData = typeof FormData !== "undefined" && rest.body instanceof FormData;
   const requestHeaders = isFormData ? headers : { "Content-Type": "application/json", ...headers };
 
-  const resp = await fetch(path, {
-    credentials: "include",
-    headers: requestHeaders,
-    ...rest,
-  });
+  let resp;
+  try {
+    resp = await fetch(path, {
+      credentials: "include",
+      headers: requestHeaders,
+      ...rest,
+    });
+  } catch (error) {
+    throw connectionError(path, error);
+  }
 
   if (resp.status === 204) return null;
 
@@ -57,7 +74,12 @@ function filenameFromContentDisposition(value) {
 }
 
 async function download(path, fallbackFilename = "download") {
-  const resp = await fetch(path, { credentials: "include" });
+  let resp;
+  try {
+    resp = await fetch(path, { credentials: "include" });
+  } catch (error) {
+    throw connectionError(path, error);
+  }
 
   if (resp.status === 401 && !isAuthPath(path)) {
     if (!window.location.pathname.endsWith("/login.html")) {

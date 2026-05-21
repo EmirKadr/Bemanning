@@ -26,25 +26,32 @@ AGENT_PASSWORD = "AgentTest123"
 
 WEB_WORKFLOW_STEPS = (
     "login_admin",
+    "download_import_templates",
     "create_user",
     "edit_user",
+    "import_user",
     "toggle_user_setting",
     "toggle_user_active",
     "create_activity",
     "edit_activity",
-    "deactivate_activity",
+    "delete_activity",
     "import_activity",
+    "import_person",
     "create_person",
     "edit_person_inline",
     "edit_person_fields_inline",
+    "edit_person_activity_inline",
     "edit_person_week_template",
     "edit_person_hourly_schedule",
+    "schedule_person_activity",
     "edit_schedule_cell",
     "split_schedule_cell",
     "copy_paste_schedule_cell",
+    "drag_fill_schedule_cells",
     "copy_day",
     "clear_day",
     "undo_redo",
+    "overview_person_activity",
     "overview_edit",
     "history_filter",
     "viewer_read_only",
@@ -68,11 +75,13 @@ class InteractiveRun:
         self.run_id = run_id
         self.results: list[StepResult] = []
         self.agent_user = f"agent_user_{run_id}"
+        self.agent_user_imported = f"agent_import_user_{run_id}"
         self.agent_person = f"Agent Person {run_id}"
         self.agent_person_updated = f"Agent Person Redigerad {run_id}"
+        self.agent_person_imported = f"Agent Importperson {run_id}"
         self.agent_activity = f"Agent Aktivitet {run_id}"
         self.agent_activity_updated = f"Agent Aktivitet Redigerad {run_id}"
-        self.agent_activity_imported = f"Agent Importställe {run_id}"
+        self.agent_activity_imported = f"Agent Importaktivitet {run_id}"
 
     def url(self, path: str) -> str:
         return self.base_url + path
@@ -136,14 +145,17 @@ class InteractiveRun:
         self.login("admin", "admin123")
         self.record("login_admin", screenshot=self.screenshot("01-admin-login"))
 
+        self.download_import_templates()
         self.create_user()
         self.edit_user()
+        self.import_user()
         self.toggle_user_setting()
         self.toggle_user_active()
         self.create_activity()
         self.edit_activity()
-        self.deactivate_activity()
+        self.delete_activity()
         self.import_activity()
+        self.import_person()
         self.create_person()
         self.edit_person_inline()
         self.edit_person_fields_inline()
@@ -169,6 +181,21 @@ class InteractiveRun:
         self.record("create_user", screenshot=before, detail=self.agent_user)
         self.record("create_user_saved", screenshot=self.screenshot("03-user-created"))
 
+    def download_import_templates(self) -> None:
+        downloads = (
+            ("/personer.html", "#download-person-template", "personer-importmall.xlsx"),
+            ("/aktiviteter.html", "#download-activity-template", "aktiviteter-importmall.xlsx"),
+            ("/anvandare.html", "#download-user-template", "anvandare-importmall.xlsx"),
+        )
+        for path, selector, expected_name in downloads:
+            self.goto(path, selector)
+            with self.page.expect_download(timeout=15000) as download_info:
+                self.page.click(selector)
+            download = download_info.value
+            if download.suggested_filename != expected_name:
+                raise AssertionError(f"Expected {expected_name}, got {download.suggested_filename}")
+        self.record("download_import_templates", screenshot=self.screenshot("02-import-template-downloads"))
+
     def edit_user(self) -> None:
         row = self.page.locator("#users-body tr", has_text=self.agent_user)
         row.locator("button[data-edit]").click()
@@ -182,6 +209,19 @@ class InteractiveRun:
         self.wait_for_text("Agent Test User Redigerad")
         self.record("edit_user", screenshot=modal)
         self.record("edit_user_saved", screenshot=self.screenshot("05-user-edited"))
+
+    def import_user(self) -> None:
+        self.goto("/anvandare.html", "#users-body")
+        xlsx_path = self.output_dir / f"user-import-{self.run_id}.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["anvandarnamn", "namn", "roller", "omrade"])
+        sheet.append([self.agent_user_imported, "Agent Import User", "Visning", "Mestergruppen"])
+        workbook.save(xlsx_path)
+
+        self.page.set_input_files("#user-import-file", str(xlsx_path))
+        self.wait_for_text(self.agent_user_imported)
+        self.record("import_user", screenshot=self.screenshot("05b-user-imported"))
 
     def toggle_user_setting(self) -> None:
         checkbox = self.page.locator("#lock-foreign-schedule-cells")
@@ -206,7 +246,7 @@ class InteractiveRun:
         self.record("toggle_user_active", screenshot=self.screenshot("07-user-active-toggled"))
 
     def create_activity(self) -> None:
-        self.goto("/stallen.html", "#acts-body")
+        self.goto("/aktiviteter.html", "#acts-body")
         self.page.click("#new-act")
         self.page.wait_for_selector("#m-label", timeout=15000)
         self.page.fill("#m-label", self.agent_activity)
@@ -232,18 +272,14 @@ class InteractiveRun:
         self.record("edit_activity", screenshot=modal)
         self.record("edit_activity_saved", screenshot=self.screenshot("09-activity-edited"))
 
-    def deactivate_activity(self) -> None:
+    def delete_activity(self) -> None:
         row = self.page.locator("#acts-body tr", has_text=self.agent_activity_updated)
         row.locator("button[data-delete]").click()
         self.page.wait_for_timeout(700)
-        show_inactive = self.page.locator("#show-inactive")
-        if not show_inactive.is_checked():
-            show_inactive.check()
-        self.wait_for_text(self.agent_activity_updated)
-        self.record("deactivate_activity", screenshot=self.screenshot("10-activity-deactivated"))
+        self.record("delete_activity", screenshot=self.screenshot("10-activity-deleted"))
 
     def import_activity(self) -> None:
-        self.goto("/stallen.html", "#acts-body")
+        self.goto("/aktiviteter.html", "#acts-body")
         xlsx_path = self.output_dir / f"activity-import-{self.run_id}.xlsx"
         workbook = Workbook()
         sheet = workbook.active
@@ -254,6 +290,19 @@ class InteractiveRun:
         self.page.set_input_files("#activity-import-file", str(xlsx_path))
         self.wait_for_text(self.agent_activity_imported)
         self.record("import_activity", screenshot=self.screenshot("11-activity-imported"))
+
+    def import_person(self) -> None:
+        self.goto("/personer.html", "#persons-body")
+        xlsx_path = self.output_dir / f"person-import-{self.run_id}.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["namn", "hemomrade", "huvudaktivitet", "sortering"])
+        sheet.append([self.agent_person_imported, "Mestergruppen", "MG Plock", 994])
+        workbook.save(xlsx_path)
+
+        self.page.set_input_files("#person-import-file", str(xlsx_path))
+        self.wait_for_text(self.agent_person_imported)
+        self.record("import_person", screenshot=self.screenshot("11b-person-imported"))
 
     def create_person(self) -> None:
         self.goto("/personer.html", "#persons-body")
@@ -292,22 +341,25 @@ class InteractiveRun:
         self.page.wait_for_timeout(700)
 
         row = self.page.locator("#persons-body tr", has_text=self.agent_person_updated)
-        row.locator("td").nth(4).click()
+        row.locator("td").nth(3).click()
         self.page.wait_for_selector("#persons-body input.inline-input", timeout=15000)
         self.page.fill("#persons-body input.inline-input", "996")
         self.page.keyboard.press("Enter")
         self.page.wait_for_timeout(700)
 
         row = self.page.locator("#persons-body tr", has_text=self.agent_person_updated)
-        row.locator("td").nth(3).click()
+        row.locator("td").nth(2).click()
+        self.page.wait_for_selector("#persons-body select.inline-input", timeout=15000)
+        self.page.locator("#persons-body select.inline-input").select_option(label="MG Plock")
         self.page.wait_for_timeout(700)
-        show_inactive = self.page.locator("#show-inactive")
-        if not show_inactive.is_checked():
-            show_inactive.check()
-        self.wait_for_text(self.agent_person_updated)
+        self.record("edit_person_activity_inline", screenshot=self.screenshot("13b-person-activity-inline-edited"))
+
         row = self.page.locator("#persons-body tr", has_text=self.agent_person_updated)
-        row.locator("td").nth(3).click()
+        row.locator("td").nth(2).click()
+        self.page.wait_for_selector("#persons-body select.inline-input", timeout=15000)
+        self.page.locator("#persons-body select.inline-input").select_option(label="MG VM")
         self.page.wait_for_timeout(700)
+
         self.record("edit_person_fields_inline", screenshot=self.screenshot("13-person-fields-inline-edited"))
 
     def edit_person_week_template(self) -> None:
@@ -347,6 +399,50 @@ class InteractiveRun:
     def schedule_cell(self, hour: int):
         return self.schedule_row().locator(f"td[data-hour='{hour}']")
 
+    def selected_schedule_label(self, hour: int) -> str:
+        return self.schedule_cell(hour).locator("select").first.evaluate(
+            "select => select.options[select.selectedIndex]?.textContent?.trim() || ''"
+        )
+
+    def drag_schedule_cell(self, source_hour: int, target_hour: int) -> None:
+        source = self.schedule_cell(source_hour)
+        target = self.schedule_cell(target_hour)
+        source.scroll_into_view_if_needed()
+        target.scroll_into_view_if_needed()
+        source_handle = source.element_handle()
+        target_handle = target.element_handle()
+        if not source_handle or not target_handle:
+            raise AssertionError("Could not locate schedule cells for drag fill")
+        self.page.evaluate(
+            """([source, target]) => {
+                const sourceBox = source.getBoundingClientRect();
+                const targetBox = target.getBoundingClientRect();
+                const sourceX = sourceBox.left + 4;
+                const sourceY = sourceBox.top + 4;
+                const targetX = targetBox.left + targetBox.width / 2;
+                const targetY = targetBox.top + targetBox.height / 2;
+                source.dispatchEvent(new MouseEvent('mousedown', {
+                    bubbles: true,
+                    button: 0,
+                    clientX: sourceX,
+                    clientY: sourceY,
+                }));
+                document.dispatchEvent(new MouseEvent('mousemove', {
+                    bubbles: true,
+                    clientX: targetX,
+                    clientY: targetY,
+                }));
+                document.dispatchEvent(new MouseEvent('mouseup', {
+                    bubbles: true,
+                    button: 0,
+                    clientX: targetX,
+                    clientY: targetY,
+                }));
+            }""",
+            [source_handle, target_handle],
+        )
+        self.page.wait_for_timeout(1000)
+
     def edit_schedule(self) -> None:
         self.goto("/index.html", "#scheduleTable")
         self.page.locator("#areaSelect").select_option(label="Mestergruppen")
@@ -354,9 +450,17 @@ class InteractiveRun:
         self.page.fill("#nameFilter", self.agent_person_updated)
         self.wait_for_text(self.agent_person_updated)
 
-        self.schedule_cell(8).locator("select").first.select_option(label="MG VM")
+        self.schedule_cell(8).locator("select").first.select_option(label="MG Plock")
         self.page.wait_for_timeout(700)
+        if self.selected_schedule_label(8) != "MG Plock":
+            raise AssertionError("Schedule activity was not applied to the person row")
+        self.record("schedule_person_activity", screenshot=self.screenshot("14-schedule-person-activity"))
         self.record("edit_schedule_cell", screenshot=self.screenshot("14-schedule-cell-edited"))
+
+        self.drag_schedule_cell(8, 7)
+        if self.selected_schedule_label(7) != "MG Plock":
+            raise AssertionError("Drag fill did not copy the expected activity")
+        self.record("drag_fill_schedule_cells", screenshot=self.screenshot("14b-schedule-drag-fill"))
 
         self.schedule_cell(9).dblclick()
         self.page.wait_for_selector(
@@ -374,6 +478,8 @@ class InteractiveRun:
         self.schedule_cell(10).click(position={"x": 8, "y": 8})
         self.page.keyboard.press("Control+V")
         self.page.wait_for_timeout(700)
+        if self.selected_schedule_label(10) != "MG Plock":
+            raise AssertionError("Keyboard copy/paste did not copy the expected activity")
         self.record("copy_paste_schedule_cell", screenshot=self.screenshot("16-schedule-copy-paste"))
 
         self.page.click("#copyBtn")
@@ -406,8 +512,14 @@ class InteractiveRun:
         self.page.fill("#nameFilter", self.agent_person_updated)
         self.wait_for_text(self.agent_person_updated)
         first_day_select = self.schedule_like_overview_select()
-        first_day_select.select_option(label="MG VM")
+        first_day_select.select_option(label="MG Plock")
         self.page.wait_for_timeout(700)
+        selected = first_day_select.evaluate(
+            "select => select.options[select.selectedIndex]?.textContent?.trim() || ''"
+        )
+        if selected != "MG Plock":
+            raise AssertionError("Overview activity was not applied to the person row")
+        self.record("overview_person_activity", screenshot=self.screenshot("22-overview-person-activity"))
         self.record("overview_edit", screenshot=self.screenshot("22-overview-day-edited"))
         self.page.select_option("#viewMode", "month")
         self.page.wait_for_timeout(700)
@@ -437,7 +549,7 @@ class InteractiveRun:
 
         for path, name in (
             ("/personer.html", "viewer_blocked_personer"),
-            ("/stallen.html", "viewer_blocked_stallen"),
+            ("/aktiviteter.html", "viewer_blocked_aktiviteter"),
             ("/anvandare.html", "viewer_blocked_anvandare"),
             ("/historik.html", "viewer_blocked_historik"),
         ):

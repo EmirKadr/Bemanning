@@ -12,7 +12,7 @@ hemsidan. Hemsidan ska alltså vara facit under övergången.
   `https://stigamo.nu` som sida. Den ska köra en lokal app-yta och prata med
   den centrala servern via API.
 - All gemensam sanning ligger kvar centralt: användare, roller, schema,
-  personer, ställen, historik, inställningar och KPI-mål.
+  personer, aktiviteter, historik, inställningar och KPI-mål.
 - Stora produktivitetsloggar är lokala i klienten tills vi bygger planerad
   API-hämtning/import.
 - Ingen riskfylld funktion får tas bort för att appen byggs om. Om appen och
@@ -114,7 +114,7 @@ flera dagar, timmis utan mall, undo/redo och jämför timmar mot Bemanning.
 Extra test senare: importmall, import med dubblett, skapa person, ändra inline,
 inaktivera, visa inaktiva, ändra veckomall, timmis utan fast schema.
 
-### Ställen/aktiviteter och områden
+### Aktiviteter och områden
 
 - `GET /api/areas` och `GET /api/activities` kräver inloggning.
 - Skapa/ändra/inaktivera kräver admin.
@@ -148,7 +148,7 @@ Extra test senare: skapa användare, skapa utan lösenord, lösenordssättning,
   entities.
 - Muterande API-flöden loggar audit så långt de är byggda idag.
 
-Extra test senare: gör ändringar i schema/person/ställe/användare och bekräfta
+Extra test senare: gör ändringar i schema/person/aktivitet/användare och bekräfta
 att de syns med rätt filter.
 
 ### Produktivitet
@@ -248,4 +248,3 @@ Vi ska inte gå vidare till nästa fas om något av detta händer:
 - KPI-mål blir lokal istället för central sanning.
 - Undo/redo eller versionskonflikter beter sig olika.
 - En import ersätter gammal sanning innan ny data är validerad.
-

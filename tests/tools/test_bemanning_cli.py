@@ -1,4 +1,5 @@
 import json
+import sqlite3
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -6,6 +7,7 @@ from fastapi.routing import APIRoute
 
 from app.backend.main import app
 from tools import bemanning_cli
+from tools import visual_smoke
 
 
 class CliTestHandler(BaseHTTPRequestHandler):
@@ -96,3 +98,107 @@ def test_cli_accepts_base_url_after_subcommand():
 
     assert args.base_url == "http://127.0.0.1:1"
     assert args.command == "api"
+
+
+def test_cli_command_groups_work_against_local_app(tmp_path, capsys):
+    base_url, server = visual_smoke.start_local_server(tmp_path)
+    cookie_jar = tmp_path / "cli-cookies.txt"
+    common = ["--base-url", base_url, "--cookie-jar", str(cookie_jar)]
+    try:
+        assert bemanning_cli.main([*common, "routes", "--format", "json"]) == 0
+        assert bemanning_cli.main([*common, "call", "health"]) == 0
+        assert bemanning_cli.main(
+            [*common, "auth", "login", "--username", "admin", "--password", "admin123"]
+        ) == 0
+        assert bemanning_cli.main([*common, "auth", "me"]) == 0
+        assert bemanning_cli.main([*common, "api", "GET", "/api/activities"]) == 0
+        assert bemanning_cli.main([*common, "auth", "logout"]) == 0
+    finally:
+        server.close()
+
+    output = capsys.readouterr().out
+    assert '"status": "ok"' in output
+    assert '"username": "admin"' in output
+    assert "GG Plock" in output
+
+
+def test_cli_db_lookup_finds_hidden_people_users_and_activities(tmp_path, capsys):
+    db_path = tmp_path / "lookup.sqlite"
+    with sqlite3.connect(db_path) as connection:
+        connection.executescript(
+            """
+            create table areas (
+                id integer primary key,
+                name text not null
+            );
+            create table users (
+                id integer primary key,
+                username text not null,
+                display_name text,
+                role text not null,
+                area_id integer,
+                is_active integer not null
+            );
+            create table activities (
+                id integer primary key,
+                code text not null,
+                label text not null,
+                category text not null,
+                area_id integer,
+                summary_activity_id integer,
+                is_active integer not null
+            );
+            create table persons (
+                id integer primary key,
+                name text not null,
+                home_area_id integer,
+                home_activity_id integer,
+                is_active integer not null
+            );
+            insert into areas (id, name) values (1, 'Mestergruppen');
+            insert into activities (id, code, label, category, area_id, summary_activity_id, is_active)
+            values (1, 'MG_PLOCK', 'MG Plock', 'work', 1, null, 1);
+            insert into users (id, username, display_name, role, area_id, is_active)
+            values (1, 'antonh', 'Anton Holmqvist', 'leader', 1, 0);
+            insert into persons (id, name, home_area_id, home_activity_id, is_active)
+            values (1, 'Anton Holmqvist', 1, 1, 0);
+            """
+        )
+
+    database_url = f"sqlite:///{db_path.as_posix()}"
+    result = bemanning_cli.main(
+        [
+            "db",
+            "lookup",
+            "all",
+            "--database-url",
+            database_url,
+            "--q",
+            "Anton Holmqvist",
+            "--json",
+        ]
+    )
+    output = capsys.readouterr().out
+
+    assert result == 0
+    payload = json.loads(output)
+    assert payload["count"] == 2
+    assert {row["type"] for row in payload["results"]} == {"person", "user"}
+    assert all(row["is_active"] == 0 for row in payload["results"])
+
+    active_result = bemanning_cli.main(
+        [
+            "db",
+            "lookup",
+            "all",
+            "--database-url",
+            database_url,
+            "--q",
+            "Anton Holmqvist",
+            "--active-only",
+        ]
+    )
+    active_output = capsys.readouterr().out
+
+    assert active_result == 1
+    assert "Inga traffar." in active_output

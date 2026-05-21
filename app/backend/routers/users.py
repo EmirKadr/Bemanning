@@ -197,14 +197,14 @@ def _validate_area_id(db: Session, area_id: int | None) -> None:
     if area_id is None:
         return
     if not db.get(Area, area_id):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Avdelning hittades inte")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
 
 
 def build_user_import_template_excel() -> bytes:
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Användare"
-    sheet.append(["användarnamn (obligatorisk)", "namn (frivillig)", "roller (obligatorisk)", "avdelning (frivillig)"])
+    sheet.append(["användarnamn (obligatorisk)", "namn (frivillig)", "roller (obligatorisk)", "område (frivillig)"])
     sheet.column_dimensions["A"].width = 24
     sheet.column_dimensions["B"].width = 28
     sheet.column_dimensions["C"].width = 18
@@ -330,7 +330,7 @@ async def import_users(
         if row.area_name:
             area = areas_by_key.get(_compact_key(row.area_name))
             if not area:
-                errors.append(UserImportError(row=row.row_number, username=row.username, error="Avdelning hittades inte"))
+                errors.append(UserImportError(row=row.row_number, username=row.username, error="Område hittades inte"))
                 continue
             area_id = area.id
 

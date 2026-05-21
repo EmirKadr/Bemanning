@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aktiviteter - Bemanning</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/app-icon-192.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body class="with-sidebar">
+  <header class="topbar"></header>
+
+  <section class="controls">
+    <button class="primary" id="new-act">+ Ny aktivitet</button>
+    <button id="download-activity-template" hidden>Ladda ner importmall</button>
+    <button id="import-activities" hidden>Importera Excel</button>
+    <button class="import-help-btn" id="activity-import-help" type="button" title="Hjälp med import" aria-label="Hjälp med import" hidden>?</button>
+    <input id="activity-import-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+  </section>
+
+  <main>
+    <div class="section-title">Aktiviteter</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Färg</th>
+            <th>Etikett</th>
+            <th id="code-column-header" hidden>Kod</th>
+            <th>Område</th>
+            <th>Summeras som</th>
+            <th>Kategori</th>
+            <th>Sortering</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="acts-body"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/activities.js"></script>
+</body>
+</html>

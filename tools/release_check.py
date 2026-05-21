@@ -11,15 +11,22 @@ from core.app_info import APP_VERSION
 
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def _frontend_package_files() -> tuple[str, ...]:
+    frontend_dir = ROOT / "app" / "frontend"
+    if not frontend_dir.is_dir():
+        return ()
+    return tuple(
+        f"_internal/app/frontend/{path.relative_to(frontend_dir).as_posix()}"
+        for path in sorted(frontend_dir.rglob("*"))
+        if path.is_file()
+    )
+
+
 REQUIRED_PACKAGE_FILES = (
     "Bemanning.exe",
-    "_internal/app/frontend/index.html",
-    "_internal/app/frontend/login.html",
-    "_internal/app/frontend/produktivitet.html",
-    "_internal/app/frontend/css/styles.css",
-    "_internal/app/frontend/js/api.js",
-    "_internal/app/frontend/js/common.js",
-    "_internal/app/frontend/js/productivity.js",
+    *_frontend_package_files(),
     "_internal/warehouse_tools/vendor/allokering12.1.py",
     "_internal/warehouse_tools/vendor/wms_sok79.py",
     "_internal/warehouse_tools/vendor/lowfreqdata/buffertpall/artikel_max.csv",

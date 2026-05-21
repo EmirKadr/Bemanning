@@ -24,6 +24,10 @@ python -m tools.bemanning_cli routes --format table
 python desktop\main.py --smoke-test
 ```
 
+Samma skydd finns i GitHub Actions pa varje push och pull request via
+`.github/workflows/test.yml`. Den kor pytest, JS-syntaxkontroll, desktop smoke
+och en Render-liknande build med Alembic + seed.
+
 For release eller desktop-andringar:
 
 ```powershell
@@ -87,6 +91,21 @@ python -m pytest tests\services\test_warehouse_tools_local_data.py
 Testet kontrollerar publikt flodesregister, datapool, summaries, tabellnycklar,
 radantal och representativa cellvarden for de deterministiska flodena.
 
+## Read-only databasuppslag
+
+Nar man behover svara pa fragor som "finns den har anvandaren/personen i
+databasen?" ska man anvanda CLI:ns read-only-uppslag i stallet for att skriva
+egna SQL-snuttar:
+
+```powershell
+python -m tools.bemanning_cli db lookup all --q "Anton Holmqvist"
+python -m tools.bemanning_cli db lookup users --q "emikad" --json
+python -m tools.bemanning_cli db lookup persons --q "Henrik" --database-url "sqlite:///app/bemanning_local.db"
+```
+
+Kommandot laser bara fran databasen och visar aven inaktiva/dolda rader som
+standard. Anvand `--active-only` om bara aktiva rader ska visas.
+
 `--via-desktop-proxy` testar samma frontend via desktop-appens lokala appserver
 och proxar API-anrop till testbackend. Anvand den nar en andring paverkar
 Windows-appens lokala appyta, cookies, API-proxy eller paketerad frontend.
@@ -97,7 +116,7 @@ Bas-screenshots som ska granskas:
 - Bemanning i admin-, arbetsledar- och visningsroll.
 - Oversikt i admin-, arbetsledar- och visningsroll.
 - Personer.
-- Stallen.
+- Aktiviteter.
 - Historik.
 - Anvandare.
 - Uppladdningar, Bearbeta, Dela och Harleda for admin/super user och
@@ -105,7 +124,7 @@ Bas-screenshots som ska granskas:
 
 Scenario-screenshots som ska granskas:
 
-- Bemanning med Alla avdelningar.
+- Bemanning med Alla områden.
 - Bemanning med Mestergruppen.
 - Bemanning med Autostore.
 - Bemanning med tomt personfilter.
@@ -123,7 +142,7 @@ Scenario-screenshots som ska granskas:
 - Ny anvandare-modal.
 - Redigera anvandare-modal.
 - Historik med filter.
-- Nekad atkomst for visningsroll till Personer, Stallen, Anvandare och Historik.
+- Nekad atkomst for visningsroll till Personer, Aktiviteter, Anvandare och Historik.
 - Nekad atkomst for arbetsledare till Anvandare och Historik.
 - Nekad atkomst for arbetsledare och visningsroll till Uppladdningar.
 
@@ -154,10 +173,10 @@ under `artifacts/interactive/<timestamp>/`.
 Det testar bland annat:
 
 - Logga in som admin.
-- Skapa och redigera anvandare, inklusive roll och avdelning.
+- Skapa och redigera anvandare, inklusive roll och område.
 - Andra installningscheckbox och aktivera/inaktivera anvandare.
 - Skapa och redigera stalle/aktivitet.
-- Inaktivera stalle/aktivitet och verifiera att inaktiva kan visas.
+- Ta bort aktivitet och verifiera att den försvinner.
 - Skapa person, redigera namn inline och andra veckomall.
 - Vaxla person mellan fast schemamall och timmis utan att rakna timmis som ledig.
 - Redigera personens omrade, sortering och aktiv-status inline.
@@ -231,7 +250,7 @@ men det blockerar inte de vanliga webbarbetsflodena. Anvand da:
 `tools.visual_data` lagger in:
 
 - admin, arbetsledare, Bemanningsansvarig, visningsroll och Lagerkontorist
-- personer i flera avdelningar
+- personer i flera områden
 - veckomallar med ledig helg
 - schemaceller med heldagar och halvtimmar
 - auditlogg for Historik

@@ -33,9 +33,9 @@ const VIEW_ACCESS_OPTIONS = [
   { id: "allocationTrace", label: "Härleda" },
   { id: "persons", label: "Personer" },
   { id: "personImport", label: "Personimport" },
-  { id: "stallen", label: "Ställen" },
-  { id: "stallenImport", label: "Ställenimport" },
-  { id: "areas", label: "Avdelningar" },
+  { id: "activities", label: "Aktiviteter" },
+  { id: "activityImport", label: "Aktivitetsimport" },
+  { id: "areas", label: "Områden" },
   { id: "analytics", label: "Historik" },
   { id: "users", label: "Användare" },
   { id: "userImport", label: "Användarimport" },
@@ -80,7 +80,7 @@ function editableRoleOptions() {
 function areaName(areaId) {
   if (areaId == null) return "-";
   const area = areas.find((item) => Number(item.id) === Number(areaId));
-  return area ? area.name : `Avdelning #${areaId}`;
+  return area ? area.name : `Område #${areaId}`;
 }
 
 function passwordStatus(user) {
@@ -327,7 +327,7 @@ function openModal(user) {
           </label>
         `).join("")}
       </div>
-      <label>Avdelning</label>
+      <label>Område</label>
       <select id="m-area">
         <option value="">Ingen förinställning</option>
         ${areas.map((area) => `<option value="${area.id}" ${Number(user?.area_id) === Number(area.id) ? "selected" : ""}>${escapeHtml(area.name)}</option>`).join("")}

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..audit import log as audit_log
 from ..deps import get_db, require_view_access
-from ..models import Activity, Area, Person, User
+from ..models import Activity, Area, Person, PersonScheduleTemplate, ScheduleCell, User
 from ..schemas import PersonCreate, PersonImportError, PersonImportResult, PersonOut, PersonUpdate
 
 router = APIRouter(prefix="/api/persons", tags=["persons"])
@@ -29,6 +29,7 @@ HEADER_ALIASES = {
     "omrade": "home_area",
     "area": "home_area",
     "homearea": "home_area",
+    "huvudaktivitet": "home_activity",
     "huvudstalle": "home_activity",
     "aktivitet": "home_activity",
     "homeactivity": "home_activity",
@@ -115,7 +116,7 @@ def build_person_import_template_excel() -> bytes:
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Personer"
-    sheet.append(["namn (obligatorisk)", "hemområde (frivillig)", "huvudställe (frivillig)", "sortering (frivillig)"])
+    sheet.append(["namn (obligatorisk)", "hemområde (frivillig)", "huvudaktivitet (frivillig)", "sortering (frivillig)"])
     sheet.column_dimensions["A"].width = 28
     sheet.column_dimensions["B"].width = 24
     sheet.column_dimensions["C"].width = 28
@@ -217,8 +218,7 @@ def list_persons(
     _user: User = Depends(require_view_access("persons", "view")),
 ) -> list[Person]:
     q = db.query(Person)
-    if not include_inactive:
-        q = q.filter(Person.is_active.is_(True))
+    _ = include_inactive
     if area_id is not None:
         q = q.filter(Person.home_area_id == area_id)
     return q.order_by(Person.sort_order, Person.name).all()
@@ -274,7 +274,7 @@ async def import_persons(
         if row.home_activity:
             activity = activity_lookup.get(_compact_key(row.home_activity))
             if activity is None:
-                errors.append(PersonImportError(row=row.row_number, name=row.name, error="Huvudställe hittades inte"))
+                errors.append(PersonImportError(row=row.row_number, name=row.name, error="Huvudaktivitet hittades inte"))
                 continue
             home_activity_id = activity.id
             if home_area_id is None:
@@ -320,27 +320,11 @@ def create_person(
 ) -> Person:
     existing = _find_name_conflict(db, payload.name)
     if existing:
-        if existing.is_active:
-            raise HTTPException(status.HTTP_409_CONFLICT, detail="Person med samma namn finns redan")
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Person med samma namn finns redan")
 
-        before = _person_snapshot(existing)
-        for key, value in payload.model_dump().items():
-            setattr(existing, key, value)
-        existing.is_active = True
-        audit_log(
-            db,
-            entity_type="person",
-            entity_id=existing.id,
-            action="reactivate",
-            old_value=before,
-            new_value=_person_snapshot(existing),
-            user_id=user.id,
-        )
-        db.commit()
-        db.refresh(existing)
-        return existing
-
-    person = Person(**payload.model_dump())
+    data = payload.model_dump()
+    data["is_active"] = True
+    person = Person(**data)
     db.add(person)
     db.flush()
     audit_log(
@@ -378,8 +362,9 @@ def update_person(
     if payload.name is not None and _find_name_conflict(db, payload.name, exclude_person_id=person_id):
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Person med samma namn finns redan")
     before = _person_snapshot(person)
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    for key, value in payload.model_dump(exclude_unset=True, exclude={"is_active"}).items():
         setattr(person, key, value)
+    person.is_active = True
     audit_log(
         db,
         entity_type="person",
@@ -404,14 +389,18 @@ def delete_person(
     if not person:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Person hittades inte")
     before = _person_snapshot(person)
-    person.is_active = False
+    db.query(ScheduleCell).filter(ScheduleCell.person_id == person_id).delete(synchronize_session=False)
+    db.query(PersonScheduleTemplate).filter(PersonScheduleTemplate.person_id == person_id).delete(
+        synchronize_session=False
+    )
+    db.delete(person)
     audit_log(
         db,
         entity_type="person",
         entity_id=person.id,
-        action="deactivate",
+        action="delete",
         old_value=before,
-        new_value=_person_snapshot(person),
+        new_value=None,
         user_id=user.id,
     )
     db.commit()

@@ -1,12 +1,12 @@
 # Bemanningssystem
 
-Webbaserad ersättning för Excel-bemanningsfilen. Arbetsledare planerar bemanning per vecka/dag/område i en matris (personer × timmar) där varje cell anger ställe/aktivitet.
+Webbaserad ersättning för Excel-bemanningsfilen. Arbetsledare planerar bemanning per vecka/dag/område i en matris (personer × timmar) där varje cell anger aktivitet.
 
 ## Funktioner i MVP
 
 - **Bemanningsvy** – matris med personer som rader och 06:00–23:00 som kolumner. Välj år/vecka/dag/område. Cellerna är dropdowns med alla aktiva aktiviteter (färgkodade).
 - **Personregister** – lägg till, redigera och inaktivera personer.
-- **Ställeregister** – lägg till, redigera och inaktivera aktiviteter med egen färg och sortering.
+- **Aktivitetsregister** – lägg till, redigera och ta bort aktiviteter med egen färg och sortering.
 - **Summering** – visar timmar och uppskattat antal personer per aktivitet för vald dag.
 - **Kopiera dag** – kopiera bemanningen från en dag till en annan, valfritt inom samma område.
 - **Rensa dag** – tömmer alla celler för vald dag/område.
@@ -79,6 +79,18 @@ uvicorn backend.main:app --reload
 ```
 Öppna http://localhost:8000.
 
+### Lokal testmiljö med live-data
+
+`start_local.bat` använder alltid SQLite-filen `app/bemanning_local.db`, så lokala ändringar kan inte påverka live-databasen.
+
+Om du vill att den lokala testmiljön ska börja med en färsk kopia av live-data, sätt live-databasens externa Render-URL som en lokal miljövariabel innan du kör `start_local.bat`:
+
+```powershell
+setx LIVE_DATABASE_URL "postgresql://..."
+```
+
+Nästa gång `start_local.bat` öppnas ersätts `app/bemanning_local.db` med en ny lokal kopia. Om `LIVE_DATABASE_URL` saknas används den vanliga lokala seed-databasen.
+
 ## Mappstruktur
 
 ```
@@ -103,7 +115,7 @@ app/
 ├── frontend/               statiska filer (serveras av FastAPI)
 │   ├── index.html          bemanningsvyn
 │   ├── personer.html
-│   ├── stallen.html
+│   ├── aktiviteter.html
 │   ├── login.html
 │   ├── css/styles.css
 │   └── js/{api,common,schedule,persons,activities}.js
@@ -127,7 +139,7 @@ Detta innebär:
 - [x] Steg 2: Modeller + migrations + seed
 - [x] Steg 3: Auth + personregister
 - [x] Steg 4: Bemanningsvyn med multi-user-säkerhet
-- [x] Steg 5: Bulk-operationer + ställeregister + audit_log
+- [x] Steg 5: Bulk-operationer + aktivitetsregister + audit_log
 - [x] Steg 6: README + polish
 
 ## Skjutet till v1.1 / v2

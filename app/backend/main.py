@@ -1,7 +1,8 @@
 from pathlib import Path
 import threading
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -35,9 +36,27 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def prevent_stale_static_cache_in_development(request: Request, call_next):
+    response = await call_next(request)
+    if not settings.is_production and request.url.path.endswith((".html", ".js", ".css")):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok", "environment": settings.ENVIRONMENT}
+
+
+@app.get("/stallen.html", include_in_schema=False)
+@app.get("/stallen", include_in_schema=False)
+def legacy_activities_page_redirect() -> RedirectResponse:
+    return RedirectResponse(
+        url="/aktiviteter.html",
+        status_code=308,
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 def _sync_allocation_observations_background() -> None:

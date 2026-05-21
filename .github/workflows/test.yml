@@ -1,0 +1,69 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: bemanning_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bemanning_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      QT_QPA_PLATFORM: offscreen
+      BEMANNING_DISABLE_UPDATE_CHECK: "1"
+      SECRET_KEY: test-secret
+      SUPER_USER_USERNAMES: admin,emikad,mikhal
+      EXCEL_API_TOKEN: test-token
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r app/requirements.txt -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Simulate Render build
+        working-directory: app
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/bemanning_test
+          ENVIRONMENT: production
+        run: |
+          alembic upgrade head
+          python -m backend.seed
+          python -c "from backend.main import app; print(app.title)"
+
+      - name: Run pytest
+        run: python -m pytest
+
+      - name: Check frontend JavaScript syntax
+        run: |
+          find app/frontend/js -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Run desktop smoke test
+        run: python desktop/main.py --smoke-test

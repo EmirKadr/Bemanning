@@ -1,4 +1,4 @@
-// Ställeregister – CRUD av aktiviteter.
+// Aktivitetsregister - CRUD av aktiviteter.
 
 let areas = [];
 let activities = [];
@@ -26,7 +26,7 @@ function canSeeCodes() {
 
 async function load() {
   activities = await api.get("/api/activities");
-  const canEditStallen = canEditPage(currentUser, "stallen");
+  const canEditActivities = canEditPage(currentUser, "activities");
   const acts = [...activities]
     .sort((a, b) => typeof compareActivitiesForAreaFocus === "function"
       ? compareActivitiesForAreaFocus(a, b, areas)
@@ -45,7 +45,7 @@ async function load() {
       <td>${escapeHtml(a.category)}</td>
       <td>${a.sort_order}</td>
       <td>
-        ${canEditStallen ? `
+        ${canEditActivities ? `
         <button data-edit="${a.id}">Redigera</button>
         <button data-delete="${a.id}" class="danger">Ta bort</button>
         ` : ""}
@@ -53,13 +53,13 @@ async function load() {
     tbody.appendChild(tr);
   });
 
-  if (!canEditStallen) return;
+  if (!canEditActivities) return;
   tbody.querySelectorAll("button[data-edit]").forEach((b) =>
     b.addEventListener("click", () => openModal(acts.find((x) => x.id === Number(b.dataset.edit))))
   );
   tbody.querySelectorAll("button[data-delete]").forEach((b) =>
     b.addEventListener("click", async () => {
-      if (!confirm("Ta bort stället permanent?")) return;
+      if (!confirm("Ta bort aktiviteten permanent?")) return;
       try { await api.del(`/api/activities/${b.dataset.delete}`); load(); }
       catch (e) { showToast(e.message, "error"); }
     })
@@ -168,20 +168,20 @@ function openImportResultModal(result) {
 
 function showImportResult(result) {
   if (result.created && result.skipped) {
-    showToast(`${result.created} ställen importerades. ${result.skipped} rad(er) hoppades över.`, "warn", 7000);
+    showToast(`${result.created} aktiviteter importerades. ${result.skipped} rad(er) hoppades över.`, "warn", 7000);
     openImportResultModal(result);
     return;
   }
   if (result.created) {
-    showToast(`${result.created} ställen importerades`, "success");
+    showToast(`${result.created} aktiviteter importerades`, "success");
     return;
   }
   if (result.skipped) {
-    showToast("Inga ställen importerades", "error", 7000);
+    showToast("Inga aktiviteter importerades", "error", 7000);
     openImportResultModal(result);
     return;
   }
-  showToast("Excel-filen innehöll inga ställen", "warn");
+  showToast("Excel-filen innehöll inga aktiviteter", "warn");
 }
 
 async function importActivityFile(file) {
@@ -206,16 +206,16 @@ function setupImportControls() {
   const helpButton = document.getElementById("activity-import-help");
   const fileInput = document.getElementById("activity-import-file");
 
-  if (!canEditPage(currentUser, "stallenImport")) return;
+  if (!canEditPage(currentUser, "activityImport")) return;
 
   downloadButton.hidden = false;
   importButton.hidden = false;
   helpButton.hidden = false;
 
-  setupImportHelpButton("activity-import-help", "Importera ställen");
+  setupImportHelpButton("activity-import-help", "Importera aktiviteter");
   downloadButton.addEventListener("click", async () => {
     try {
-      await api.download("/api/activities/import-template", "stallen-importmall.xlsx");
+      await api.download("/api/activities/import-template", "aktiviteter-importmall.xlsx");
     } catch (error) {
       showToast(error.message || "Kunde inte ladda ner importmallen.", "error", 7000);
     }
@@ -230,13 +230,13 @@ function setupImportControls() {
 }
 
 (async () => {
-  currentUser = await initPage("stallen");
+  currentUser = await initPage("activities");
   if (!currentUser) return;
   areas = await api.get("/api/areas");
   await load();
   setupImportControls();
   const newActButton = document.getElementById("new-act");
-  newActButton.hidden = !canEditPage(currentUser, "stallen");
-  if (canEditPage(currentUser, "stallen")) newActButton.addEventListener("click", () => openModal(null));
+  newActButton.hidden = !canEditPage(currentUser, "activities");
+  if (canEditPage(currentUser, "activities")) newActButton.addEventListener("click", () => openModal(null));
   window.addEventListener("bemanning:areaFocusChanged", () => load());
 })();

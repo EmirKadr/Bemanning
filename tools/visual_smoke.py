@@ -71,7 +71,7 @@ PAGES: tuple[VisualPage, ...] = (
     VisualPage("oversikt", "/overblick.html", "#overviewTable", ("admin", "leader", "staffing", "viewer")),
     VisualPage("produktivitet", "/produktivitet.html", "#productivityStatus", ("admin",)),
     VisualPage("personer", "/personer.html", "#persons-table", ("admin", "leader", "staffing")),
-    VisualPage("stallen", "/stallen.html", "#acts-body", ("admin", "leader", "staffing")),
+    VisualPage("aktiviteter", "/aktiviteter.html", "#acts-body", ("admin", "leader", "staffing")),
     VisualPage("historik", "/historik.html", "#auditBody", ("admin",)),
     VisualPage("anvandare", "/anvandare.html", "#users-body", ("admin",)),
     VisualPage("uppladdningar", "/uppladdningar.html", "#allocationRoot .allocation-panel", ("admin", "warehouse", "article")),
@@ -81,7 +81,7 @@ PAGES: tuple[VisualPage, ...] = (
 )
 
 STATES: tuple[VisualState, ...] = (
-    VisualState("bemanning-alla-avdelningar", "/index.html", "#scheduleTable", "schedule_area_all", ("admin", "leader", "staffing")),
+    VisualState("bemanning-alla-omraden", "/index.html", "#scheduleTable", "schedule_area_all", ("admin", "leader", "staffing")),
     VisualState("bemanning-mestergruppen", "/index.html", "#scheduleTable", "schedule_area_mg", ("admin", "leader", "staffing")),
     VisualState("bemanning-autostore", "/index.html", "#scheduleTable", "schedule_area_as", ("admin",)),
     VisualState("bemanning-tomt-filter", "/index.html", "#scheduleTable", "schedule_empty_filter", ("admin",)),
@@ -94,14 +94,14 @@ STATES: tuple[VisualState, ...] = (
     VisualState("oversikt-tomt-filter", "/overblick.html", "#overviewTable", "overview_empty_filter", ("admin",)),
     VisualState("personer-veckomall-modal", "/personer.html", "#persons-body button[data-schedule]", "person_schedule_modal"),
     VisualState("personer-ny-person-modal", "/personer.html", "#new-person", "click_new_person"),
-    VisualState("stallen-import-hjalp", "/stallen.html", "#activity-import-help", "activity_import_help", ("admin",)),
-    VisualState("stallen-ny-aktivitet-modal", "/stallen.html", "#new-act", "click_new_activity"),
-    VisualState("stallen-redigera-aktivitet-modal", "/stallen.html", "#acts-body button[data-edit]", "activity_edit_modal"),
+    VisualState("aktiviteter-import-hjalp", "/aktiviteter.html", "#activity-import-help", "activity_import_help", ("admin",)),
+    VisualState("aktiviteter-ny-aktivitet-modal", "/aktiviteter.html", "#new-act", "click_new_activity"),
+    VisualState("aktiviteter-redigera-aktivitet-modal", "/aktiviteter.html", "#acts-body button[data-edit]", "activity_edit_modal"),
     VisualState("anvandare-ny-anvandare-modal", "/anvandare.html", "#new-user", "click_new_user"),
     VisualState("anvandare-redigera-anvandare-modal", "/anvandare.html", "#users-body button[data-edit]", "user_edit_modal"),
     VisualState("historik-filter", "/historik.html", "#auditBody", "analytics_filter", ("admin",)),
     VisualState("viewer-nekad-personer", "/personer.html", "#scheduleTable", "noop", ("viewer",)),
-    VisualState("viewer-nekad-stallen", "/stallen.html", "#scheduleTable", "noop", ("viewer",)),
+    VisualState("viewer-nekad-aktiviteter", "/aktiviteter.html", "#scheduleTable", "noop", ("viewer",)),
     VisualState("viewer-nekad-anvandare", "/anvandare.html", "#scheduleTable", "noop", ("viewer",)),
     VisualState("viewer-nekad-historik", "/historik.html", "#scheduleTable", "noop", ("viewer",)),
     VisualState("viewer-nekad-produktivitet", "/produktivitet.html", "#scheduleTable", "noop", ("viewer",)),
@@ -118,7 +118,7 @@ STATES: tuple[VisualState, ...] = (
     VisualState("oversikt-fokus-mestergruppen", "/overblick.html", "#overviewTable", "area_focus_mg", ("admin", "leader", "staffing")),
     VisualState("produktivitet-fokus-mestergruppen", "/produktivitet.html", "#productivityStatus", "area_focus_mg", ("admin",)),
     VisualState("personer-fokus-mestergruppen", "/personer.html", "#persons-table", "area_focus_mg", ("admin", "leader", "staffing")),
-    VisualState("stallen-fokus-mestergruppen", "/stallen.html", "#acts-body", "area_focus_mg", ("admin", "leader", "staffing")),
+    VisualState("aktiviteter-fokus-mestergruppen", "/aktiviteter.html", "#acts-body", "area_focus_mg", ("admin", "leader", "staffing")),
 )
 
 
@@ -246,6 +246,14 @@ def _wait_for_table_rows(page, selector: str) -> None:
     page.wait_for_timeout(300)
 
 
+def assert_no_legacy_activity_labels(page) -> None:
+    title = page.title()
+    body_text = page.locator("body").inner_text(timeout=15000)
+    legacy_label = "St" + "\u00e4llen"
+    if legacy_label in title or legacy_label in body_text:
+        raise AssertionError("Legacy activity label is visible in the rendered UI")
+
+
 def _login(page, base_url: str, role: str) -> None:
     username, password = TEST_USERS[role]
     page.goto(_page_url(base_url, "/login.html"), wait_until="networkidle")
@@ -367,6 +375,7 @@ def _capture_for_role(context, base_url: str, output_dir: Path, role: str, viewp
                 continue
             page.goto(_page_url(base_url, target.path), wait_until="networkidle")
             _wait_for_page(page, target.wait_for)
+            assert_no_legacy_activity_labels(page)
             screenshot_path = output_dir / f"{_safe_name(viewport.name, role, target.name)}.png"
             _screenshot(page, screenshot_path)
             artifacts.append(
@@ -385,6 +394,7 @@ def _capture_for_role(context, base_url: str, output_dir: Path, role: str, viewp
                 page.goto(_page_url(base_url, state.path), wait_until="networkidle")
                 _wait_for_page(page, state.wait_for)
                 _apply_state(page, state)
+                assert_no_legacy_activity_labels(page)
                 screenshot_path = output_dir / f"{_safe_name(viewport.name, role, state.name)}.png"
                 _screenshot(page, screenshot_path)
                 artifacts.append(

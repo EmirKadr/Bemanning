@@ -23,7 +23,7 @@ def test_visual_smoke_covers_expected_routes():
         "oversikt",
         "produktivitet",
         "personer",
-        "stallen",
+        "aktiviteter",
         "historik",
         "anvandare",
         "uppladdningar",
@@ -53,11 +53,11 @@ def test_visual_smoke_covers_critical_scenarios():
         "oversikt-fokus-mestergruppen",
         "produktivitet-fokus-mestergruppen",
         "personer-fokus-mestergruppen",
-        "stallen-fokus-mestergruppen",
+        "aktiviteter-fokus-mestergruppen",
         "oversikt-manad-mestergruppen",
         "personer-veckomall-modal",
-        "stallen-import-hjalp",
-        "stallen-redigera-aktivitet-modal",
+        "aktiviteter-import-hjalp",
+        "aktiviteter-redigera-aktivitet-modal",
         "anvandare-redigera-anvandare-modal",
         "historik-filter",
         "viewer-nekad-personer",
@@ -75,24 +75,32 @@ def test_visual_smoke_covers_critical_scenarios():
 
 def test_interactive_e2e_covers_mutating_workflows():
     assert {
+        "download_import_templates",
         "create_user",
         "edit_user",
+        "import_user",
         "toggle_user_setting",
         "toggle_user_active",
         "create_activity",
         "edit_activity",
-        "deactivate_activity",
+        "delete_activity",
+        "import_activity",
+        "import_person",
         "create_person",
         "edit_person_inline",
         "edit_person_fields_inline",
+        "edit_person_activity_inline",
         "edit_person_week_template",
         "edit_person_hourly_schedule",
+        "schedule_person_activity",
         "edit_schedule_cell",
         "split_schedule_cell",
         "copy_paste_schedule_cell",
+        "drag_fill_schedule_cells",
         "copy_day",
         "clear_day",
         "undo_redo",
+        "overview_person_activity",
         "overview_edit",
         "history_filter",
         "viewer_read_only",
@@ -124,6 +132,13 @@ def test_visual_smoke_has_handler_for_every_state_action():
     configured_actions = {state.action for state in visual_smoke.STATES}
 
     assert configured_actions <= handled_actions
+
+
+def test_visual_smoke_fails_if_legacy_activity_label_is_rendered():
+    source = inspect.getsource(visual_smoke._capture_for_role)
+
+    assert hasattr(visual_smoke, "assert_no_legacy_activity_labels")
+    assert "assert_no_legacy_activity_labels(page)" in source
 
 
 def test_visual_smoke_can_capture_through_desktop_local_proxy():
@@ -483,6 +498,8 @@ def test_area_focus_toggle_is_wired_to_views():
     assert "function nextAreaFocus" in common
     assert 'toggle.addEventListener("click", () => writeAreaFocus(nextAreaFocus()))' in common
     assert "preferredAreaIdFromFocus" in common
+    assert "preferredActivityAreaId" in common
+    assert "normalizeExistingAreaId(userAreaId, areas)" in common
     assert "compareActivitiesForAreaFocus" in common
     assert "comparePersonsForAreaFocus" in common
     assert ".area-focus-toggle" in styles
@@ -490,6 +507,8 @@ def test_area_focus_toggle_is_wired_to_views():
     assert 'const CALC_AREA_KEYS = ["GG", "MG", "AS", "EH"]' in schedule
     assert 'typeof areaFocusCode === "function" && areaFocusCode()' in schedule
     assert 'typeof areaFocusCode === "function" && areaFocusCode()' in overview
+    assert "compareActivitiesForAreaFocus(a, b, state.areas, state.currentUser?.area_id)" in schedule
+    assert "compareActivitiesForAreaFocus(a, b, state.areas, state.currentUser?.area_id)" in overview
     assert '"bemanning:areaFocusChanged"' in schedule
     assert '"bemanning:areaFocusChanged"' in overview
     assert '"bemanning:areaFocusChanged"' in productivity
@@ -544,7 +563,7 @@ def test_import_views_have_templates_and_help_buttons():
     persons_js = (frontend / "js" / "persons.js").read_text(encoding="utf-8")
     users_html = (frontend / "anvandare.html").read_text(encoding="utf-8")
     users_js = (frontend / "js" / "users.js").read_text(encoding="utf-8")
-    activities_html = (frontend / "stallen.html").read_text(encoding="utf-8")
+    activities_html = (frontend / "aktiviteter.html").read_text(encoding="utf-8")
     activities_js = (frontend / "js" / "activities.js").read_text(encoding="utf-8")
 
     assert "setupImportHelpButton" in common
@@ -575,21 +594,31 @@ def test_import_views_have_templates_and_help_buttons():
     assert 'id="import-activities"' in activities_html
     assert 'id="activity-import-help"' in activities_html
     assert "/api/activities/import-template" in activities_js
-    assert 'api.download("/api/activities/import-template", "stallen-importmall.xlsx")' in activities_js
+    assert 'api.download("/api/activities/import-template", "aktiviteter-importmall.xlsx")' in activities_js
     assert 'window.location.href = "/api/activities/import-template"' not in activities_js
     assert "/api/activities/import" in activities_js
-    assert 'canEditPage(currentUser, "stallen")' in activities_js
+    assert 'canEditPage(currentUser, "activities")' in activities_js
     assert 'id="show-inactive"' not in activities_html
     assert "<th>Aktiv</th>" not in activities_html
     assert "m-active" not in activities_js
     assert "Inaktivera" not in activities_js
     assert "Ta bort" in activities_js
-    assert 'setupImportHelpButton("activity-import-help", "Importera ställen")' in activities_js
+    assert 'setupImportHelpButton("activity-import-help", "Importera aktiviteter")' in activities_js
+
+
+def test_api_fetch_failures_get_clear_swedish_message():
+    api_js = (ROOT / "app" / "frontend" / "js" / "api.js").read_text(encoding="utf-8")
+
+    assert "function connectionError" in api_js
+    assert "Kunde inte ansluta till servern" in api_js
+    assert "Appen måste öppnas via servern" in api_js
+    assert "throw connectionError(path, error)" in api_js
+    assert "originalError" in api_js
 
 
 def test_sidebar_pages_reserve_layout_before_auth_finishes():
     frontend = ROOT / "app" / "frontend"
-    public_pages = {"login.html", "set-password.html"}
+    public_pages = {"login.html", "set-password.html", "stallen.html"}
 
     for html_path in frontend.glob("*.html"):
         html = html_path.read_text(encoding="utf-8")

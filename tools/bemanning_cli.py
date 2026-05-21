@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import asdict, dataclass
 from http.cookiejar import MozillaCookieJar
@@ -18,12 +19,14 @@ from string import Formatter
 from typing import Any
 
 import requests
+from sqlalchemy import create_engine, text
 
 from core.app_info import SERVER_BASE_URL
 
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_COOKIE_JAR = ROOT / ".bemanning-cli-cookies.txt"
+DEFAULT_LOCAL_DB = ROOT / "app" / "bemanning_local.db"
 
 
 @dataclass(frozen=True)
@@ -53,11 +56,11 @@ ROUTES: tuple[ApiRoute, ...] = (
     ApiRoute("areas.create", "POST", "/api/areas", "Skapa område"),
     ApiRoute("areas.update", "PUT", "/api/areas/{area_id}", "Uppdatera område"),
     ApiRoute("activities.list", "GET", "/api/activities", "Lista aktiviteter"),
-    ApiRoute("activities.import_template", "GET", "/api/activities/import-template", "Hämta importmall för ställen"),
-    ApiRoute("activities.import", "POST", "/api/activities/import", "Importera ställen"),
+    ApiRoute("activities.import_template", "GET", "/api/activities/import-template", "Hämta importmall för aktiviteter"),
+    ApiRoute("activities.import", "POST", "/api/activities/import", "Importera aktiviteter"),
     ApiRoute("activities.create", "POST", "/api/activities", "Skapa aktivitet"),
     ApiRoute("activities.update", "PUT", "/api/activities/{activity_id}", "Uppdatera aktivitet"),
-    ApiRoute("activities.delete", "DELETE", "/api/activities/{activity_id}", "Inaktivera aktivitet"),
+    ApiRoute("activities.delete", "DELETE", "/api/activities/{activity_id}", "Ta bort aktivitet"),
     ApiRoute("settings.get", "GET", "/api/settings", "Hämta inställningar"),
     ApiRoute("settings.update", "PUT", "/api/settings", "Uppdatera inställningar"),
     ApiRoute("settings.sidebar_get", "GET", "/api/settings/sidebar", "Hämta global sidomeny"),
@@ -72,7 +75,7 @@ ROUTES: tuple[ApiRoute, ...] = (
     ApiRoute("persons.create", "POST", "/api/persons", "Skapa person"),
     ApiRoute("persons.get", "GET", "/api/persons/{person_id}", "Hämta person"),
     ApiRoute("persons.update", "PUT", "/api/persons/{person_id}", "Uppdatera person"),
-    ApiRoute("persons.delete", "DELETE", "/api/persons/{person_id}", "Inaktivera person"),
+    ApiRoute("persons.delete", "DELETE", "/api/persons/{person_id}", "Ta bort person"),
     ApiRoute("person_schedules.get", "GET", "/api/persons/{person_id}/schedule", "Hämta veckomall"),
     ApiRoute("person_schedules.update", "PUT", "/api/persons/{person_id}/schedule", "Uppdatera veckomall"),
     ApiRoute("schedule.get", "GET", "/api/schedule", "Hämta dagsschema"),
@@ -205,6 +208,8 @@ def _print_response(response: requests.Response, output: str | None = None) -> i
         Path(output).write_bytes(response.content)
     else:
         content_type = response.headers.get("content-type", "")
+        if not response.content:
+            return 0 if response.ok else 1
         if "application/json" in content_type:
             print(json.dumps(response.json(), indent=2, ensure_ascii=False))
         else:
@@ -212,6 +217,127 @@ def _print_response(response: requests.Response, output: str | None = None) -> i
             if response.content and not response.content.endswith(b"\n"):
                 print()
     return 0 if response.ok else 1
+
+
+def _normalize_database_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    if url.startswith("postgresql://") and "+psycopg" not in url:
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
+
+
+def _default_database_url() -> str:
+    configured = os.getenv("DATABASE_URL")
+    if configured:
+        return configured
+    if DEFAULT_LOCAL_DB.exists():
+        return f"sqlite:///{DEFAULT_LOCAL_DB.as_posix()}"
+    raise SystemExit("Saknar DATABASE_URL och hittade ingen lokal app/bemanning_local.db")
+
+
+def _db_lookup_query(kind: str, active_only: bool) -> str:
+    active_filter = " AND {alias}.is_active = 1" if active_only else ""
+    queries = {
+        "users": f"""
+            SELECT
+                'user' AS type,
+                u.id AS id,
+                u.username AS key,
+                COALESCE(u.display_name, '') AS name,
+                COALESCE(u.role, '') AS role_or_category,
+                COALESCE(a.name, '') AS area,
+                u.is_active AS is_active,
+                '' AS extra
+            FROM users u
+            LEFT JOIN areas a ON a.id = u.area_id
+            WHERE (LOWER(u.username) LIKE :pattern OR LOWER(COALESCE(u.display_name, '')) LIKE :pattern)
+            {active_filter.format(alias='u')}
+        """,
+        "persons": f"""
+            SELECT
+                'person' AS type,
+                p.id AS id,
+                '' AS key,
+                p.name AS name,
+                '' AS role_or_category,
+                COALESCE(a.name, '') AS area,
+                p.is_active AS is_active,
+                COALESCE(act.label, '') AS extra
+            FROM persons p
+            LEFT JOIN areas a ON a.id = p.home_area_id
+            LEFT JOIN activities act ON act.id = p.home_activity_id
+            WHERE LOWER(p.name) LIKE :pattern
+            {active_filter.format(alias='p')}
+        """,
+        "activities": f"""
+            SELECT
+                'activity' AS type,
+                act.id AS id,
+                act.code AS key,
+                act.label AS name,
+                COALESCE(act.category, '') AS role_or_category,
+                COALESCE(a.name, '') AS area,
+                act.is_active AS is_active,
+                COALESCE(summary.label, '') AS extra
+            FROM activities act
+            LEFT JOIN areas a ON a.id = act.area_id
+            LEFT JOIN activities summary ON summary.id = act.summary_activity_id
+            WHERE (LOWER(act.code) LIKE :pattern OR LOWER(act.label) LIKE :pattern)
+            {active_filter.format(alias='act')}
+        """,
+    }
+    if kind == "all":
+        return "\nUNION ALL\n".join(_db_lookup_query(item, active_only) for item in ("users", "persons", "activities"))
+    return queries[kind]
+
+
+def _lookup_database(*, database_url: str, kind: str, query: str, active_only: bool, limit: int) -> list[dict[str, Any]]:
+    engine = create_engine(_normalize_database_url(database_url), pool_pre_ping=True)
+    pattern = f"%{query.strip().lower()}%"
+    statement = text(f"SELECT * FROM ({_db_lookup_query(kind, active_only)}) lookup_results ORDER BY type, name, key LIMIT :limit")
+    with engine.connect() as connection:
+        rows = connection.execute(statement, {"pattern": pattern, "limit": limit}).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def _print_db_rows(rows: list[dict[str, Any]], *, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps({"count": len(rows), "results": rows}, indent=2, ensure_ascii=False, default=str))
+        return
+    if not rows:
+        print("Inga traffar.")
+        return
+    headers = ("type", "id", "key", "name", "role/category", "area", "active", "extra")
+    print(" | ".join(headers))
+    print(" | ".join("---" for _ in headers))
+    for row in rows:
+        print(
+            " | ".join(
+                [
+                    str(row.get("type") or ""),
+                    str(row.get("id") or ""),
+                    str(row.get("key") or ""),
+                    str(row.get("name") or ""),
+                    str(row.get("role_or_category") or ""),
+                    str(row.get("area") or ""),
+                    "ja" if row.get("is_active") else "nej",
+                    str(row.get("extra") or ""),
+                ]
+            )
+        )
+
+
+def _run_db(args: argparse.Namespace) -> int:
+    rows = _lookup_database(
+        database_url=args.database_url or _default_database_url(),
+        kind=args.kind,
+        query=args.query,
+        active_only=args.active_only,
+        limit=args.limit,
+    )
+    _print_db_rows(rows, as_json=args.json)
+    return 0 if rows else 1
 
 
 def _run_call(args: argparse.Namespace) -> int:
@@ -350,6 +476,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     set_password = auth_sub.add_parser("set-password")
     set_password.add_argument("--password", required=True)
     set_password.set_defaults(func=_run_auth)
+
+    db = sub.add_parser("db", help="Las fran databasen utan att andra nagot.")
+    db_sub = db.add_subparsers(dest="db_command", required=True)
+    lookup = db_sub.add_parser("lookup", help="Sok efter anvandare, personer eller aktiviteter i databasen.")
+    lookup.add_argument("kind", choices=("all", "users", "persons", "activities"))
+    lookup.add_argument("--q", "--query", dest="query", required=True, help="Soktext, t.ex. anvandarnamn eller personnamn.")
+    lookup.add_argument("--database-url", help="Databas-URL. Om den saknas anvands DATABASE_URL eller app/bemanning_local.db.")
+    lookup.add_argument("--active-only", action="store_true", help="Visa bara aktiva rader.")
+    lookup.add_argument("--limit", type=int, default=25)
+    lookup.add_argument("--json", action="store_true")
+    lookup.set_defaults(func=_run_db)
     return parser.parse_args(argv)
 
 

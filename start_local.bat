@@ -8,8 +8,8 @@ set "ENVIRONMENT=development"
 set "SUPER_USER_USERNAMES=admin,emikad,mikhal"
 set "EXCEL_API_TOKEN=dev-token"
 
-echo Synkar lokal SQLite-databas mot models...
-python -m backend.bootstrap_local || goto :error
+echo Forbereder lokal SQLite-databas...
+python -m backend.prepare_local_database || goto :error
 
 start "" "http://localhost:8000"
 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload

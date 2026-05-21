@@ -5,6 +5,7 @@ import json
 from sqlalchemy.orm import Session
 
 from .models import AppSetting
+from .user_access import normalize_role_view_access_ids, normalize_role_view_id
 
 
 LOCK_FOREIGN_SCHEDULE_CELLS_KEY = "lock_foreign_schedule_cells"
@@ -72,7 +73,19 @@ def set_lock_foreign_schedule_cells(db: Session, value: bool, *, user_id: int | 
 
 def get_sidebar_layout(db: Session) -> list[dict]:
     value = get_json_setting(db, SIDEBAR_LAYOUT_KEY, default=[])
-    return value if isinstance(value, list) else []
+    if not isinstance(value, list):
+        return []
+    normalized = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        parent_id = item.get("parent_id")
+        normalized.append({
+            **item,
+            "id": normalize_role_view_id(item.get("id")),
+            "parent_id": normalize_role_view_id(parent_id) if parent_id else None,
+        })
+    return normalized
 
 
 def set_sidebar_layout(db: Session, items: list[dict], *, user_id: int | None = None) -> AppSetting:
@@ -81,7 +94,7 @@ def set_sidebar_layout(db: Session, items: list[dict], *, user_id: int | None = 
 
 def get_role_view_access(db: Session) -> dict:
     value = get_json_setting(db, ROLE_VIEW_ACCESS_KEY, default={})
-    return value if isinstance(value, dict) else {}
+    return normalize_role_view_access_ids(value) if isinstance(value, dict) else {}
 
 
 def set_role_view_access(db: Session, access: dict, *, user_id: int | None = None) -> AppSetting:

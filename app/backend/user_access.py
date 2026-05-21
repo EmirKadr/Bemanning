@@ -18,6 +18,10 @@ PLANNING_VIEW_ROLES = {VIEWER_ROLE, *EDITOR_ROLES}
 BASE_ROLES = {"admin", "leader", STAFFING_MANAGER_ROLE, VIEWER_ROLE, WAREHOUSE_CLERK_ROLE, ARTICLE_PLACER_ROLE}
 ASSIGNABLE_ROLES = {*BASE_ROLES, SUPER_USER_ROLE}
 ROLE_ACCESS_LEVEL_RANK = {"none": 0, "view": 1, "edit": 2}
+ROLE_VIEW_ID_ALIASES = {
+    "stallen": "activities",
+    "stallenImport": "activityImport",
+}
 ROLE_VIEW_IDS = {
     "schedule",
     "overview",
@@ -28,8 +32,8 @@ ROLE_VIEW_IDS = {
     "allocationTrace",
     "persons",
     "personImport",
-    "stallen",
-    "stallenImport",
+    "activities",
+    "activityImport",
     "areas",
     "analytics",
     "users",
@@ -44,24 +48,24 @@ ROLE_VIEW_DEFAULT_ACCESS = {
         "overview": "edit",
         "persons": "edit",
         "personImport": "edit",
-        "stallen": "edit",
-        "stallenImport": "edit",
+        "activities": "edit",
+        "activityImport": "edit",
     },
     STAFFING_MANAGER_ROLE: {
         "schedule": "edit",
         "overview": "edit",
         "persons": "edit",
         "personImport": "edit",
-        "stallen": "edit",
-        "stallenImport": "edit",
+        "activities": "edit",
+        "activityImport": "edit",
     },
     "admin": {
         "schedule": "edit",
         "overview": "edit",
         "persons": "edit",
         "personImport": "edit",
-        "stallen": "edit",
-        "stallenImport": "edit",
+        "activities": "edit",
+        "activityImport": "edit",
         "areas": "edit",
         "users": "edit",
         "appSettings": "edit",
@@ -116,6 +120,24 @@ def role_view_default_access() -> dict[str, dict[str, str]]:
     return {role: dict(ROLE_VIEW_DEFAULT_ACCESS.get(role, {})) for role in BASE_ROLES}
 
 
+def normalize_role_view_id(view_id: str | None) -> str:
+    view_key = str(view_id or "").strip()
+    return ROLE_VIEW_ID_ALIASES.get(view_key, view_key)
+
+
+def normalize_role_view_access_ids(access: dict | None) -> dict[str, dict[str, str]]:
+    incoming = access if isinstance(access, dict) else {}
+    normalized: dict[str, dict[str, str]] = {}
+    for role, views in incoming.items():
+        role_key = str(role or "").strip()
+        if not isinstance(views, dict):
+            continue
+        role_views = normalized.setdefault(role_key, {})
+        for view_id, level in views.items():
+            role_views[normalize_role_view_id(str(view_id or ""))] = str(level or "").strip()
+    return normalized
+
+
 def normalize_role_view_access(access: dict | None) -> dict[str, dict[str, str]]:
     normalized = role_view_default_access()
     incoming = access if isinstance(access, dict) else {}
@@ -125,7 +147,7 @@ def normalize_role_view_access(access: dict | None) -> dict[str, dict[str, str]]
             continue
         role_views = normalized.setdefault(role_key, {})
         for view_id, level in views.items():
-            view_key = str(view_id or "").strip()
+            view_key = normalize_role_view_id(str(view_id or ""))
             level_key = str(level or "").strip()
             if view_key in ROLE_VIEW_IDS and level_key in ROLE_ACCESS_LEVEL_RANK:
                 role_views[view_key] = level_key
@@ -164,10 +186,11 @@ def can_admin(user: User) -> bool:
 def role_view_access_level(user: User, access: dict | None, view_id: str) -> str:
     if is_super_user(user):
         return "edit"
+    view_key = normalize_role_view_id(view_id)
     normalized = normalize_role_view_access(access)
     best = "none"
     for role in user_roles(user):
-        level = normalized.get(role, {}).get(view_id, "none")
+        level = normalized.get(role, {}).get(view_key, "none")
         if ROLE_ACCESS_LEVEL_RANK.get(level, 0) > ROLE_ACCESS_LEVEL_RANK.get(best, 0):
             best = level
     return best

@@ -118,10 +118,15 @@ const SIDEBAR_DEFAULT_LAYOUT = [
   { id: "allocationSplit" },
   { id: "allocationTrace" },
   { id: "persons" },
-  { id: "stallen" },
+  { id: "activities" },
   { id: "analytics" },
   { id: "users" },
 ];
+
+const VIEW_ID_ALIASES = {
+  stallen: "activities",
+  stallenImport: "activityImport",
+};
 
 const ROLE_VIEW_IDS = [
   "schedule",
@@ -133,8 +138,8 @@ const ROLE_VIEW_IDS = [
   "allocationTrace",
   "persons",
   "personImport",
-  "stallen",
-  "stallenImport",
+  "activities",
+  "activityImport",
   "areas",
   "analytics",
   "users",
@@ -160,24 +165,24 @@ const ROLE_VIEW_DEFAULT_ACCESS = {
     overview: "edit",
     persons: "edit",
     personImport: "edit",
-    stallen: "edit",
-    stallenImport: "edit",
+    activities: "edit",
+    activityImport: "edit",
   },
   staffing_manager: {
     schedule: "edit",
     overview: "edit",
     persons: "edit",
     personImport: "edit",
-    stallen: "edit",
-    stallenImport: "edit",
+    activities: "edit",
+    activityImport: "edit",
   },
   admin: {
     schedule: "edit",
     overview: "edit",
     persons: "edit",
     personImport: "edit",
-    stallen: "edit",
-    stallenImport: "edit",
+    activities: "edit",
+    activityImport: "edit",
     areas: "edit",
     users: "edit",
     appSettings: "edit",
@@ -299,17 +304,30 @@ function activityAreaCode(activity, areas) {
   return String(area?.code || "").trim().toUpperCase();
 }
 
-function activityFocusRank(activity, areas) {
-  const focus = areaFocusCode();
-  if (!focus) return 0;
-  if (activity?.category === "absence") return 1;
-  return activityAreaCode(activity, areas) === focus ? 0 : 2;
+function normalizeExistingAreaId(value, areas) {
+  if (value == null || value === "") return null;
+  const id = Number(value);
+  if (!Number.isInteger(id)) return null;
+  if ((areas || []).length && !(areas || []).some((area) => Number(area.id) === id)) return null;
+  return id;
 }
 
-function compareActivitiesForAreaFocus(a, b, areas) {
-  const focus = areaFocusCode();
-  if (focus) {
-    const rank = activityFocusRank(a, areas) - activityFocusRank(b, areas);
+function preferredActivityAreaId(areas, userAreaId = null) {
+  const focusedAreaId = preferredAreaIdFromFocus(areas);
+  return focusedAreaId != null ? focusedAreaId : normalizeExistingAreaId(userAreaId, areas);
+}
+
+function activityFocusRank(activity, areas, userAreaId = null) {
+  const preferredAreaId = preferredActivityAreaId(areas, userAreaId);
+  if (preferredAreaId == null) return 0;
+  if (activity?.category === "absence") return 1;
+  return Number(activity?.area_id) === preferredAreaId ? 0 : 2;
+}
+
+function compareActivitiesForAreaFocus(a, b, areas, userAreaId = null) {
+  const preferredAreaId = preferredActivityAreaId(areas, userAreaId);
+  if (preferredAreaId != null) {
+    const rank = activityFocusRank(a, areas, userAreaId) - activityFocusRank(b, areas, userAreaId);
     if (rank !== 0) return rank;
   }
   return (Number(a?.sort_order) || 0) - (Number(b?.sort_order) || 0)
@@ -437,6 +455,11 @@ function roleViewDefaultAccess() {
   ]));
 }
 
+function normalizeViewId(viewId) {
+  const value = String(viewId || "").trim();
+  return VIEW_ID_ALIASES[value] || value;
+}
+
 function normalizeRoleViewAccess(access = {}) {
   const defaults = roleViewDefaultAccess();
   const normalized = roleViewDefaultAccess();
@@ -448,8 +471,9 @@ function normalizeRoleViewAccess(access = {}) {
     if (!roles.has(role) || !roleAccess || typeof roleAccess !== "object") continue;
     normalized[role] = { ...(defaults[role] || {}) };
     for (const [viewId, level] of Object.entries(roleAccess)) {
-      if (!views.has(viewId)) continue;
-      normalized[role][viewId] = ROLE_VIEW_LEVELS.includes(level) ? level : "none";
+      const normalizedViewId = normalizeViewId(viewId);
+      if (!views.has(normalizedViewId)) continue;
+      normalized[role][normalizedViewId] = ROLE_VIEW_LEVELS.includes(level) ? level : "none";
     }
   }
   return normalized;
@@ -481,9 +505,10 @@ function roleViewAccessPayload(access) {
 function roleViewAccessLevel(user, viewId) {
   if (user?.is_super_user) return "edit";
   const access = roleViewAccessForRender();
+  const normalizedViewId = normalizeViewId(viewId);
   let best = "none";
   for (const role of userRoles(user)) {
-    const level = access[role]?.[viewId] || "none";
+    const level = access[role]?.[normalizedViewId] || "none";
     if ((ROLE_VIEW_LEVEL_RANK[level] || 0) > (ROLE_VIEW_LEVEL_RANK[best] || 0)) best = level;
   }
   return best;
@@ -595,12 +620,12 @@ function sidebarPageDefinitions(user, activePage) {
       active: activePage === "persons",
     },
     {
-      id: "stallen",
-      label: "Ställen",
-      href: "/stallen.html",
+      id: "activities",
+      label: "Aktiviteter",
+      href: "/aktiviteter.html",
       icon: "📍",
-      visible: canViewPage(user, "stallen"),
-      active: activePage === "stallen",
+      visible: canViewPage(user, "activities"),
+      active: activePage === "activities",
     },
     {
       id: "analytics",
@@ -629,10 +654,10 @@ function normalizeSidebarLayout(items = []) {
   const incoming = Array.isArray(items) ? items : [];
 
   for (const item of incoming) {
-    const id = String(item?.id || "").trim();
+    const id = normalizeViewId(item?.id);
     if (!knownIds.has(id) || seen.has(id)) continue;
     seen.add(id);
-    const parentId = String(item.parent_id || item.parentId || "").trim();
+    const parentId = normalizeViewId(item.parent_id || item.parentId || "");
     normalized.push({
       id,
       heading: String(item.heading || "").trim().slice(0, 80),
@@ -1532,6 +1557,7 @@ window.ROLE_VIEW_LEVELS = ROLE_VIEW_LEVELS;
 window.ROLE_VIEW_IDS = ROLE_VIEW_IDS;
 window.SIDEBAR_DEFAULT_LAYOUT = SIDEBAR_DEFAULT_LAYOUT;
 window.roleViewDefaultAccess = roleViewDefaultAccess;
+window.normalizeViewId = normalizeViewId;
 window.normalizeRoleViewAccess = normalizeRoleViewAccess;
 window.cacheRoleViewAccess = cacheRoleViewAccess;
 window.roleViewAccessPayload = roleViewAccessPayload;

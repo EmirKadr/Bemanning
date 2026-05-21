@@ -38,8 +38,10 @@ HEADER_ALIASES = {
     "department": "area",
     "summerassom": "summary_activity",
     "summerasom": "summary_activity",
+    "summeringsaktivitet": "summary_activity",
     "sammanstallning": "summary_activity",
     "sammanställning": "summary_activity",
+    "huvudaktivitet": "summary_activity",
     "huvudstalle": "summary_activity",
     "huvudställe": "summary_activity",
     "summary": "summary_activity",
@@ -117,7 +119,7 @@ def _parse_sort_order(value: str, *, row_number: int, label: str) -> tuple[int |
 def build_activity_import_template_excel() -> bytes:
     workbook = Workbook()
     sheet = workbook.active
-    sheet.title = "Ställen"
+    sheet.title = "Aktiviteter"
     sheet.append(["etikett (obligatorisk)", "område (frivillig)", "summeras som (frivillig)", "sortering (frivillig)"])
     sheet.column_dimensions["A"].width = 28
     sheet.column_dimensions["B"].width = 24
@@ -292,11 +294,11 @@ def list_activities(
 
 
 @router.get("/import-template")
-def download_import_template(_admin: User = Depends(require_view_access("stallenImport", "edit"))) -> Response:
+def download_import_template(_admin: User = Depends(require_view_access("activityImport", "edit"))) -> Response:
     return Response(
         content=build_activity_import_template_excel(),
         media_type=EXCEL_MEDIA_TYPE,
-        headers={"Content-Disposition": 'attachment; filename="stallen-importmall.xlsx"'},
+        headers={"Content-Disposition": 'attachment; filename="aktiviteter-importmall.xlsx"'},
     )
 
 
@@ -304,7 +306,7 @@ def download_import_template(_admin: User = Depends(require_view_access("stallen
 async def import_activities(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    admin: User = Depends(require_view_access("stallenImport", "edit")),
+    admin: User = Depends(require_view_access("activityImport", "edit")),
 ) -> ActivityImportResult:
     content = await file.read()
     if len(content) > MAX_IMPORT_BYTES:
@@ -326,7 +328,7 @@ async def import_activities(
         seen_labels.add(label_key)
 
         if label_key in existing_labels:
-            errors.append(ActivityImportError(row=row.row_number, label=row.label, error="Stället finns redan"))
+            errors.append(ActivityImportError(row=row.row_number, label=row.label, error="Aktiviteten finns redan"))
             continue
 
         area = None
@@ -341,7 +343,7 @@ async def import_activities(
             summary_activity = activity_lookup.get(_compact_key(row.summary_activity))
             if summary_activity is None:
                 errors.append(
-                    ActivityImportError(row=row.row_number, label=row.label, error="Summeringsställe hittades inte")
+                    ActivityImportError(row=row.row_number, label=row.label, error="Summeringsaktivitet hittades inte")
                 )
                 continue
             summary_activity_id = _validate_summary_activity(
@@ -391,7 +393,7 @@ async def import_activities(
 def create_activity(
     payload: ActivityCreate,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_view_access("stallen", "edit")),
+    admin: User = Depends(require_view_access("activities", "edit")),
 ) -> Activity:
     data = payload.model_dump()
     data["code"] = _resolve_activity_code(db, payload, admin)
@@ -422,7 +424,7 @@ def update_activity(
     activity_id: int,
     payload: ActivityUpdate,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_view_access("stallen", "edit")),
+    admin: User = Depends(require_view_access("activities", "edit")),
 ) -> Activity:
     activity = db.get(Activity, activity_id)
     if not activity:
@@ -464,7 +466,7 @@ def update_activity(
 def delete_activity(
     activity_id: int,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_view_access("stallen", "edit")),
+    admin: User = Depends(require_view_access("activities", "edit")),
 ) -> None:
     activity = db.get(Activity, activity_id)
     if not activity:

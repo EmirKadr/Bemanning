@@ -95,9 +95,10 @@ def test_role_view_access_can_grant_and_revoke_feature_permissions():
     staffing = make_user("staffing_manager")
     viewer = make_user("viewer")
 
-    assert can_access_view(staffing, {}, "stallen", "edit")
-    assert can_access_view(staffing, {"staffing_manager": {"stallen": "view"}}, "stallen", "view")
-    assert not can_access_view(staffing, {"staffing_manager": {"stallen": "view"}}, "stallen", "edit")
+    assert can_access_view(staffing, {}, "activities", "edit")
+    assert can_access_view(staffing, {"staffing_manager": {"activities": "view"}}, "activities", "view")
+    assert not can_access_view(staffing, {"staffing_manager": {"activities": "view"}}, "activities", "edit")
+    assert can_access_view(staffing, {"staffing_manager": {"stallen": "view"}}, "activities", "view")
     assert can_access_view(leader, {"leader": {"roleAccess": "edit"}}, "roleAccess", "edit")
     assert not can_access_view(viewer, {}, "personImport", "edit")
     assert role_view_access_level(viewer, {"viewer": {"users": "view"}}, "users") == "view"

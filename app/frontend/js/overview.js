@@ -190,7 +190,9 @@ function buildActivitySelect(includeActivityIds = []) {
   };
 
   const sortedActivities = typeof compareActivitiesForAreaFocus === "function"
-    ? [...state.activitiesActive].sort((a, b) => compareActivitiesForAreaFocus(a, b, state.areas))
+    ? [...state.activitiesActive].sort((a, b) =>
+      compareActivitiesForAreaFocus(a, b, state.areas, state.currentUser?.area_id)
+    )
     : state.activitiesActive;
   sortedActivities.forEach(appendOption);
   includeActivityIds

@@ -1278,7 +1278,7 @@ button.danger:hover { background: #fef2f2; border-color: #fecaca; }
 
 
 /* ============================================================
-   Tabeller (data – personer, ställen)
+   Tabeller (data – personer, aktiviteter)
    ============================================================ */
 
 .table-wrap {
@@ -1334,11 +1334,9 @@ table.data td:last-child > button {
 }
 table.data td:last-child > button:first-child { margin-left: 0; }
 
-/* Personer-tabellen: smalare Aktiv + Sortering så åtgärdskolumnen får mer plats */
+/* Personer-tabellen: smalare sortering så åtgärdskolumnen får mer plats */
 table#persons-table th:nth-child(4),
-table#persons-table td:nth-child(4),
-table#persons-table th:nth-child(5),
-table#persons-table td:nth-child(5) {
+table#persons-table td:nth-child(4) {
   width: 90px;
 }
 
@@ -2016,7 +2014,7 @@ body.dragging-ov select { pointer-events: none; }
 
 
 /* ============================================================
-   Sort/filter rows (personer, ställen)
+   Sort/filter rows (personer, aktiviteter)
    ============================================================ */
 
 tr.sort-row th {

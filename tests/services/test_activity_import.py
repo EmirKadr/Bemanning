@@ -162,8 +162,9 @@ def test_downloaded_activity_template_imports_mixed_optional_summary_and_sorting
     _gg, _mg, summary, admin, _staffing = seed_activity_import_base(import_db)
     response = download_import_template(_admin=admin)
 
-    assert response.headers["Content-Disposition"] == 'attachment; filename="stallen-importmall.xlsx"'
+    assert response.headers["Content-Disposition"] == 'attachment; filename="aktiviteter-importmall.xlsx"'
     workbook = load_workbook(io.BytesIO(response.body))
+    assert workbook.active.title == "Aktiviteter"
     sheet = workbook.active
     assert [sheet.cell(1, column).value for column in range(1, 5)] == [
         "etikett (obligatorisk)",
@@ -213,7 +214,7 @@ def test_bemanningsansvarig_can_manage_activities(import_db):
     gg, _mg, _summary, _admin, staffing = seed_activity_import_base(import_db)
 
     response = download_import_template(_admin=staffing)
-    assert response.headers["Content-Disposition"] == 'attachment; filename="stallen-importmall.xlsx"'
+    assert response.headers["Content-Disposition"] == 'attachment; filename="aktiviteter-importmall.xlsx"'
 
     created = create_activity(
         payload=ActivityCreate(label="Bemanning test", area_id=gg.id, sort_order=99),
@@ -243,7 +244,7 @@ def test_activity_delete_removes_inactive_legacy_activity_and_clears_references(
     gg, _mg, summary, _admin, staffing = seed_activity_import_base(import_db)
     legacy = Activity(
         code="GG_GAMMAL",
-        label="Gammalt ställe",
+        label="Gammal aktivitet",
         area_id=gg.id,
         summary_activity_id=summary.id,
         color="#ffffff",
@@ -253,7 +254,7 @@ def test_activity_delete_removes_inactive_legacy_activity_and_clears_references(
     )
     child = Activity(
         code="GG_BARN",
-        label="Barnställe",
+        label="Barnaktivitet",
         area_id=gg.id,
         summary_activity_id=None,
         color="#ffffff",
@@ -280,7 +281,7 @@ def test_activity_delete_removes_inactive_legacy_activity_and_clears_references(
     import_db.commit()
 
     labels = [activity.label for activity in list_activities(include_inactive=False, db=import_db)]
-    assert "Gammalt ställe" in labels
+    assert "Gammal aktivitet" in labels
 
     delete_activity(activity_id=legacy.id, db=import_db, admin=staffing)
 

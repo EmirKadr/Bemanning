@@ -1,0 +1,57 @@
+---
+title: Oversikt
+status: aktiv
+updated: 2026-05-21
+tags: [oversikt, ui, knappar]
+---
+
+# Oversikt
+
+Kort svar: Oversikt visar bemanning pa dag-niva i vecka eller manad. En cell representerar en persons dag och skriver/tommer hela dagen enligt personens veckomall.
+
+## Knappar och kontroller
+
+| Kontroll | Vad anvandaren gor | Vad systemet gor | API/kod | Vanliga fel |
+| --- | --- | --- | --- | --- |
+| Vy | Valjer Vecka eller Manad | Byter tabellhuvud/body och periodstate | `viewMode`, `load` | Manad doljer veckofaltet. |
+| Foregaende/nasta | Klickar pilar | Flyttar vecka eller manad | `shiftPeriod` | Periodtyp beror pa vald vy. |
+| Ar | Valjer ar | Laddar aktuell vecka/manad i nytt ar | `GET /api/overview` eller `/month` | ISO-vecka kan ligga over arsskifte. |
+| Vecka | Valjer vecka | Laddar veckoversikt | `/api/overview` | Visas bara i veckovy. |
+| Manad | Valjer manad | Laddar manadsoversikt | `/api/overview/month` | Visas bara i manadsvy. |
+| Omrade | Filtrerar personer | Skickar `area_id` till API | `areaSelect` | Tomt varde = alla omraden. |
+| Undo/Redo | Angra/gor om dagandringar | Restore av snapshots via schema-API | `/api/schedule/hours/restore` | Disabled om stacken ar tom eller read-only. |
+| Personfilter | Skriver soktext | Filtrerar personer klient-side | `refreshPersons` | Shift-klick pa header sorterar. |
+| Dagcell-dropdown | Valjer aktivitet/tomt for hel dag | Skriver/tommer personens schematimmar for dagen | `POST /api/overview/day` | Om dagen ar blandad visas confirm innan overskrivning. |
+| Drag over dagceller | Fyller flera dagar/personer | Skickar bulk-dagar | `POST /api/overview/days/bulk` | Max 100 celler. Fel per cell kan rapporteras. |
+
+## Cellbetydelser
+
+- En dominant aktivitet visas om hela dagens effektiva schema summeras till samma aktivitet.
+- Blandad dag markeras som mixed.
+- Ledig dag visas som off.
+- Schemalagd tom dag visas med separat stil.
+- Timmar visas som info i cellen.
+
+## Viktiga regler
+
+- Oversikt anvander både explicita celler och kvarvarande malltider.
+- Heldagsandring anvander personens veckomall. Om personen saknar fast mall/timmis kan API stoppa andringen.
+- Vid blandad dag fragar klienten innan den skriver over med ett enda varde.
+- Drag skapar manga heldagsandringar och pushar undo-snapshot for de lyckade.
+
+## Felsokningssvar for framtida chat
+
+| Fraga | Svar |
+| --- | --- |
+| "Varfor far jag inte andra en dag?" | Anvandaren kan vara read-only, personen kan sakna fast schema, eller API nekade rollen. |
+| "Vad betyder randig/blandad dag?" | Dagen innehaller flera aktiviteter eller segment och kan skrivas over med confirm. |
+| "Varfor raknas inte timmis som ledig?" | Timmis utan fast mall betraktas inte som en standardledig dag for heldagsandring. |
+| "Varfor visar Oversikt andra timmar an Bemanning?" | Kontrollera att samma ar/vecka/dag/omrade anvands och att malltider plus explicita celler raknas. |
+
+## Kallor
+
+- `../app/frontend/overblick.html`
+- `../app/frontend/js/overview.js`
+- `../app/backend/routers/overview.py`
+- `../APP_MIGRATION_PLAN.md`
+

@@ -38,6 +38,8 @@ def _sync_lightweight_sqlite_columns() -> None:
             connection.exec_driver_sql(
                 "ALTER TABLE persons ADD COLUMN has_fixed_schedule BOOLEAN NOT NULL DEFAULT 1"
             )
+        if person_columns and "is_active" in person_columns:
+            connection.exec_driver_sql("UPDATE persons SET is_active = 1 WHERE is_active IS NOT 1")
         if activity_columns and "is_active" in activity_columns:
             connection.exec_driver_sql("UPDATE activities SET is_active = 1 WHERE is_active IS NOT 1")
 
