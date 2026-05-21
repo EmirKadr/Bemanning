@@ -61,7 +61,7 @@ tester om andringen ror delad logik, API-kontrakt, behorighet eller UI.
 | `tests/services/test_assistant_chat.py` | Apphjalpens MiniMax-konfiguration, promptregler, repo-/wiki-kontext, anvandarkontext och kvot. | Apphjalp, MiniMax, wiki-kontext, behorighetssvar eller chattsession. |
 | `tests/services/test_data_fetch_service.py` | Hamta data-flodets katalog, LLM-plan, hemlighetsbarriar, extern datahamtning och Excel-export. | `Hamta data`, extern datakalla, katalogbyggnad, MiniMax-planering eller export. |
 | `tests/services/test_health_service.py` | Desktop/klient-health URL och felhantering. | Health service eller anslutningskontroll. |
-| `tests/services/test_legacy_activity_routes.py` | Gamla `stallen`-vagar redirectar till nya aktivitetsvyn och statiska filer cachas ratt i dev. | Legacy-redirects, statisk frontendservering eller aktivitetsrutter. |
+| `tests/services/test_legacy_activity_routes.py` | Gamla aktivitetsvagar redirectar till nya aktivitetsvyn och statiska filer cachas ratt i dev. | Legacy-redirects, statisk frontendservering eller aktivitetsrutter. |
 | `tests/services/test_live_local_sync.py` | Lokal SQLite-sync fran live-databas och skydd mot fel target. | `prepare_local_database`, live/local sync eller `start_local.bat`-dataflode. |
 | `tests/services/test_person_import.py` | Personimportmallar, Excel-parsning, dubblettskydd, skapa/uppdatera/ta bort person. | Personimport, person-CRUD eller namnvalidering. |
 | `tests/services/test_person_schedules.py` | Timmis/fast schema-regler for personers veckomallar. | Personschema, timmisflagga eller veckomalllogik. |
@@ -83,7 +83,7 @@ tester om andringen ror delad logik, API-kontrakt, behorighet eller UI.
 | `tests/tools/test_bemanning_cli.py` | CLI-routekatalog, API_ROUTES-dokumentation, generiska API-call och DB-lookup. | `tools/bemanning_cli.py`, API-rutter, CLI-adapter eller API-dokumentation. |
 | `tests/tools/test_ci_workflows.py` | CI och release workflows kor ratt grindar fore build/deploy. | `.github/workflows/*` eller releasepipeline. |
 | `tests/tools/test_desktop_app_probe_runtime.py` | Desktop-proben kan starta lokal server/proxy och skriva runtime-artifacts. | `tools/desktop_app_probe.py` eller desktop-proxytest. |
-| `tests/tools/test_legacy_activity_browser.py` | Browserkontrakt for legacy `stallen` -> `aktiviteter` och vybehorighetsmodalens text. | Legacy aktivitetssidor, aktivitets-UI eller rollaccessmodal. |
+| `tests/tools/test_legacy_activity_browser.py` | Browserkontrakt for legacy-aktivitetssidor och vybehorighetsmodalens text. | Legacy aktivitetssidor, aktivitets-UI eller rollaccessmodal. |
 | `tests/tools/test_persons_view.py` | Personvyns frontendkontrakt: delete-knapp, Ctrl+Z och ingen aktiv/inaktiv-toggle. | `personer.html` eller `persons.js`. |
 | `tests/tools/test_release_check.py` | Release-zippen innehaller nodvandiga filer och frontend. | `tools/release_check.py`, packaging eller release-artefakter. |
 | `tests/tools/test_sidebar_user_browser.py` | Sidebarens footer visar namn, roll och logout i ratt ordning i browser. | Sidebar footer, anvandarvisning eller logoutknapp. |
