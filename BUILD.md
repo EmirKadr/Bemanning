@@ -68,7 +68,7 @@ Standardvardet ar `https://stigamo.nu`.
 Det betyder att appen inte langre behover rendera hemsidan direkt, men den delar
 fortfarande samma centrala PostgreSQL-sanning som hemsidan. Klienten innehaller
 ingen lokal databas. Standardporten ar `8766` och kan andras med
-`BEMANNING_DESKTOP_PORT`.
+`FLOW_DESKTOP_PORT`.
 
 ## GitHub artifact
 

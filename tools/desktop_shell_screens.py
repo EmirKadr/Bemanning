@@ -60,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     args.output.mkdir(parents=True, exist_ok=True)
 
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    os.environ["BEMANNING_DISABLE_UPDATE_CHECK"] = "1"
+    os.environ["FLOW_DISABLE_UPDATE_CHECK"] = "1"
     sys.path.insert(0, str(ROOT))
 
     from PyQt6.QtCore import Qt

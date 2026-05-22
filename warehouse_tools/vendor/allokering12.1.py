@@ -1895,7 +1895,7 @@ def _github_token_path() -> Path:
 
 
 def _load_github_token() -> Optional[str]:
-    for env_key in ("OBSERVATIONS_GITHUB_TOKEN", "BEMANNING_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"):
+    for env_key in ("OBSERVATIONS_GITHUB_TOKEN", "FLOW_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"):
         token = os.environ.get(env_key, "").strip()
         if token:
             return token

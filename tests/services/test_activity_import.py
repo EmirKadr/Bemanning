@@ -224,7 +224,7 @@ def test_bemanningsansvarig_can_manage_activities(import_db):
 
     assert created.id is not None
     assert created.label == "flow test"
-    assert created.code.startswith("GG_BEMANNING_TEST")
+    assert created.code.startswith("GG_FLOW_TEST")
 
     updated = update_activity(
         activity_id=created.id,

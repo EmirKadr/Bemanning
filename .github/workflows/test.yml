@@ -23,7 +23,7 @@ jobs:
           --health-retries 5
     env:
       QT_QPA_PLATFORM: offscreen
-      BEMANNING_DISABLE_UPDATE_CHECK: "1"
+      FLOW_DISABLE_UPDATE_CHECK: "1"
       SECRET_KEY: test-secret
       SUPER_USER_USERNAMES: admin,emikad,mikhal
       EXCEL_API_TOKEN: test-token

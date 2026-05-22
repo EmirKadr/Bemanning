@@ -67,6 +67,6 @@ def test_sync_database_refuses_non_sqlite_target(tmp_path):
 
 def test_sync_from_env_skips_when_live_database_url_is_missing(monkeypatch):
     monkeypatch.delenv("LIVE_DATABASE_URL", raising=False)
-    monkeypatch.delenv("BEMANNING_LIVE_DATABASE_URL", raising=False)
+    monkeypatch.delenv("FLOW_LIVE_DATABASE_URL", raising=False)
 
     assert sync_from_env() is False

@@ -181,7 +181,7 @@ def start_local_server(output_dir: Path) -> tuple[str, ServerProcess]:
             "SECRET_KEY": "visual-smoke-secret",
             "ENVIRONMENT": "development",
             "SUPER_USER_USERNAMES": "admin,emikad",
-            "BEMANNING_DISABLE_UPDATE_CHECK": "1",
+            "FLOW_DISABLE_UPDATE_CHECK": "1",
         }
     )
     _run_python_module("app.backend.bootstrap_local", env)

@@ -190,7 +190,7 @@ def test_allocation_observations_github_sync_is_wired():
     assert "fetch_observations_from_github()" in main
     assert "sync_allocation_observations_on_startup" in main
     assert '"OBSERVATIONS_GITHUB_TOKEN"' in engine
-    assert '"BEMANNING_GITHUB_TOKEN"' in engine
+    assert '"FLOW_GITHUB_TOKEN"' in engine
     assert "github_sent_rows" in engine
     assert "article_max_changed_rows" in engine
 

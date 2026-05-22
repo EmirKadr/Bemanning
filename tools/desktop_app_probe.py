@@ -80,8 +80,8 @@ class FakeWorker:
 
 def run_shell_probe(*, output_dir: Path, base_url: str) -> list[ProbeStep]:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    os.environ["BEMANNING_DISABLE_UPDATE_CHECK"] = "1"
-    os.environ["BEMANNING_SERVER_BASE_URL"] = base_url
+    os.environ["FLOW_DISABLE_UPDATE_CHECK"] = "1"
+    os.environ["FLOW_SERVER_BASE_URL"] = base_url
     sys.path.insert(0, str(ROOT))
 
     from PyQt6.QtCore import Qt
@@ -156,8 +156,8 @@ def run_real_webengine_child(*, output_dir: Path, base_url: str) -> int:
     env = os.environ.copy()
     env.setdefault("QT_QPA_PLATFORM", "offscreen")
     env.setdefault("QTWEBENGINE_DISABLE_SANDBOX", "1")
-    env["BEMANNING_DISABLE_UPDATE_CHECK"] = "1"
-    env["BEMANNING_SERVER_BASE_URL"] = base_url
+    env["FLOW_DISABLE_UPDATE_CHECK"] = "1"
+    env["FLOW_SERVER_BASE_URL"] = base_url
     command = [
         sys.executable,
         "-m",
