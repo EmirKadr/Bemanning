@@ -1,6 +1,6 @@
-# Bemanningssystem
+# flow
 
-Webbaserad ersättning för Excel-bemanningsfilen. Arbetsledare planerar bemanning per vecka/dag/område i en matris (personer × timmar) där varje cell anger aktivitet.
+Webbaserad ersättning för Excel-bemanningsfilen. Arbetsledare planerar flow per vecka/dag/område i en matris (personer × timmar) där varje cell anger aktivitet.
 
 ## Funktioner i MVP
 
@@ -74,15 +74,15 @@ Seeden skapar en admin-användare:
 
 1. Initiera git-repo och pusha till GitHub:
    ```powershell
-   cd "C:\Users\emikad\OneDrive - Dole Nordic AB\Skrivbordet\projects\Bemanningsfil"
+   cd "C:\Users\emikad\OneDrive - Dole Nordic AB\Skrivbordet\projects\flow"
    git init
    git add app/ demo/ referens/
-   git commit -m "Initial commit: bemanningssystem MVP"
-   git remote add origin https://github.com/<DITT_NAMN>/bemanningsfil.git
+   git commit -m "Initial commit: flow MVP"
+   git remote add origin https://github.com/<DITT_NAMN>/flow.git
    git push -u origin main
    ```
 2. På [render.com](https://render.com): **New → Blueprint** → välj GitHub-repot. Render läser `app/render.yaml` automatiskt.
-3. Render skapar databasen `bemanning-db` och web-servicen `bemanning-web`, sätter `DATABASE_URL` och auto-genererar `SECRET_KEY`.
+3. Render skapar databasen `flow-db` och web-servicen `flow-web`, sätter `DATABASE_URL` och auto-genererar `SECRET_KEY`.
 4. Build-steget kör `pip install`, `alembic upgrade head` och `python -m backend.seed`. Vid varje deploy uppdateras seed-data (idempotent).
 5. När deploy är klar: öppna `https://stigamo.nu` och logga in.
 
@@ -92,7 +92,7 @@ Seeden skapar en admin-användare:
 
 ```powershell
 # Starta Postgres
-docker run -d --name bemanning-pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=bemanning postgres:16
+docker run -d --name flow-pg -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=flow postgres:16
 
 cd app
 python -m venv .venv
@@ -107,7 +107,7 @@ uvicorn backend.main:app --reload
 
 ### Lokal testmiljö med live-data
 
-`start_local.bat` använder alltid SQLite-filen `app/bemanning_local.db`, så lokala ändringar kan inte påverka live-databasen.
+`start_local.bat` använder alltid SQLite-filen `app/flow_local.db`, så lokala ändringar kan inte påverka live-databasen.
 
 Om du vill att den lokala testmiljön ska börja med en färsk kopia av live-data, sätt live-databasens externa Render-URL som en lokal miljövariabel innan du kör `start_local.bat`:
 
@@ -115,9 +115,9 @@ Om du vill att den lokala testmiljön ska börja med en färsk kopia av live-dat
 setx LIVE_DATABASE_URL "postgresql://..."
 ```
 
-Nästa gång `start_local.bat` öppnas ersätts `app/bemanning_local.db` med en ny lokal kopia. Om `LIVE_DATABASE_URL` saknas används den vanliga lokala seed-databasen.
+Nästa gång `start_local.bat` öppnas ersätts `app/flow_local.db` med en ny lokal kopia. Om `LIVE_DATABASE_URL` saknas används den vanliga lokala seed-databasen.
 
-Kör `stop_local.bat` från projektroten om en gammal lokal server fortfarande håller `app/bemanning_local.db` eller port `8000` låst.
+Kör `stop_local.bat` från projektroten om en gammal lokal server fortfarande håller `app/flow_local.db` eller port `8000` låst.
 
 ## Mappstruktur
 
@@ -178,6 +178,6 @@ Schemat är förberett för dessa funktioner – de kräver bara nytt UI, inte r
 - Kompetensvalidering – `persons.competencies` och `activities.required_competency` finns redan
 - Realtidsuppdateringar via WebSockets
 - Rapporter (timmar per person/månad, närvarostatistik)
-- Excel-import från `Bemanning Huset - 2026.xlsx`
+- Excel-import från `flow Huset - 2026.xlsx`
 - Halvtimmar/kvartstimmar (kräver migration)
 - Tauri/Electron Windows-app (frontend/ är redan statisk)

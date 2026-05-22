@@ -31,7 +31,7 @@ def configure_downloads(profile: QWebEngineProfile) -> None:
         download.accept()
 
     profile.downloadRequested.connect(accept_download)
-    profile._bemanning_download_handler = accept_download
+    profile._flow_download_handler = accept_download
 
 
 def create_web_view(parent=None) -> QWebEngineView:

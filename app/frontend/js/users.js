@@ -24,7 +24,7 @@ const ROLE_ACCESS_LEVEL_OPTIONS = [
 ];
 const ROLE_ACCESS_LEVEL_ORDER = ROLE_ACCESS_LEVEL_OPTIONS.map((option) => option.value);
 const VIEW_ACCESS_OPTIONS = [
-  { id: "schedule", label: "Bemanning" },
+  { id: "schedule", label: "flow" },
   { id: "overview", label: "Översikt" },
   { id: "productivity", label: "Produktivitet" },
   { id: "dataFetch", label: "Hämta data" },

@@ -56,8 +56,8 @@ def test_check_for_update_finds_setup_asset():
         "tag_name": "v0.2.0",
         "html_url": "https://example.test/releases/v0.2.0",
         "assets": [
-            {"name": "Bemanning-0.2.0-win64.zip", "browser_download_url": "zip"},
-            {"name": "Bemanning-0.2.0-Setup.exe", "browser_download_url": "exe"},
+            {"name": "flow-0.2.0-win64.zip", "browser_download_url": "zip"},
+            {"name": "flow-0.2.0-Setup.exe", "browser_download_url": "exe"},
         ],
     })
 
@@ -65,7 +65,7 @@ def test_check_for_update_finds_setup_asset():
 
     assert info is not None
     assert info.version == "0.2.0"
-    assert info.installer_name == "Bemanning-0.2.0-Setup.exe"
+    assert info.installer_name == "flow-0.2.0-Setup.exe"
     assert info.installer_url == "exe"
 
 
@@ -76,7 +76,7 @@ def test_download_update_installer_writes_file(tmp_path):
         tag_name="v0.2.0",
         release_url="https://example.test/release",
         installer_url="https://example.test/setup.exe",
-        installer_name="Bemanning-0.2.0-Setup.exe",
+        installer_name="flow-0.2.0-Setup.exe",
     )
     progress = []
 
@@ -87,6 +87,6 @@ def test_download_update_installer_writes_file(tmp_path):
         progress_cb=progress.append,
     )
 
-    assert path.name == "Bemanning-0.2.0-Setup.exe"
+    assert path.name == "flow-0.2.0-Setup.exe"
     assert path.read_bytes() == b"installer"
     assert progress[-1] == 100

@@ -33,11 +33,11 @@ Kort svar: Apphjalpen ar en liten chattpanel i sidomenyn. Knappen sitter direkt 
 
 - Dialogen sparas i `sessionStorage` under aktuell browserflik eller desktop-webbvy.
 - Under pagaende API-anrop visas en assistant-bubbla med spinner och texten `Hamtar svar`.
-- Oppet/stangt lage sparas i `bemanning-assistant-chat-open`.
-- Dialograder sparas i `bemanning-assistant-chat`.
-- Utkast sparas i `bemanning-assistant-chat-draft`.
-- Lokal frageraknare sparas i `bemanning-assistant-chat-count`.
-- Lokal chattdata versioneras med `bemanning-assistant-chat-version`; nar lagringsformatet andras rensar frontend gammal lokal data vid nasta sidladdning.
+- Oppet/stangt lage sparas i `flow-assistant-chat-open`.
+- Dialograder sparas i `flow-assistant-chat`.
+- Utkast sparas i `flow-assistant-chat-draft`.
+- Lokal frageraknare sparas i `flow-assistant-chat-count`.
+- Lokal chattdata versioneras med `flow-assistant-chat-version`; nar lagringsformatet andras rensar frontend gammal lokal data vid nasta sidladdning.
 - Backend har ocksa en sessionskvot i server-sessionen: max 10 lyckade MiniMax-fragor.
 - Raknaren visar anvanda fragor i hela aktuell session, inte bara synliga fragor i panelen. Om panelen visar `5/10 fragor i sessionen` efter en synlig fraga betyder det normalt att fyra lyckade fragor redan har skickats tidigare i samma server-/browser-session.
 - `Rensa dialog` nollstaller lokal dialog, lokalt utkast, lokal raknare och backendens kvot for aktuell session, men haller panelen oppen.
@@ -45,7 +45,7 @@ Kort svar: Apphjalpen ar en liten chattpanel i sidomenyn. Knappen sitter direkt 
 
 ## Teknisk prompt och kunskapsbas
 
-Backendens systemprompt sager att modellen ar `Apphjalpen for Bemanning`, ska svara pa svenska med korrekta `å`, `ä` och `ö`, vara konkret, inte gissa utan wiki-stod och be om exakt vy/knapp/feltext nar information saknas.
+Backendens systemprompt sager att modellen ar `Apphjalpen for flow`, ska svara pa svenska med korrekta `å`, `ä` och `ö`, vara konkret, inte gissa utan wiki-stod och be om exakt vy/knapp/feltext nar information saknas.
 
 Backend lagger in en begransad anvandarkontext i prompten for att chatten ska kunna svara pa behorighetsfragor utan att gissa. Kontexten innehaller:
 

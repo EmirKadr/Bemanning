@@ -237,15 +237,15 @@ def test_allocate_display_summary_matches_current_local_fixture_data():
     }
 
 
-def test_warehouse_tool_testdata_is_local_to_bemanning():
+def test_warehouse_tool_testdata_is_local_to_flow():
     if not WAREHOUSE_TESTDATA.is_dir():
         pytest.skip("Lokala warehouse-regressionsfiler saknas.")
     assert WAREHOUSE_TESTDATA.is_dir()
     assert any(WAREHOUSE_TESTDATA.glob("v_ask_pick_log_full-*.csv"))
-    assert ROOT.name == "Bemanningsfil"
+    assert ROOT.name == "flow"
 
 
-def test_warehouse_registry_is_loaded_from_bemanning_package():
+def test_warehouse_registry_is_loaded_from_flow_package():
     assert tuple(flows.FLOW_BY_ID) == REGISTRY_FLOW_IDS
     assert len(flows.public_pool()) == 10
     public_registry = flows.public_registry()

@@ -1,13 +1,13 @@
 ---
-title: Bemanning wiki-index
+title: flow wiki-index
 status: aktiv
 updated: 2026-05-21
 tags: [wiki, index]
 ---
 
-# Bemanning wiki-index
+# flow wiki-index
 
-Kort svar: Bemanning ar en FastAPI/vanilla-JS webbapp och PyQt-baserad Windows-app for planering av bemanning, register, historik, produktivitet och lagerverktyg. Den har wikin ar agentens forsta stopp innan kodlasning.
+Kort svar: flow ar en FastAPI/vanilla-JS webbapp och PyQt-baserad Windows-app for planering av flow, register, historik, produktivitet och lagerverktyg. Den har wikin ar agentens forsta stopp innan kodlasning.
 
 ## Starta har
 
@@ -21,7 +21,7 @@ Kort svar: Bemanning ar en FastAPI/vanilla-JS webbapp och PyQt-baserad Windows-a
 
 ## Funktionssidor
 
-- [Bemanning dagsschema](bemanning-schedule.md) - matrisen, celler, split, drag, kopiera, rensa, undo/redo och kalkyl.
+- [flow dagsschema](bemanning-schedule.md) - matrisen, celler, split, drag, kopiera, rensa, undo/redo och kalkyl.
 - [Oversikt](overview-page.md) - vecka/manad, heldagsbemanning, drag och undo/redo.
 - [Personer](persons.md) - personregister, inline-edit, import och veckomall.
 - [Aktiviteter och omraden](activities-areas.md) - aktivitetsregister, kod, summering och legacy-stalle.

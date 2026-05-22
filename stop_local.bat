@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 
-echo Stanger lokal Bemanning-server...
+echo Stanger lokal flow-server...
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$root = (Resolve-Path '.').Path.TrimEnd('\');" ^
@@ -12,7 +12,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { [void]$pids.Add([int]$_.OwningProcess) };" ^
   "$changed = $true; while ($changed) { $changed = $false; foreach ($process in $allProcesses) { if ($pids.Contains([int]$process.ParentProcessId) -and -not $pids.Contains([int]$process.ProcessId)) { [void]$pids.Add([int]$process.ProcessId); $changed = $true } } };" ^
   "$targets = @($pids | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue });" ^
-  "if ($targets.Count -eq 0) { Write-Host 'Ingen lokal Bemanning-server hittades.'; exit 0 };" ^
+  "if ($targets.Count -eq 0) { Write-Host 'Ingen lokal flow-server hittades.'; exit 0 };" ^
   "foreach ($targetPid in $targets) { try { Stop-Process -Id $targetPid -Force -ErrorAction Stop; Write-Host ('Stoppade PID ' + $targetPid) } catch { Write-Host ('PID ' + $targetPid + ' kunde inte stoppas eller finns inte langre.') } };" ^
   "Start-Sleep -Seconds 1; exit 0"
 

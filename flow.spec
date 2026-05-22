@@ -1,10 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller build spec for Bemanning."""
+"""PyInstaller build spec for flow."""
 from pathlib import Path
 
 
 project_root = Path(SPECPATH)
-app_icon = project_root / "desktop" / "assets" / "app_icon.ico"
+app_icon = project_root / "desktop" / "assets" / "flow_icon.ico"
 frontend_dir = project_root / "app" / "frontend"
 warehouse_vendor_dir = project_root / "warehouse_tools" / "vendor"
 
@@ -36,7 +36,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="Bemanning",
+    name="flow",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -57,5 +57,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="Bemanning",
+    name="flow",
 )

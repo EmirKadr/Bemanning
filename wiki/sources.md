@@ -24,7 +24,7 @@ Kort svar: wikin ar syntetiserad fran repo-filerna nedan. Raa kallor ska normalt
 
 ## Frontend-kallor
 
-- `../app/frontend/index.html`, `../app/frontend/js/schedule.js` - Bemanning dagsschema.
+- `../app/frontend/index.html`, `../app/frontend/js/schedule.js` - flow dagsschema.
 - `../app/frontend/overblick.html`, `../app/frontend/js/overview.js` - Oversikt.
 - `../app/frontend/personer.html`, `../app/frontend/js/persons.js` - Personregister och veckomallar.
 - `../app/frontend/aktiviteter.html`, `../app/frontend/js/activities.js` - Aktiviteter.
@@ -52,5 +52,5 @@ Kort svar: wikin ar syntetiserad fran repo-filerna nedan. Raa kallor ska normalt
 
 - `../desktop/app.py`, `../desktop/local_app_server.py`, `../desktop/web_view.py`, `../desktop/main.py` - Windows-skal och lokal appserver.
 - `../warehouse_tools/catalog.py`, `../warehouse_tools/flows.py`, `../warehouse_tools/detect.py` - lagerfloden, filslotar och filidentifiering.
-- `../tools/bemanning_cli.py`, `../tools/visual_smoke.py`, `../tools/interactive_e2e.py`, `../tools/desktop_app_probe.py` - agentverktyg och teststod.
+- `../tools/flow_cli.py`, `../tools/visual_smoke.py`, `../tools/interactive_e2e.py`, `../tools/desktop_app_probe.py` - agentverktyg och teststod.
 

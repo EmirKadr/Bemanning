@@ -1,4 +1,4 @@
-"""Run an interactive end-to-end exercise of the Bemanning web app.
+"""Run an interactive end-to-end exercise of the flow web app.
 
 This is the "let an agent poke around" tool. It creates a disposable local
 database, starts the app, clicks through important workflows, creates records,

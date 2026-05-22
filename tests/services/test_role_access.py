@@ -22,7 +22,7 @@ def test_viewer_cannot_edit_planning():
     assert exc_info.value.status_code == 403
 
 
-def test_viewer_can_open_bemanning_view():
+def test_viewer_can_open_flow_view():
     assert require_planning_viewer(make_user("viewer")).role == "viewer"
 
 

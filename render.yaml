@@ -1,12 +1,12 @@
 databases:
-  - name: bemanning-db
+  - name: flow-db
     plan: free
-    databaseName: bemanning
-    user: bemanning
+    databaseName: flow
+    user: flow
 
 services:
   - type: web
-    name: bemanning-web
+    name: flow-web
     runtime: python
     plan: starter
     rootDir: app
@@ -15,7 +15,7 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: bemanning-db
+          name: flow-db
           property: connectionString
       - key: SECRET_KEY
         generateValue: true

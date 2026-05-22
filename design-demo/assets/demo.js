@@ -52,7 +52,7 @@ const PERSONS = [
   { id: 17, name: "Tova Berg",        home_area_id: 3, home_activity_id: 32, is_active: true, sort_order: 17 },
 ];
 
-// Mockad bemanning för måndag i Granngården – några celler ifyllda
+// Mockad flow för måndag i Granngården – några celler ifyllda
 const CELLS = [
   // Filip: GG VM 6-11, GG Plock 13-15
   { p: 1, h: 6,  a: 12 }, { p: 1, h: 7,  a: 12 }, { p: 1, h: 8,  a: 12 }, { p: 1, h: 9,  a: 12 },
@@ -107,12 +107,12 @@ function renderSidebar(activePage) {
     <div class="brand">
       <div class="brand-dot">B</div>
       <div>
-        <div class="brand-name">Bemanning</div>
+        <div class="brand-name">flow</div>
         <div class="brand-sub">Stigamo · demo</div>
       </div>
     </div>
     <nav class="nav">
-      ${link("index.html",     "schedule", "📋", "Bemanning")}
+      ${link("index.html",     "schedule", "📋", "flow")}
       ${link("overblick.html", "overview", "📅", "Översikt")}
       ${link("personer.html",  "persons",  "👥", "Personer")}
       ${link("stallen.html",   "places",   "📍", "Ställen")}

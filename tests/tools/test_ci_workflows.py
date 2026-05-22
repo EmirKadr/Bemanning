@@ -8,8 +8,8 @@ def test_push_ci_runs_core_test_gates_against_postgres_render_simulation():
     workflow = (ROOT / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8")
 
     assert "postgres:16" in workflow
-    assert "bemanning_test" in workflow
-    assert "postgresql+psycopg://postgres:postgres@localhost:5432/bemanning_test" in workflow
+    assert "flow_test" in workflow
+    assert "postgresql+psycopg://postgres:postgres@localhost:5432/flow_test" in workflow
     assert "alembic upgrade head" in workflow
     assert "python -m backend.seed" in workflow
     assert "python -m pytest" in workflow

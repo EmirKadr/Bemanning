@@ -238,5 +238,5 @@ function setupImportControls() {
   const newActButton = document.getElementById("new-act");
   newActButton.hidden = !canEditPage(currentUser, "activities");
   if (canEditPage(currentUser, "activities")) newActButton.addEventListener("click", () => openModal(null));
-  window.addEventListener("bemanning:areaFocusChanged", () => load());
+  window.addEventListener("flow:areaFocusChanged", () => load());
 })();

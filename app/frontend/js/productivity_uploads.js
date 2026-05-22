@@ -1,5 +1,5 @@
 (() => {
-  const DB_NAME = "bemanning-productivity-files";
+  const DB_NAME = "flow-productivity-files";
   const DB_VERSION = 1;
   const STORE = "files";
 
@@ -507,7 +507,7 @@
     await refreshPanel(panel);
   }
 
-  window.addEventListener("bemanning:uploadsCleared", refreshPanels);
+  window.addEventListener("flow:uploadsCleared", refreshPanels);
 
   window.addEventListener("dragend", clearDropHighlights);
 

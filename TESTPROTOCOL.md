@@ -1,6 +1,6 @@
 # Testprotokoll
 
-Det har protokollet beskriver hur en agent ska testa Bemanning efter andringar.
+Det har protokollet beskriver hur en agent ska testa flow efter andringar.
 Appen finns i tva klienter som ska hallas i paritet:
 
 - `app/` ar webbappen.
@@ -20,7 +20,7 @@ Kor detta fore commit nar andringen inte ar rent dokumentar:
 ```powershell
 python -m pytest
 Get-ChildItem -Path app\frontend\js -Filter *.js | ForEach-Object { node --check $_.FullName }
-python -m tools.bemanning_cli routes --format table
+python -m tools.flow_cli routes --format table
 python desktop\main.py --smoke-test
 ```
 
@@ -80,7 +80,7 @@ tester om andringen ror delad logik, API-kontrakt, behorighet eller UI.
 | `tests/tools/test_activity_terminology.py` | Terminologikontrakt sa gamla aktivitetsord inte smyger in. | UI-text, docs eller migration fran gammal terminologi. |
 | `tests/tools/test_allocation_split_browser.py` | Playwright-test for Dela-resultattabell och kolumnkopiering. | `dela.html`, split values, tabellrendering eller clipboard for lagerverktyg. |
 | `tests/tools/test_api_route_contracts.py` | Frontendens hardkodade API-anrop finns i FastAPI med ratt metod. | Nya/andrade API-anrop i JS eller backend-rutter. |
-| `tests/tools/test_bemanning_cli.py` | CLI-routekatalog, API_ROUTES-dokumentation, generiska API-call och DB-lookup. | `tools/bemanning_cli.py`, API-rutter, CLI-adapter eller API-dokumentation. |
+| `tests/tools/test_flow_cli.py` | CLI-routekatalog, API_ROUTES-dokumentation, generiska API-call och DB-lookup. | `tools/flow_cli.py`, API-rutter, CLI-adapter eller API-dokumentation. |
 | `tests/tools/test_ci_workflows.py` | CI och release workflows kor ratt grindar fore build/deploy. | `.github/workflows/*` eller releasepipeline. |
 | `tests/tools/test_desktop_app_probe_runtime.py` | Desktop-proben kan starta lokal server/proxy och skriva runtime-artifacts. | `tools/desktop_app_probe.py` eller desktop-proxytest. |
 | `tests/tools/test_legacy_activity_browser.py` | Browserkontrakt for legacy-aktivitetssidor och vybehorighetsmodalens text. | Legacy aktivitetssidor, aktivitets-UI eller rollaccessmodal. |
@@ -126,9 +126,9 @@ python -m tools.visual_smoke --via-desktop-proxy --roles public,admin,warehouse
 python -m tools.visual_smoke --output artifacts\visual\manual-check
 ```
 
-## Lagerverktyg / lokal Bemanning-data
+## Lagerverktyg / lokal flow-data
 
-Bearbeta, Dela och Harleda kor Bemannings egna `warehouse_tools`-paket.
+Bearbeta, Dela och Harleda kor flows egna `warehouse_tools`-paket.
 Lagerflodena testas mot lokal fixture-data i `testdata/warehouse_tools`, sa
 testsviten inte kraver nagot sibling-projekt.
 
@@ -146,9 +146,9 @@ databasen?" ska man anvanda CLI:ns read-only-uppslag i stallet for att skriva
 egna SQL-snuttar:
 
 ```powershell
-python -m tools.bemanning_cli db lookup all --q "Anton Holmqvist"
-python -m tools.bemanning_cli db lookup users --q "emikad" --json
-python -m tools.bemanning_cli db lookup persons --q "Henrik" --database-url "sqlite:///app/bemanning_local.db"
+python -m tools.flow_cli db lookup all --q "Anton Holmqvist"
+python -m tools.flow_cli db lookup users --q "emikad" --json
+python -m tools.flow_cli db lookup persons --q "Henrik" --database-url "sqlite:///app/flow_local.db"
 ```
 
 Kommandot laser bara fran databasen och visar aven inaktiva/dolda rader som
@@ -161,7 +161,7 @@ Windows-appens lokala appyta, cookies, API-proxy eller paketerad frontend.
 Bas-screenshots som ska granskas:
 
 - Login.
-- Bemanning i admin-, arbetsledar- och visningsroll.
+- flow i admin-, arbetsledar- och visningsroll.
 - Oversikt i admin-, arbetsledar- och visningsroll.
 - Personer.
 - Aktiviteter.
@@ -172,10 +172,10 @@ Bas-screenshots som ska granskas:
 
 Scenario-screenshots som ska granskas:
 
-- Bemanning med Alla områden.
-- Bemanning med Mestergruppen.
-- Bemanning med Autostore.
-- Bemanning med tomt personfilter.
+- flow med Alla områden.
+- flow med Mestergruppen.
+- flow med Autostore.
+- flow med tomt personfilter.
 - Kopiera dag-modal.
 - Bemanningskalkyl med Alla.
 - Kompakt/sidebar-collapse.
@@ -199,7 +199,7 @@ Granska visuellt att:
 - Text inte kapas eller overlappar.
 - Sidebar, kontroller och tabeller ligger ratt i desktop och mobil.
 - Rollerna visar ratt navigation och ratt vyer.
-- Otillgangliga sidor skickar anvandaren till Bemanning och visar feltoast.
+- Otillgangliga sidor skickar anvandaren till flow och visar feltoast.
 - Databasikonen, uppladdningsnotis och uppladdningspilen syns pa Lager-sidorna.
 - Lagerverktygsvyerna kan visas via desktop-proxyn utan att sidebar blinkar bort.
 - Farger, halvceller, schemalagda/lediga celler och kalkyl syns begripligt.

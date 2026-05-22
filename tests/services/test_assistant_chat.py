@@ -80,7 +80,7 @@ def test_assistant_prompt_is_strict_when_repo_search_is_not_triggered(monkeypatc
     assert "Gissa inte fram möjliga knappar" in system_prompt
     assert "Användarkontext" in system_prompt
     assert "Primär roll: Visare (`viewer`)" in system_prompt
-    assert "Bemanning (`schedule`), Översikt (`overview`)" in system_prompt
+    assert "flow (`schedule`), Översikt (`overview`)" in system_prompt
     assert "Repo-sökning:\nInte körd" in system_prompt
 
 
@@ -120,7 +120,7 @@ def test_assistant_chat_sends_wiki_context_and_dialogue(monkeypatch):
                 "page_path": "/index.html",
                 "messages": [
                     {"role": "user", "content": "Var hittar jag kopiera?"},
-                    {"role": "assistant", "content": "Det finns i Bemanning."},
+                    {"role": "assistant", "content": "Det finns i flow."},
                     {"role": "user", "content": "Hur funkar Kopiera dag?"},
                 ],
             },
@@ -137,7 +137,7 @@ def test_assistant_chat_sends_wiki_context_and_dialogue(monkeypatch):
     assert "bemanning-schedule.md" in messages[0]["content"]
     assert "Undvik markdown-tabeller" in messages[0]["content"]
     assert "korrekta å, ä och ö" in messages[0]["content"]
-    assert "Vyer med view men inte edit: Bemanning (`schedule`), Översikt (`overview`)" in messages[0]["content"]
+    assert "Vyer med view men inte edit: flow (`schedule`), Översikt (`overview`)" in messages[0]["content"]
     assert [message["role"] for message in messages[1:]] == ["user", "assistant", "user"]
     assert captured["payload"]["reasoning_split"] is True
 

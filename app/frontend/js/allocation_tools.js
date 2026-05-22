@@ -1,5 +1,5 @@
 const ALLOCATION_API = "/api/allokering";
-const ALLOCATION_DB_NAME = "bemanning-allokering-files";
+const ALLOCATION_DB_NAME = "flow-allokering-files";
 const ALLOCATION_DB_VERSION = 1;
 const ALLOCATION_STORE = "files";
 const ALLOCATION_HIDDEN_FLOW_IDS = new Set(["observations-update", "observations-sync", "update-check"]);
@@ -1044,7 +1044,7 @@ async function initAllocationPage() {
   }
 }
 
-window.addEventListener("bemanning:uploadsCleared", async () => {
+window.addEventListener("flow:uploadsCleared", async () => {
   const root = document.getElementById("allocationRoot");
   if (!root || !allocationState.user) return;
   allocationState.files = await loadStoredAllocationFiles();
@@ -1054,7 +1054,7 @@ window.addEventListener("bemanning:uploadsCleared", async () => {
   renderAllocationPage();
 });
 
-window.addEventListener("bemanning:allocationFilesChanged", async () => {
+window.addEventListener("flow:allocationFilesChanged", async () => {
   const root = document.getElementById("allocationRoot");
   if (!root || !allocationState.user) return;
   allocationState.files = await loadStoredAllocationFiles();

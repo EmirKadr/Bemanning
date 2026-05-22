@@ -1,13 +1,13 @@
 ---
-title: Bemanning dagsschema
+title: flow dagsschema
 status: aktiv
 updated: 2026-05-21
-tags: [bemanning, schema, ui, knappar]
+tags: [flow, schema, ui, knappar]
 ---
 
-# Bemanning dagsschema
+# flow dagsschema
 
-Kort svar: Bemanning ar huvudmatrisen. Anvandaren valjer ar/vecka/dag/omrade och satter aktivitet per person och timme. Andringar sparas direkt till `/api/schedule/*` med versionsskydd.
+Kort svar: flow ar huvudmatrisen. Anvandaren valjer ar/vecka/dag/omrade och satter aktivitet per person och timme. Andringar sparas direkt till `/api/schedule/*` med versionsskydd.
 
 ## Anvandarflode
 

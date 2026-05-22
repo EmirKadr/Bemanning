@@ -5,7 +5,7 @@ from tools.release_check import REQUIRED_PACKAGE_FILES, check_release_artifacts
 
 def make_release(tmp_path, *, version="9.9.9", missing_zip_entry=None):
     release_dir = tmp_path / "release"
-    package_dir = release_dir / "Bemanning"
+    package_dir = release_dir / "flow"
     package_dir.mkdir(parents=True)
 
     for relative in REQUIRED_PACKAGE_FILES:
@@ -13,10 +13,10 @@ def make_release(tmp_path, *, version="9.9.9", missing_zip_entry=None):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("x", encoding="utf-8")
 
-    setup_path = release_dir / f"Bemanning-{version}-Setup.exe"
+    setup_path = release_dir / f"flow-{version}-Setup.exe"
     setup_path.write_bytes(b"setup")
 
-    zip_path = release_dir / f"Bemanning-{version}-win64.zip"
+    zip_path = release_dir / f"flow-{version}-win64.zip"
     with zipfile.ZipFile(zip_path, "w") as archive:
         for relative in REQUIRED_PACKAGE_FILES:
             if relative == missing_zip_entry:

@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0app"
 
-set "DATABASE_URL=sqlite:///./bemanning_local.db"
+set "DATABASE_URL=sqlite:///./flow_local.db"
 set "SECRET_KEY=dev-only-change-me"
 set "ENVIRONMENT=development"
 set "SUPER_USER_USERNAMES=admin,emikad,mikhal"

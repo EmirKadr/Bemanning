@@ -1,7 +1,7 @@
 """Load and expose the vendored warehouse runtime.
 
 The legacy runtime still lives in one large file for output parity with the
-existing Allokering app.  Bemanning now vendors that runtime here instead of
+existing Allokering app.  flow now vendors that runtime here instead of
 importing a sibling application at runtime.  New code should be added as clean
 modules under `warehouse_tools`, and the vendored file can be reduced flow by
 flow once golden parity tests exist.

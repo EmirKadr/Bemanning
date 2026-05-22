@@ -2340,7 +2340,7 @@ async function loadSchedule() {
   document.getElementById("weekInput").addEventListener("change", onControlChange);
   document.getElementById("daySelect").addEventListener("change", onControlChange);
   document.getElementById("areaSelect").addEventListener("change", onControlChange);
-  window.addEventListener("bemanning:areaFocusChanged", async () => {
+  window.addEventListener("flow:areaFocusChanged", async () => {
     state.areaId = preferredAreaIdForCurrentUser();
     const areaSelect = document.getElementById("areaSelect");
     if (areaSelect) areaSelect.value = state.areaId == null ? "" : String(state.areaId);

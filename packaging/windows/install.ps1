@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$appName = "Bemanning"
+$appName = "flow"
 $sourceDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $targetDir = Join-Path $env:LOCALAPPDATA $appName
 $exePath = Join-Path $targetDir "$appName.exe"
@@ -39,7 +39,7 @@ $uninstallBatchPath = Join-Path $targetDir "Avinstallera $appName.bat"
 $uninstallScript = @'
 $ErrorActionPreference = "Stop"
 
-$appName = "Bemanning"
+$appName = "flow"
 $targetDir = Join-Path $env:LOCALAPPDATA $appName
 $startMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\$appName"
 $desktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "$appName.lnk"
@@ -59,7 +59,7 @@ if (Test-Path $targetDir) {
     Remove-Item -LiteralPath $targetDir -Recurse -Force
 }
 
-Write-Host "Bemanning ar avinstallerat."
+Write-Host "flow ar avinstallerat."
 '@
 
 $uninstallBatch = @"

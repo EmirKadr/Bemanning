@@ -78,9 +78,9 @@ REPO_EXCLUDED_DIRS = {
 REPO_EXCLUDED_NAMES = {
     ".env",
     ".env.local",
-    ".bemanning-cli-cookies.txt",
-    "bemanning_local.db",
-    "bemanning_local.db.syncing",
+    ".flow-cli-cookies.txt",
+    "flow_local.db",
+    "flow_local.db.syncing",
     "deploy_probe.sqlite",
 }
 
@@ -143,7 +143,7 @@ ROLE_LABELS = {
 }
 
 VIEW_LABELS = {
-    "schedule": "Bemanning",
+    "schedule": "flow",
     "overview": "Översikt",
     "productivity": "Produktivitet",
     "allocationUploads": "Uppladdningar",
@@ -184,7 +184,7 @@ VIEW_CONTEXT_ORDER = [
     "roleAccess",
 ]
 
-SYSTEM_PROMPT_TEMPLATE = """Du är Apphjälpen för Bemanning.
+SYSTEM_PROMPT_TEMPLATE = """Du är Apphjälpen för flow.
 
 Du är en kunnig supportperson för användningen av appen. Ditt jobb är att hjälpa
 personen som ställer frågor medan de använder programmet.

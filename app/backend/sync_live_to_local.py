@@ -1,4 +1,4 @@
-"""Copy a live Bemanning database into the local SQLite preview database.
+"""Copy a live flow database into the local SQLite preview database.
 
 The copy is deliberately one-way: source is opened for reads, and the target
 must be a SQLite file. Local edits can therefore never write back to live.
@@ -18,7 +18,7 @@ from .database import Base, _normalize_url
 from .models import Activity, AppSetting, Area, AuditLog, Person, PersonScheduleTemplate, ScheduleCell, User
 
 
-SOURCE_ENV_NAMES = ("LIVE_DATABASE_URL", "BEMANNING_LIVE_DATABASE_URL")
+SOURCE_ENV_NAMES = ("LIVE_DATABASE_URL", "FLOW_LIVE_DATABASE_URL")
 TABLE_COPY_ORDER = (
     Area,
     User,
@@ -136,7 +136,7 @@ def sync_database(source_database_url: str, target_database_url: str) -> dict[st
         if temp_path.exists():
             temp_path.unlink(missing_ok=True)
         raise LocalSyncError(
-            "Kunde inte ersatta app/bemanning_local.db eftersom den anvands av en annan process. "
+            "Kunde inte ersatta app/flow_local.db eftersom den anvands av en annan process. "
             "Stang alla gamla start_local.bat/uvicorn-terminaler och stang localhost:8000-fliken, "
             "vanta nagra sekunder och starta sedan igen."
         ) from exc

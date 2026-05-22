@@ -42,8 +42,8 @@ Kort svar: `app/` ar FastAPI + statisk vanilla JS. `desktop/` ar ett PyQt6-skal 
 
 - `localStorage`: tema, sidebar-collapse, sidebar-layout-cache, role-view-access-cache.
 - `sessionStorage`: vald datumkontext, sidebar-user-cache, upload notice.
-- IndexedDB `bemanning-allokering-files`: lokala filer for lagerverktyg.
-- IndexedDB `bemanning-productivity-files`: lokala produktivitetsloggar.
+- IndexedDB `flow-allokering-files`: lokala filer for lagerverktyg.
+- IndexedDB `flow-productivity-files`: lokala produktivitetsloggar.
 
 ## Deployment och lokal drift
 

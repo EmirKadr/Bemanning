@@ -7,7 +7,7 @@ tags: [api, backend]
 
 # API-karta
 
-Kort svar: `API_ROUTES.md` ar kontraktslistan och testas mot FastAPI-appen via `tools.bemanning_cli`. Denna sida grupperar API:t efter anvandarfloden.
+Kort svar: `API_ROUTES.md` ar kontraktslistan och testas mot FastAPI-appen via `tools.flow_cli`. Denna sida grupperar API:t efter anvandarfloden.
 
 ## Auth och halsa
 
@@ -24,13 +24,13 @@ Kort svar: `API_ROUTES.md` ar kontraktslistan och testas mot FastAPI-appen via `
 - `POST /api/query-data/run` - kor en validerad plan mot extern datakälla och returnerar tabellpreview.
 - `GET /api/query-data/export/{session_id}` - laddar ner senaste datahamtning som Excel.
 
-## Bemanning och oversikt
+## flow och oversikt
 
 - `GET /api/schedule` - hamta dagsschema.
 - `PUT /api/schedule/cell` - satt en cell/ett segment.
 - `PUT /api/schedule/cell/split` - dela eller sla ihop timme.
 - `POST /api/schedule/cells` - bulk-satt flera celler, anvands vid drag.
-- `PUT /api/schedule/hours/restore` - undo/redo for Bemanning och Oversikt.
+- `PUT /api/schedule/hours/restore` - undo/redo for flow och Oversikt.
 - `GET /api/schedule/summary` - summering per aktivitet.
 - `POST /api/schedule/copy` - kopiera dag/vecka.
 - `POST /api/schedule/clear` - rensa schema.
@@ -61,13 +61,13 @@ Kort svar: `API_ROUTES.md` ar kontraktslistan och testas mot FastAPI-appen via `
 ## Agentkommandon
 
 ```powershell
-python -m tools.bemanning_cli routes --format table
-python -m tools.bemanning_cli routes --format markdown
-python -m tools.bemanning_cli api GET /api/health
+python -m tools.flow_cli routes --format table
+python -m tools.flow_cli routes --format markdown
+python -m tools.flow_cli api GET /api/health
 ```
 
 ## Kallor
 
 - `../API_ROUTES.md`
-- `../tools/bemanning_cli.py`
-- `../tests/tools/test_bemanning_cli.py`
+- `../tools/flow_cli.py`
+- `../tests/tools/test_flow_cli.py`

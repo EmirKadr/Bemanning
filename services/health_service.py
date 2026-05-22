@@ -1,4 +1,4 @@
-"""Health checks for the central Bemanning backend."""
+"""Health checks for the central flow backend."""
 from __future__ import annotations
 
 from dataclasses import dataclass

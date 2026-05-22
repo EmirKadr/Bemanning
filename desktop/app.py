@@ -1,4 +1,4 @@
-"""Qt desktop shell for the central Bemanning web app."""
+"""Qt desktop shell for the central flow web app."""
 from __future__ import annotations
 
 import ctypes
@@ -120,7 +120,7 @@ def _resource_path(*parts: str) -> Path:
 
 
 def _app_icon() -> QIcon:
-    icon_path = _resource_path("desktop", "assets", "app_icon.ico")
+    icon_path = _resource_path("desktop", "assets", "flow_icon.ico")
     if icon_path.exists():
         return QIcon(str(icon_path))
     return QIcon()
@@ -234,7 +234,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(14)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        title = QLabel("Startar Bemanning")
+        title = QLabel("Startar flow")
         title.setStyleSheet("font-size: 24px; font-weight: 700;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -300,7 +300,7 @@ class MainWindow(QMainWindow):
 
     def _on_health_error(self, message: str) -> None:
         self._error_view.set_message(
-            "Klienten kunde inte nå den centrala Bemanning-servern.\n\n"
+            "Klienten kunde inte nå den centrala flow-servern.\n\n"
             f"Fel: {message}"
         )
         self._stack.setCurrentWidget(self._error_view)
@@ -313,7 +313,7 @@ class MainWindow(QMainWindow):
 
     def _on_browser_load_finished(self, ok: bool) -> None:
         if ok:
-            self.statusBar().showMessage("Bemanning är redo.", 3000)
+            self.statusBar().showMessage("flow är redo.", 3000)
             return
         self._error_view.set_message(
             "Render svarade på health check, men själva appen kunde inte laddas.\n\n"

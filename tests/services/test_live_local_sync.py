@@ -62,7 +62,7 @@ def test_sync_database_refuses_non_sqlite_target(tmp_path):
     source_path = tmp_path / "live.db"
 
     with pytest.raises(ValueError, match="SQLite"):
-        sync_database(sqlite_url(source_path), "postgresql+psycopg://postgres:postgres@localhost/bemanning")
+        sync_database(sqlite_url(source_path), "postgresql+psycopg://postgres:postgres@localhost/flow")
 
 
 def test_sync_from_env_skips_when_live_database_url_is_missing(monkeypatch):

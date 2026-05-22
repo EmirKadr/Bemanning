@@ -11,13 +11,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: bemanning_test
+          POSTGRES_DB: flow_test
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d bemanning_test"
+          --health-cmd "pg_isready -U postgres -d flow_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -56,7 +56,7 @@ jobs:
       - name: Simulate Render build
         working-directory: app
         env:
-          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/bemanning_test
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/flow_test
           ENVIRONMENT: production
         run: |
           alembic upgrade head

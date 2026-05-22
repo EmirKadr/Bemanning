@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from fastapi.routing import APIRoute
 
 from app.backend.main import app
-from tools import bemanning_cli
+from tools import flow_cli
 from tools import visual_smoke
 
 
@@ -46,13 +46,13 @@ def test_cli_route_registry_covers_every_fastapi_api_route():
                 continue
             app_routes.add((method, route.path))
 
-    cli_routes = {(route.method, route.path) for route in bemanning_cli.ROUTES}
+    cli_routes = {(route.method, route.path) for route in flow_cli.ROUTES}
 
     assert app_routes - cli_routes == set()
 
 
 def test_cli_routes_outputs_markdown(capsys):
-    result = bemanning_cli.main(["routes", "--format", "markdown"])
+    result = flow_cli.main(["routes", "--format", "markdown"])
     output = capsys.readouterr().out
 
     assert result == 0
@@ -61,9 +61,9 @@ def test_cli_routes_outputs_markdown(capsys):
 
 
 def test_api_routes_document_covers_cli_routes():
-    doc = (bemanning_cli.ROOT / "API_ROUTES.md").read_text(encoding="utf-8")
+    doc = (flow_cli.ROOT / "API_ROUTES.md").read_text(encoding="utf-8")
 
-    for route in bemanning_cli.ROUTES:
+    for route in flow_cli.ROUTES:
         assert f"`{route.name}`" in doc
         assert f"`{route.path}`" in doc
 
@@ -72,7 +72,7 @@ def test_cli_can_call_generic_health_endpoint(tmp_path, capsys):
     server, thread = start_cli_test_server()
     try:
         base_url = f"http://127.0.0.1:{server.server_address[1]}"
-        result = bemanning_cli.main(
+        result = flow_cli.main(
             [
                 "--base-url",
                 base_url,
@@ -94,7 +94,7 @@ def test_cli_can_call_generic_health_endpoint(tmp_path, capsys):
 
 
 def test_cli_accepts_base_url_after_subcommand():
-    args = bemanning_cli.parse_args(["api", "GET", "/api/health", "--base-url", "http://127.0.0.1:1"])
+    args = flow_cli.parse_args(["api", "GET", "/api/health", "--base-url", "http://127.0.0.1:1"])
 
     assert args.base_url == "http://127.0.0.1:1"
     assert args.command == "api"
@@ -105,14 +105,14 @@ def test_cli_command_groups_work_against_local_app(tmp_path, capsys):
     cookie_jar = tmp_path / "cli-cookies.txt"
     common = ["--base-url", base_url, "--cookie-jar", str(cookie_jar)]
     try:
-        assert bemanning_cli.main([*common, "routes", "--format", "json"]) == 0
-        assert bemanning_cli.main([*common, "call", "health"]) == 0
-        assert bemanning_cli.main(
+        assert flow_cli.main([*common, "routes", "--format", "json"]) == 0
+        assert flow_cli.main([*common, "call", "health"]) == 0
+        assert flow_cli.main(
             [*common, "auth", "login", "--username", "admin", "--password", "admin123"]
         ) == 0
-        assert bemanning_cli.main([*common, "auth", "me"]) == 0
-        assert bemanning_cli.main([*common, "api", "GET", "/api/activities"]) == 0
-        assert bemanning_cli.main([*common, "auth", "logout"]) == 0
+        assert flow_cli.main([*common, "auth", "me"]) == 0
+        assert flow_cli.main([*common, "api", "GET", "/api/activities"]) == 0
+        assert flow_cli.main([*common, "auth", "logout"]) == 0
     finally:
         server.close()
 
@@ -166,7 +166,7 @@ def test_cli_db_lookup_finds_hidden_people_users_and_activities(tmp_path, capsys
         )
 
     database_url = f"sqlite:///{db_path.as_posix()}"
-    result = bemanning_cli.main(
+    result = flow_cli.main(
         [
             "db",
             "lookup",
@@ -186,7 +186,7 @@ def test_cli_db_lookup_finds_hidden_people_users_and_activities(tmp_path, capsys
     assert {row["type"] for row in payload["results"]} == {"person", "user"}
     assert all(row["is_active"] == 0 for row in payload["results"])
 
-    active_result = bemanning_cli.main(
+    active_result = flow_cli.main(
         [
             "db",
             "lookup",

@@ -59,10 +59,10 @@ jobs:
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Bemanning-windows
+          name: flow-windows
           path: |
-            release/Bemanning-*-win64.zip
-            release/Bemanning-*-Setup.exe
+            release/flow-*-win64.zip
+            release/flow-*-Setup.exe
 
       - name: Publish GitHub release assets
         if: startsWith(github.ref, 'refs/tags/')
@@ -73,6 +73,6 @@ jobs:
           $tag = "${{ github.ref_name }}"
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --title "Bemanning $tag" --generate-notes
+            gh release create $tag --title "flow $tag" --generate-notes
           }
-          gh release upload $tag release/Bemanning-*-win64.zip release/Bemanning-*-Setup.exe --clobber
+          gh release upload $tag release/flow-*-win64.zip release/flow-*-Setup.exe --clobber

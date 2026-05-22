@@ -620,7 +620,7 @@ function updateRowDisabled(row) {
   const newPersonButton = document.getElementById("new-person");
   newPersonButton.hidden = !canEditPage(currentUser, "persons");
   if (canEditPage(currentUser, "persons")) newPersonButton.addEventListener("click", () => openModal(null));
-  window.addEventListener("bemanning:areaFocusChanged", () => renderRows());
+  window.addEventListener("flow:areaFocusChanged", () => renderRows());
 
   document.querySelectorAll("tr.filter-row input").forEach((inp) => {
     inp.addEventListener("input", () => {

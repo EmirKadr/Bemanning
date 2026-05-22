@@ -14,7 +14,7 @@ Kort svar: vid produktbeteende ska agenten testa både webb och Windows-paritet 
 ```powershell
 python -m pytest
 Get-ChildItem -Path app\frontend\js -Filter *.js | ForEach-Object { node --check $_.FullName }
-python -m tools.bemanning_cli routes --format table
+python -m tools.flow_cli routes --format table
 python desktop\main.py --smoke-test
 ```
 
@@ -32,9 +32,9 @@ python -m tools.desktop_app_probe
 
 | Andring | Minsta rimliga verifiering |
 | --- | --- |
-| Backendregel/API | Relevant `pytest` + `bemanning_cli routes` om API-vag andras |
+| Backendregel/API | Relevant `pytest` + `flow_cli routes` om API-vag andras |
 | Frontend-JS | `node --check`, visuell smoke eller interaktiv E2E beroende pa risk |
-| Bemanning/Oversikt | Interaktiv E2E for celler, drag, undo/redo och roller |
+| flow/Oversikt | Interaktiv E2E for celler, drag, undo/redo och roller |
 | Sidebar/roller | Rolltester + visual smoke for flera roller |
 | Produktivitet/lager | `tests/services/test_warehouse_tools_local_data.py` och relevanta UI-screenshots |
 | Desktop-app | `desktop\main.py --smoke-test`, desktop probe/shell screens |

@@ -1,4 +1,4 @@
-"""Entry point for the Bemanning desktop client."""
+"""Entry point for the flow desktop client."""
 from __future__ import annotations
 
 import os
@@ -14,10 +14,10 @@ def _smoke_test() -> int:
     from services.update_service import is_newer_version
     from desktop.local_app_server import localize_set_cookie
 
-    assert APP_NAME == "Bemanning"
+    assert APP_NAME == "flow"
     assert build_health_url().endswith("/api/health")
     assert is_newer_version("0.1.1", "0.1.0") is True
-    assert "Secure" not in localize_set_cookie("bemanning_session=x; Path=/; Secure")
+    assert "Secure" not in localize_set_cookie("flow_session=x; Path=/; Secure")
     return 0
 
 

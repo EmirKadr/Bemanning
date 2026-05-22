@@ -25,7 +25,7 @@ def _frontend_package_files() -> tuple[str, ...]:
 
 
 REQUIRED_PACKAGE_FILES = (
-    "Bemanning.exe",
+    "flow.exe",
     *_frontend_package_files(),
     "_internal/warehouse_tools/vendor/allokering12.1.py",
     "_internal/warehouse_tools/vendor/wms_sok79.py",
@@ -50,9 +50,9 @@ def check_release_artifacts(
     smoke: bool = True,
 ) -> list[str]:
     errors: list[str] = []
-    package_dir = release_dir / "Bemanning"
-    zip_path = release_dir / f"Bemanning-{version}-win64.zip"
-    setup_path = release_dir / f"Bemanning-{version}-Setup.exe"
+    package_dir = release_dir / "flow"
+    zip_path = release_dir / f"flow-{version}-win64.zip"
+    setup_path = release_dir / f"flow-{version}-Setup.exe"
 
     if not package_dir.is_dir():
         errors.append(f"Saknar release-mapp: {package_dir}")
@@ -79,7 +79,7 @@ def check_release_artifacts(
     if setup_path.exists() and setup_path.stat().st_size <= 0:
         errors.append(f"Setup.exe ar tom: {setup_path}")
 
-    exe_path = package_dir / "Bemanning.exe"
+    exe_path = package_dir / "flow.exe"
     if smoke and exe_path.is_file():
         result = subprocess.run(
             [str(exe_path), "--smoke-test"],
@@ -118,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
         for error in errors:
             print(f"[release-check] {error}", file=sys.stderr)
         return 1
-    print(f"Release artifacts OK for Bemanning {args.version}")
+    print(f"Release artifacts OK for flow {args.version}")
     return 0
 
 

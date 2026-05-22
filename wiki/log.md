@@ -1,15 +1,24 @@
 ---
 title: Wiki-logg
 status: aktiv
-updated: 2026-05-21
+updated: 2026-05-22
 tags: [wiki, logg]
 ---
 
 # Wiki-logg
 
+## [2026-05-22] rename | Bytte programnamn fran Bemanning till flow
+
+Programmet bytte namn fran "Bemanning" till "flow" (sma bokstaver). Bevarade
+termer: Bemanningsvy/Bemanningsvyn (vyn), Bemanningsansvarig (rollen),
+Bemanningskalkyl/Bemanningsmatris/bemanningsceller (vy-relaterade features),
+wiki/bemanning-schedule.md (filnamn for vyns dokumentation). Ikon for
+fonster/desktop bytt till allokeringsprojektets app.ico (-> flow_icon.ico).
+Installer-ikonen for releases bevarad (ingen SetupIconFile finns i .iss).
+
 ## [2026-05-21] ingest | Initial projektwiki
 
-Skapade forsta LLM-wikin for Bemanningsfil enligt Karpathy-modellen: index, agentregler, kallmanifest, arkitektur, datamodell, rollmodell, API-karta, UI- och funktionssidor samt felsokningssida for framtida LLM-chat.
+Skapade forsta LLM-wikin for flow enligt Karpathy-modellen: index, agentregler, kallmanifest, arkitektur, datamodell, rollmodell, API-karta, UI- och funktionssidor samt felsokningssida for framtida LLM-chat.
 
 Kallor som lastes: `AGENTS.md`, `app/README.md`, `API_ROUTES.md`, `APP_MIGRATION_PLAN.md`, `TESTPROTOCOL.md`, frontend-HTML, frontend-JS, backend-routers, datamodeller, lagerverktygskatalog och produktivitetsservice. Karpathy-gisten anvandes som strukturmonster for persistent wiki, index och logg.
 
@@ -35,7 +44,7 @@ Skarpte apphjalpens prompt: wikin ar normalfragornas grans, sa om wikin inte sag
 
 ## [2026-05-21] fix | Tydligare SQLite-lås vid lokal start
 
-Uppdaterade lokal databasforberedelse sa `PermissionError` vid ersattning av `app/bemanning_local.db` blir ett tydligt meddelande om gammal `start_local.bat`/`uvicorn` i stallet for en lang Python-traceback. Dokumenterade handelsen i `user-events.md`.
+Uppdaterade lokal databasforberedelse sa `PermissionError` vid ersattning av `app/flow_local.db` blir ett tydligt meddelande om gammal `start_local.bat`/`uvicorn` i stallet for en lang Python-traceback. Dokumenterade handelsen i `user-events.md`.
 
 ## [2026-05-21] polish | Behorighetsrad och chattraknare
 
@@ -67,7 +76,7 @@ Katalogen `data/external_data_catalog.json` bedomdes inte vara hemlig och ska co
 
 ## [2026-05-21] support | Stoppa lokal server
 
-Lade till `stop_local.bat` for att stanga gamla lokala `start_local.bat`/uvicorn-processer och frigora port `8000` nar `app/bemanning_local.db` ar last. Uppdaterade README och anvandarhandelser med kommandot.
+Lade till `stop_local.bat` for att stanga gamla lokala `start_local.bat`/uvicorn-processer och frigora port `8000` nar `app/flow_local.db` ar last. Uppdaterade README och anvandarhandelser med kommandot.
 
 ## [2026-05-21] polish | Enter skickar apphjalp
 

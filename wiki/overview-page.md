@@ -7,7 +7,7 @@ tags: [oversikt, ui, knappar]
 
 # Oversikt
 
-Kort svar: Oversikt visar bemanning pa dag-niva i vecka eller manad. En cell representerar en persons dag och skriver/tommer hela dagen enligt personens veckomall.
+Kort svar: Oversikt visar flow pa dag-niva i vecka eller manad. En cell representerar en persons dag och skriver/tommer hela dagen enligt personens veckomall.
 
 ## Knappar och kontroller
 
@@ -46,7 +46,7 @@ Kort svar: Oversikt visar bemanning pa dag-niva i vecka eller manad. En cell rep
 | "Varfor far jag inte andra en dag?" | Anvandaren kan vara read-only, personen kan sakna fast schema, eller API nekade rollen. |
 | "Vad betyder randig/blandad dag?" | Dagen innehaller flera aktiviteter eller segment och kan skrivas over med confirm. |
 | "Varfor raknas inte timmis som ledig?" | Timmis utan fast mall betraktas inte som en standardledig dag for heldagsandring. |
-| "Varfor visar Oversikt andra timmar an Bemanning?" | Kontrollera att samma ar/vecka/dag/omrade anvands och att malltider plus explicita celler raknas. |
+| "Varfor visar Oversikt andra timmar an flow?" | Kontrollera att samma ar/vecka/dag/omrade anvands och att malltider plus explicita celler raknas. |
 
 ## Kallor
 

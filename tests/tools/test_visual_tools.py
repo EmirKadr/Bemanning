@@ -19,7 +19,7 @@ def test_visual_smoke_covers_expected_routes():
 
     assert set(pages_by_name) == {
         "login",
-        "bemanning",
+        "flow",
         "oversikt",
         "produktivitet",
         "personer",
@@ -32,7 +32,7 @@ def test_visual_smoke_covers_expected_routes():
         "dela",
         "harleda",
     }
-    assert pages_by_name["bemanning"].roles == ("admin", "leader", "staffing", "viewer")
+    assert pages_by_name["flow"].roles == ("admin", "leader", "staffing", "viewer")
     assert pages_by_name["personer"].roles == ("admin", "leader", "staffing")
     assert pages_by_name["produktivitet"].roles == ("admin",)
     assert pages_by_name["anvandare"].roles == ("admin",)
@@ -47,11 +47,11 @@ def test_visual_smoke_covers_critical_scenarios():
     state_names = {state.name for state in visual_smoke.STATES}
 
     assert {
-        "bemanning-mestergruppen",
-        "bemanning-autostore",
-        "bemanning-kopiera-dag-modal",
-        "bemanning-kalkyl-alla",
-        "bemanning-fokus-mestergruppen",
+        "flow-mestergruppen",
+        "flow-autostore",
+        "flow-kopiera-dag-modal",
+        "flow-kalkyl-alla",
+        "flow-fokus-mestergruppen",
         "oversikt-fokus-mestergruppen",
         "produktivitet-fokus-mestergruppen",
         "personer-fokus-mestergruppen",
@@ -162,7 +162,7 @@ def test_testprotocol_documents_agent_test_tools():
 
     for command in (
         "python -m pytest",
-        "python -m tools.bemanning_cli routes --format table",
+        "python -m tools.flow_cli routes --format table",
         "python desktop\\main.py --smoke-test",
         "python -m tools.visual_smoke",
         "python -m tools.interactive_e2e",
@@ -200,7 +200,7 @@ def test_app_migration_plan_documents_high_risk_workflows():
 
     for required in (
         "Inloggning, session och roller",
-        "Bemanning: dagsschema",
+        "flow: dagsschema",
         "Översikt",
         "Produktivitet",
         "Desktop/Windows-app",
@@ -211,7 +211,7 @@ def test_app_migration_plan_documents_high_risk_workflows():
 
 
 def test_desktop_build_bundles_local_frontend():
-    spec = (ROOT / "Bemanning.spec").read_text(encoding="utf-8")
+    spec = (ROOT / "flow.spec").read_text(encoding="utf-8")
 
     assert "app/frontend" in spec
     assert "frontend_dir" in spec
@@ -370,10 +370,10 @@ def test_frontend_theme_toggle_is_wired_globally():
     productivity_html = (frontend / "produktivitet.html").read_text(encoding="utf-8")
     uploads_html = (frontend / "uppladdningar.html").read_text(encoding="utf-8")
 
-    assert "bemanning-theme" in common
-    assert "bemanning-sidebar-user" in common
-    assert "bemanning-sidebar-layout" in common
-    assert "bemanning-role-view-access" in common
+    assert "flow-theme" in common
+    assert "flow-sidebar-user" in common
+    assert "flow-sidebar-layout" in common
+    assert "flow-role-view-access" in common
     assert "ROLE_VIEW_DEFAULT_ACCESS" in common
     assert "ROLE_VIEW_IDS" in common
     assert "new Set(ROLE_VIEW_IDS)" in common
@@ -410,7 +410,7 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert "openUploadContextMenu" in common
     assert "Rensa filer" in common
     assert "clearAllUploadedFiles" in common
-    assert "bemanning:uploadsCleared" in common
+    assert "flow:uploadsCleared" in common
     assert 'className: "sidebar-upload-link"' not in common
     assert "openSidebarEditor" in common
     assert "sidebar-subview" in common
@@ -505,7 +505,7 @@ def test_area_focus_toggle_is_wired_to_views():
     persons = (frontend / "js" / "persons.js").read_text(encoding="utf-8")
     activities = (frontend / "js" / "activities.js").read_text(encoding="utf-8")
 
-    assert "bemanning-area-focus" in common
+    assert "flow-area-focus" in common
     assert '<button class="area-focus-toggle" id="area-focus-toggle"' in common
     assert '<select class="area-focus-toggle"' not in common
     assert "AREA_FOCUS_OPTIONS" in common
@@ -524,11 +524,11 @@ def test_area_focus_toggle_is_wired_to_views():
     assert 'typeof areaFocusCode === "function" && areaFocusCode()' in overview
     assert "compareActivitiesForAreaFocus(a, b, state.areas, state.currentUser?.area_id)" in schedule
     assert "compareActivitiesForAreaFocus(a, b, state.areas, state.currentUser?.area_id)" in overview
-    assert '"bemanning:areaFocusChanged"' in schedule
-    assert '"bemanning:areaFocusChanged"' in overview
-    assert '"bemanning:areaFocusChanged"' in productivity
-    assert '"bemanning:areaFocusChanged"' in persons
-    assert '"bemanning:areaFocusChanged"' in activities
+    assert '"flow:areaFocusChanged"' in schedule
+    assert '"flow:areaFocusChanged"' in overview
+    assert '"flow:areaFocusChanged"' in productivity
+    assert '"flow:areaFocusChanged"' in persons
+    assert '"flow:areaFocusChanged"' in activities
     assert '{ id: "eh", title: "E-Handel" }' in productivity
 
 
@@ -552,7 +552,7 @@ def test_frontend_only_shows_super_user_role_to_super_users():
     assert 'selectedRoles.includes("super_user")' in users
 
 
-def test_frontend_keeps_lager_and_artikelplacering_out_of_bemanning_and_bearbeta():
+def test_frontend_keeps_lager_and_artikelplacering_out_of_flow_and_bearbeta():
     frontend = ROOT / "app" / "frontend"
     common = (frontend / "js" / "common.js").read_text(encoding="utf-8")
     schedule = (frontend / "js" / "schedule.js").read_text(encoding="utf-8")
@@ -682,7 +682,7 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     flows = (ROOT / "warehouse_tools" / "flows.py").read_text(encoding="utf-8")
 
     assert 'const ALLOCATION_API = "/api/allokering"' in allocation
-    assert 'const ALLOCATION_DB_NAME = "bemanning-allokering-files"' in allocation
+    assert 'const ALLOCATION_DB_NAME = "flow-allokering-files"' in allocation
     assert "indexedDB.open(ALLOCATION_DB_NAME" in allocation
     assert "window.allocationUploadActivity?.start()" in allocation
     assert "window.allocationUploadActivity?.finish(uploadedNames.size)" in allocation
@@ -694,8 +694,8 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert 'id="allocation-clear-all-files"' in allocation
     assert "Rensa alla" in allocation
     assert "window.clearAllUploadedFiles" in allocation
-    assert 'window.addEventListener("bemanning:uploadsCleared"' in allocation
-    assert 'window.addEventListener("bemanning:allocationFilesChanged"' in allocation
+    assert 'window.addEventListener("flow:uploadsCleared"' in allocation
+    assert 'window.addEventListener("flow:allocationFilesChanged"' in allocation
     assert "productivityUploads?.syncAllocationUploads" in allocation
     assert "Kunde inte synka produktivitetsfiler till Uppladdningar." in allocation
     assert "PRODUCTIVITY_UPLOAD_SLOTS" in allocation
@@ -729,7 +729,7 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert "productivity_pallet" in common
     assert "saveSharedAllocationFiles" in common
     assert "storeSharedAllocationFile" in common
-    assert 'new CustomEvent("bemanning:allocationFilesChanged"' in common
+    assert 'new CustomEvent("flow:allocationFilesChanged"' in common
     assert "window.sharedAllocationUploads" in common
     assert "addAllocationUploadNotice(count)" in common
     assert "isAllocationUploadsPage()" in common

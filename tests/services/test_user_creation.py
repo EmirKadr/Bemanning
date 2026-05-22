@@ -121,7 +121,7 @@ def test_create_bemanningsansvarig_user(monkeypatch, db_session, admin_user):
     monkeypatch.setattr(users_router.audit, "log", lambda *args, **kwargs: None)
 
     result = users_router.create_user(
-        UserCreate(username="petra", display_name="Petra Bemanning", roles=["staffing_manager"]),
+        UserCreate(username="petra", display_name="Petra flow", roles=["staffing_manager"]),
         db_session,
         admin_user,
     )

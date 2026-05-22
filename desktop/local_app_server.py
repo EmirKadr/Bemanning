@@ -90,7 +90,7 @@ def make_handler(frontend_dir: Path, upstream_base_url: str, session: requests.S
     upstream_root = upstream_base_url.rstrip("/") + "/"
 
     class LocalAppRequestHandler(BaseHTTPRequestHandler):
-        server_version = "BemanningLocalApp/1.0"
+        server_version = "flowLocalApp/1.0"
 
         def log_message(self, _format: str, *_args) -> None:  # noqa: A002
             return
@@ -233,7 +233,7 @@ class LocalAppServer:
         self._httpd = self._bind_server(handler)
         self._thread = threading.Thread(
             target=self._httpd.serve_forever,
-            name="BemanningLocalAppServer",
+            name="flowLocalAppServer",
             daemon=True,
         )
         self._thread.start()

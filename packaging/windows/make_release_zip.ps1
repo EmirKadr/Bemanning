@@ -26,7 +26,7 @@ function Invoke-WithRetry {
 }
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
-$appName = "Bemanning"
+$appName = "flow"
 $releaseDir = Join-Path $root "release"
 $packageDir = Join-Path $releaseDir $appName
 $zipPath = Join-Path $releaseDir "$appName-$Version-win64.zip"
@@ -51,7 +51,7 @@ Invoke-WithRetry -Description "Stage release folder" -Action {
     New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
     Copy-Item -Path (Join-Path $distDir "*") -Destination $packageDir -Recurse -Force
 
-    foreach ($asset in @("Installera Bemanning.bat", "install.ps1", "README_ANVANDARE.txt")) {
+    foreach ($asset in @("Installera flow.bat", "install.ps1", "README_ANVANDARE.txt")) {
         Copy-Item -Path (Join-Path $PSScriptRoot $asset) -Destination $packageDir -Force
     }
 }

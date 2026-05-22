@@ -18,7 +18,7 @@ Kort svar: Produktivitet analyserar stora lokala CSV-loggar i klienten och kombi
 | Block | Valjer Alla/GG/AS/EH/MG | Filtrerar rapportsektioner | `productivityGroupFilter` | Om omradesfokus andras nollas manuellt filter. |
 | Sok | Skriver text | Filtrerar sektioner/rader klient-side | `activeSearch`, `renderContent` | Sokningen ar lokal och paverkar inte datan. |
 | Filkrav/dropzoner | Drar filer till kravslot | Sparar lokal fil i IndexedDB | `productivityUploads.saveFiles` | Okand filtyp om namn/header inte matchar. |
-| Välj per filslot | Oppnar filval for viss filtyp | Sparar vald fil pa den sloten | IndexedDB `bemanning-productivity-files` | Vald fel fil kan klassas om targetKey anvands. |
+| Välj per filslot | Oppnar filval for viss filtyp | Sparar vald fil pa den sloten | IndexedDB `flow-productivity-files` | Vald fel fil kan klassas om targetKey anvands. |
 | Rensa per filslot | Klick pa x | Tar bort lokal fil | `deleteFile` | KPI-mal ar permanent och kan inte rensas via x. |
 
 ## Filer och identifiering

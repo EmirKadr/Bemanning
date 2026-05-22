@@ -1,17 +1,17 @@
-#define MyAppName "Bemanning"
+#define MyAppName "flow"
 #ifndef MyAppVersion
 #define MyAppVersion "0.1.2"
 #endif
-#define MyAppExeName "Bemanning.exe"
+#define MyAppExeName "flow.exe"
 
 [Setup]
-AppId={{A8D49C55-F8B4-43F7-91B5-8EF9D409CA24}}
+AppId={{292A28F6-0A03-49B2-B2DA-4E1DED6AC8C8}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher=Dole Nordic AB
-AppPublisherURL=https://github.com/EmirKadr/Bemanning
-AppSupportURL=https://github.com/EmirKadr/Bemanning/issues
-AppUpdatesURL=https://github.com/EmirKadr/Bemanning/releases
+AppPublisherURL=https://github.com/EmirKadr/flow
+AppSupportURL=https://github.com/EmirKadr/flow/issues
+AppUpdatesURL=https://github.com/EmirKadr/flow/releases
 DefaultDirName={localappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes

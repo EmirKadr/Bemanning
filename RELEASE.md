@@ -1,6 +1,6 @@
 # Releaseprocess
 
-Den har filen beskriver hur vi publicerar en ny version av Bemanning sa att
+Den har filen beskriver hur vi publicerar en ny version av flow sa att
 installeraren hamnar pa GitHub Releases och anvandare kan uppdatera appen.
 
 ## Viktig regel
@@ -25,8 +25,8 @@ Nar en tagg som `v0.2.0` pushas startar GitHub Actions-workflowen
 
 Workflowen bygger:
 
-- `Bemanning-0.2.0-win64.zip`
-- `Bemanning-0.2.0-Setup.exe`
+- `flow-0.2.0-win64.zip`
+- `flow-0.2.0-Setup.exe`
 
 Vid tagg-push laddas filerna aven upp pa GitHub Release. Appens updater laser
 senaste GitHub Release och letar efter `Setup.exe`. Om versionen dar ar hogre
@@ -60,8 +60,8 @@ Byt ut `0.2.0` mot versionsnumret som ska slappas.
    Forvantade filer:
 
    ```text
-   release\Bemanning-0.2.0-win64.zip
-   release\Bemanning-0.2.0-Setup.exe
+   release\flow-0.2.0-win64.zip
+   release\flow-0.2.0-Setup.exe
    ```
 
 5. Committa versionshojningen och eventuella andringar:

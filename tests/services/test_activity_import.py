@@ -217,23 +217,23 @@ def test_bemanningsansvarig_can_manage_activities(import_db):
     assert response.headers["Content-Disposition"] == 'attachment; filename="aktiviteter-importmall.xlsx"'
 
     created = create_activity(
-        payload=ActivityCreate(label="Bemanning test", area_id=gg.id, sort_order=99),
+        payload=ActivityCreate(label="flow test", area_id=gg.id, sort_order=99),
         db=import_db,
         admin=staffing,
     )
 
     assert created.id is not None
-    assert created.label == "Bemanning test"
+    assert created.label == "flow test"
     assert created.code.startswith("GG_BEMANNING_TEST")
 
     updated = update_activity(
         activity_id=created.id,
-        payload=ActivityUpdate(label="Bemanning test uppdaterad"),
+        payload=ActivityUpdate(label="flow test uppdaterad"),
         db=import_db,
         admin=staffing,
     )
 
-    assert updated.label == "Bemanning test uppdaterad"
+    assert updated.label == "flow test uppdaterad"
 
     delete_activity(activity_id=created.id, db=import_db, admin=staffing)
 

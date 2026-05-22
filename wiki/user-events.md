@@ -34,7 +34,7 @@ Kort svar: denna sida listar vad anvandaren kan se eller raka ut for: redirect, 
 | Losenord matchar inte | "Losenorden matchar inte" | Bekraftelse skiljer sig | Skriv samma losenord i bada falt. |
 | Losenord redan skapat | "Losenord ar redan skapat" | Konto forsoker set-password trots att det redan finns | Logga in vanligt eller aterstall via adminflode. |
 
-## Bemanning
+## flow
 
 | Handelse | Text/reaktion | Orsak | Atgard |
 | --- | --- | --- | --- |
@@ -56,7 +56,7 @@ Kort svar: denna sida listar vad anvandaren kan se eller raka ut for: redirect, 
 | Read-only | "Visningslage: du kan se oversikten men inte andra den." | Rollen har bara `view` | Be om edit-atkomst. |
 | Blandad dag confirm | "Denna dag har flera olika aktiviteter. Skriv over med samma varde?" | Dagen har flera aktiviteter/segment | OK skriver over hela dagen; Avbryt bevarar. |
 | Drag for stort | "For manga celler (max 100)" | For manga dagceller markerade | Dela upp draget. |
-| Heldag sparad | "Bemannade X h, tog bort Y h" | Oversikt skrev/tomde dag enligt mall | Kontrollera Bemanning om timmarna ser ovantade ut. |
+| Heldag sparad | "Bemannade X h, tog bort Y h" | Oversikt skrev/tomde dag enligt mall | Kontrollera flow om timmarna ser ovantade ut. |
 | Drag klar med fel | "Drag klar: skrev X h, tog bort Y h, Z fel" | Bulk gjorde vissa dagar men inte alla | Kontrollera dagarna som inte andrades. |
 
 ## Register: personer, aktiviteter, anvandare
@@ -116,4 +116,4 @@ Kort svar: denna sida listar vad anvandaren kan se eller raka ut for: redirect, 
 | Anslutningsfel | Felvy i Windows-skalet | Servern kan inte nas | Kontrollera internet/server eller testa webben. |
 | "Ansluten till servern" | Statusbar | Health check OK | Fortsatt anvand appen. |
 | Uppdatering finns | Dialog | GitHub Releases har ny Setup.exe | Ladda ner/installera om det ar forvantat. |
-| Lokal SQLite-sync stoppas | Text om att `bemanning_local.db` anvands av annan process | Gammal `start_local.bat`/`uvicorn` haller databasen oppen | Kor `stop_local.bat`, vanta nagon sekund och starta sedan igen. |
+| Lokal SQLite-sync stoppas | Text om att `flow_local.db` anvands av annan process | Gammal `start_local.bat`/`uvicorn` haller databasen oppen | Kor `stop_local.bat`, vanta nagon sekund och starta sedan igen. |

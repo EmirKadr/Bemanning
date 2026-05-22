@@ -27,12 +27,12 @@ from .routers import (
     users,
 )
 
-app = FastAPI(title="Bemanningssystem", version="0.1.2")
+app = FastAPI(title="flow", version="0.1.2")
 
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SECRET_KEY,
-    session_cookie="bemanning_session",
+    session_cookie="flow_session",
     https_only=settings.is_production,
     same_site="lax",
 )

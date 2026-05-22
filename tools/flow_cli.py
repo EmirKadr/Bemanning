@@ -1,10 +1,10 @@
-"""CLI for Bemanning API operations.
+"""CLI for flow API operations.
 
 Examples:
-  python -m tools.bemanning_cli --base-url http://127.0.0.1:8000 auth login --username admin --password admin123
-  python -m tools.bemanning_cli routes --format markdown
-  python -m tools.bemanning_cli call schedule.get --query year=2026 --query week=21 --query weekday=1
-  python -m tools.bemanning_cli api GET /api/health
+  python -m tools.flow_cli --base-url http://127.0.0.1:8000 auth login --username admin --password admin123
+  python -m tools.flow_cli routes --format markdown
+  python -m tools.flow_cli call schedule.get --query year=2026 --query week=21 --query weekday=1
+  python -m tools.flow_cli api GET /api/health
 """
 from __future__ import annotations
 
@@ -25,8 +25,8 @@ from core.app_info import SERVER_BASE_URL
 
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_COOKIE_JAR = ROOT / ".bemanning-cli-cookies.txt"
-DEFAULT_LOCAL_DB = ROOT / "app" / "bemanning_local.db"
+DEFAULT_COOKIE_JAR = ROOT / ".flow-cli-cookies.txt"
+DEFAULT_LOCAL_DB = ROOT / "app" / "flow_local.db"
 
 
 @dataclass(frozen=True)
@@ -240,7 +240,7 @@ def _default_database_url() -> str:
         return configured
     if DEFAULT_LOCAL_DB.exists():
         return f"sqlite:///{DEFAULT_LOCAL_DB.as_posix()}"
-    raise SystemExit("Saknar DATABASE_URL och hittade ingen lokal app/bemanning_local.db")
+    raise SystemExit("Saknar DATABASE_URL och hittade ingen lokal app/flow_local.db")
 
 
 def _db_lookup_query(kind: str, active_only: bool) -> str:
@@ -489,7 +489,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     lookup = db_sub.add_parser("lookup", help="Sok efter anvandare, personer eller aktiviteter i databasen.")
     lookup.add_argument("kind", choices=("all", "users", "persons", "activities"))
     lookup.add_argument("--q", "--query", dest="query", required=True, help="Soktext, t.ex. anvandarnamn eller personnamn.")
-    lookup.add_argument("--database-url", help="Databas-URL. Om den saknas anvands DATABASE_URL eller app/bemanning_local.db.")
+    lookup.add_argument("--database-url", help="Databas-URL. Om den saknas anvands DATABASE_URL eller app/flow_local.db.")
     lookup.add_argument("--active-only", action="store_true", help="Visa bara aktiva rader.")
     lookup.add_argument("--limit", type=int, default=25)
     lookup.add_argument("--json", action="store_true")

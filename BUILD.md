@@ -1,7 +1,7 @@
 # Bygga Windows-app
 
 Det har projektet bygger en tunn Windows-klient ovanpa den centrala
-Bemanning-webbappen. Klienten paketeras med PyInstaller till en fristaende
+flow-webbappen. Klienten paketeras med PyInstaller till en fristaende
 Windows-appmapp.
 
 Builden kors i en temporar lokal mapp for att undvika OneDrive- och
@@ -17,12 +17,12 @@ build_windows.bat
 
 Resultat:
 
-- `release\Bemanning\Bemanning.exe`
-- `release\Bemanning-0.1.0-win64.zip`
-- `release\Bemanning-0.1.0-Setup.exe` om Inno Setup 6 finns installerat
+- `release\flow\flow.exe`
+- `release\flow-0.1.0-win64.zip`
+- `release\flow-0.1.0-Setup.exe` om Inno Setup 6 finns installerat
 
 Zip-filen kan delas till anvandare utan Python. Den innehaller appen,
-`Installera Bemanning.bat`, avinstallation och en kort anvandar-README.
+`Installera flow.bat`, avinstallation och en kort anvandar-README.
 
 Om Inno Setup 6 finns installerat skapas aven en riktig `Setup.exe`.
 
@@ -31,11 +31,11 @@ Om Inno Setup 6 finns installerat skapas aven en riktig `Setup.exe`.
 Inno Setup-mallen finns i:
 
 ```text
-packaging\windows\Bemanning.iss
+packaging\windows\flow.iss
 ```
 
 Nar Inno Setup 6 finns installerat bygger `build_windows.bat` en riktig
-`Setup.exe` fran den redan byggda `release\Bemanning`-mappen. Det gar ocksa att
+`Setup.exe` fran den redan byggda `release\flow`-mappen. Det gar ocksa att
 kora:
 
 ```powershell
@@ -43,13 +43,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File packaging\windows\build_setu
 ```
 
 Installeraren ar per-user och kraver inte administratorsrattigheter. Den
-installeras i anvandarens `%LOCALAPPDATA%\Bemanning`, skapar genvagar och
+installeras i anvandarens `%LOCALAPPDATA%\flow`, skapar genvagar och
 registrerar avinstallation.
 
 ## Uppdateringar
 
 Appen har `Hjalp -> Sok efter uppdateringar` och gor aven en tyst kontroll vid
-start. Den laser senaste GitHub Release fran `EmirKadr/Bemanning`, letar efter
+start. Den laser senaste GitHub Release fran `EmirKadr/flow`, letar efter
 en asset som slutar pa `Setup.exe`, laddar ner den och startar installeraren.
 
 Eftersom installeraren ar per-user behovs inga admin-rattigheter vid

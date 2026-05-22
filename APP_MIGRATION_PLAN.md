@@ -1,6 +1,6 @@
 # App-migrering: risker, nulage och plan
 
-Målet är att bygga Bemanning som en riktig app, jämföra den mot hemsidan medan
+Målet är att bygga flow som en riktig app, jämföra den mot hemsidan medan
 allt fortfarande använder samma centrala API/databas, och först därefter ändra
 hemsidan. Hemsidan ska alltså vara facit under övergången.
 
@@ -41,18 +41,18 @@ sidor.
 ### Sidebar, tema och datum
 
 - Sidebar ritas av `common.js` på alla sidor.
-- Sidebar cacheas i `sessionStorage` som `bemanning-sidebar-user` för att slippa
+- Sidebar cacheas i `sessionStorage` som `flow-sidebar-user` för att slippa
   blink när man byter vy.
-- Tema sparas i `localStorage` som `bemanning-theme`.
+- Tema sparas i `localStorage` som `flow-theme`.
 - Sidebar collapse sparas i `localStorage` som `sidebar-collapsed`.
-- Valt datum i bemanning/översikt sparas i `sessionStorage` som
-  `bemanning-selected-date`.
+- Valt datum i flow/översikt sparas i `sessionStorage` som
+  `flow-selected-date`.
 - Logout rensar sidebar-cache och skickar användaren till login.
 
 Extra test senare: byt mellan alla vyer snabbt, växla ljust/mörkt tema,
 collapsa sidebar, logga ut och logga in igen. App och hemsida ska kännas lika.
 
-### Bemanning: dagsschema
+### flow: dagsschema
 
 - `GET /api/schedule` hämtar aktiva personer, explicita celler, schemalagda
   standardtider och låsflagga.
@@ -96,7 +96,7 @@ låst cell skapad av annan användare.
 - Översiktens undo/redo använder också `/api/schedule/hours/restore`.
 
 Extra test senare: veckovy, månadsvy, områdesfilter, ändra hel dag, dra över
-flera dagar, timmis utan mall, undo/redo och jämför timmar mot Bemanning.
+flera dagar, timmis utan mall, undo/redo och jämför timmar mot flow.
 
 ### Personer och veckomallar
 

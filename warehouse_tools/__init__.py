@@ -1,4 +1,4 @@
-"""Shared warehouse/WMS tools used by Bemanning.
+"""Shared warehouse/WMS tools used by flow.
 
 This package owns the long-term runtime for the Bearbeta, Dela and Harleda
 views. Lightweight UI metadata lives in `catalog` and native flows should be

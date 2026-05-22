@@ -31,7 +31,7 @@ def _session_upload_dir(request: Request) -> Path:
     if not upload_id:
         upload_id = uuid4().hex
         request.session["productivity_upload_id"] = upload_id
-    target = Path(tempfile.gettempdir()) / "bemanning-productivity" / upload_id
+    target = Path(tempfile.gettempdir()) / "flow-productivity" / upload_id
     target.mkdir(parents=True, exist_ok=True)
     return target
 

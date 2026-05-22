@@ -182,11 +182,11 @@ def test_update_downloaded_runs_installer_silently(qapp, monkeypatch):
     with patch("desktop.app.QProcess.startDetached", return_value=True) as start, patch(
         "desktop.app.QApplication.quit"
     ) as quit_app:
-        window._on_update_downloaded(r"C:\Temp\Bemanning-Setup.exe")
+        window._on_update_downloaded(r"C:\Temp\flow-Setup.exe")
 
     start.assert_called_once()
     installer_path, args = start.call_args.args
-    assert installer_path == r"C:\Temp\Bemanning-Setup.exe"
+    assert installer_path == r"C:\Temp\flow-Setup.exe"
     assert "/VERYSILENT" in args
     assert "/SUPPRESSMSGBOXES" in args
     assert "/CLOSEAPPLICATIONS" in args

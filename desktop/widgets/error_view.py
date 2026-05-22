@@ -18,7 +18,7 @@ class ErrorView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self._title = QLabel("Kunde inte ansluta till Bemanning")
+        self._title = QLabel("Kunde inte ansluta till flow")
         self._title.setStyleSheet("font-size: 22px; font-weight: 700;")
 
         self._message = QLabel(

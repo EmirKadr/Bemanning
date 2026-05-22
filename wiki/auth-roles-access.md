@@ -22,13 +22,13 @@ Kort svar: inloggning ar sessionsbaserad. Roller styr vad anvandaren ser och far
 
 | Roll | Svensk etikett | Typisk atkomst |
 | --- | --- | --- |
-| `leader` | Arbetsledare | Redigera Bemanning/Oversikt och normalt Personer/Aktiviteter |
+| `leader` | Arbetsledare | Redigera flow/Oversikt och normalt Personer/Aktiviteter |
 | `staffing_manager` | Bemanningsansvarig | Liknar arbetsledare med planeringsansvar |
 | `admin` | Administrator | Register, anvandare och settings, men inte automatiskt super user |
 | `super_user` | Super User | Kravs for historik och produktivitet enligt skyddade vyer/API |
 | `warehouse_clerk` | Lagerkontorist | Lagerverktyg, framfor allt uppladdning, Dela och Harleda |
 | `article_placer` | Artikelplacerare | Lagerverktyg med liknande sjalvservicebehov |
-| `viewer` | Visning | Laslage for Bemanning/Oversikt |
+| `viewer` | Visning | Laslage for flow/Oversikt |
 
 ## Vyatkomst
 
@@ -51,7 +51,7 @@ Vyer som kan styras:
 
 Om anvandaren bara har `view`:
 
-- Bemanning visar celler men sparar inte andringar.
+- flow visar celler men sparar inte andringar.
 - Oversikt visar dagar men sparar inte andringar.
 - Knappar som kopiera/rensa kan vara disabled eller ge varning.
 - Toasten forklarar: "Visningslage: du kan se ... men inte andra den."

@@ -7,13 +7,13 @@ tags: [handbok, anvandare, support, chat]
 
 # Anvandarhandbok
 
-Kort svar: denna sida beskriver hur en vanlig anvandare faktiskt anvander Bemanning. Den ar skriven for framtida LLM-chat: svara forst med vad anvandaren ska gora, sedan med varfor systemet beter sig som det gor.
+Kort svar: denna sida beskriver hur en vanlig anvandare faktiskt anvander flow. Den ar skriven for framtida LLM-chat: svara forst med vad anvandaren ska gora, sedan med varfor systemet beter sig som det gor.
 
 ## Roller i praktiken
 
 | Roll | Vad personen normalt gor | Viktiga begransningar |
 | --- | --- | --- |
-| Visning | Tittar pa Bemanning och Oversikt | Kan inte spara, rensa, dra, kopiera eller andra celler. |
+| Visning | Tittar pa flow och Oversikt | Kan inte spara, rensa, dra, kopiera eller andra celler. |
 | Arbetsledare | Planerar dag/vecka, andrar celler, personer och aktiviteter om rollen har edit | Kan stoppas av cell-las om annan anvandare fyllt cellen. |
 | Bemanningsansvarig | Samma planeringsfloden som arbetsledare, ofta bredare ansvar | Beror pa vybehorigheter. |
 | Administrator | Skapar anvandare, personer, aktiviteter och settings | Kan inte automatiskt allt som Super User om rollen saknas. |
@@ -29,9 +29,9 @@ Kort svar: denna sida beskriver hur en vanlig anvandare faktiskt anvander Bemann
 4. Kontrollera omradesfokus nere i sidomenyn. Det paverkar vilka omraden som prioriteras i flera vyer.
 5. Anvand sidomenyn for att ga till ratt vy.
 
-## Bemanning: planera en dag
+## flow: planera en dag
 
-1. Ga till `Bemanning`.
+1. Ga till `flow`.
 2. Valj ar, vecka och dag eller klicka datumet och valj datum direkt.
 3. Valj omrade. Tomt/Alla visar alla personer.
 4. Hitta personen med personfiltret i rubriken.
@@ -56,7 +56,7 @@ Viktigt: celler sparas automatiskt. Det finns ingen separat Spara-knapp.
 7. Dra over flera dagceller om samma aktivitet ska fyllas pa flera personer/dagar.
 8. Anvand undo/redo om du angrar en oversiktsandring.
 
-Oversikt ar grovplanering. Om du behover halvtimmar eller exakt timme: ga till Bemanning.
+Oversikt ar grovplanering. Om du behover halvtimmar eller exakt timme: ga till flow.
 
 ## Personer: lagg till och underhall personal
 

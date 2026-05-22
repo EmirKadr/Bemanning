@@ -1,1 +1,1 @@
-"""Desktop client package for Bemanning."""
+"""Desktop client package for flow."""

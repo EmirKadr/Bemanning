@@ -1,19 +1,19 @@
 # API-vägar och CLI
 
-Det här är den fulla API-täckningen som `tools.bemanning_cli` känner till.
-Testen `tests/tools/test_bemanning_cli.py` jämför listan mot FastAPI-appen så
+Det här är den fulla API-täckningen som `tools.flow_cli` känner till.
+Testen `tests/tools/test_flow_cli.py` jämför listan mot FastAPI-appen så
 nya `/api/*`-vägar inte tappas bort.
 
 Vanliga kommandon:
 
 ```powershell
-python -m tools.bemanning_cli routes --format table
-python -m tools.bemanning_cli routes --format markdown
-python -m tools.bemanning_cli --base-url http://127.0.0.1:8000 auth login --username admin --password admin123
-python -m tools.bemanning_cli call schedule.get --query year=2026 --query week=21 --query weekday=1
-python -m tools.bemanning_cli call persons.import --file file=personer.xlsx
-python -m tools.bemanning_cli call activities.import --file file=aktiviteter.xlsx
-python -m tools.bemanning_cli api GET /api/health
+python -m tools.flow_cli routes --format table
+python -m tools.flow_cli routes --format markdown
+python -m tools.flow_cli --base-url http://127.0.0.1:8000 auth login --username admin --password admin123
+python -m tools.flow_cli call schedule.get --query year=2026 --query week=21 --query weekday=1
+python -m tools.flow_cli call persons.import --file file=personer.xlsx
+python -m tools.flow_cli call activities.import --file file=aktiviteter.xlsx
+python -m tools.flow_cli api GET /api/health
 ```
 
 `call` använder namngivna API-vägar. `api` kan anropa valfri väg manuellt, även

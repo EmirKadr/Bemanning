@@ -1233,14 +1233,14 @@ async function handleProductivityUploadsCleared() {
     productivityGroupFilterManual = true;
     renderContent();
   });
-  window.addEventListener("bemanning:areaFocusChanged", () => {
+  window.addEventListener("flow:areaFocusChanged", () => {
     productivityGroupFilterManual = false;
     if (productivityReport) {
       renderGroupFilter(productivityReport);
       renderContent();
     }
   });
-  window.addEventListener("bemanning:uploadsCleared", handleProductivityUploadsCleared);
+  window.addEventListener("flow:uploadsCleared", handleProductivityUploadsCleared);
   document.getElementById("productivitySearch").addEventListener("input", renderContent);
   setupProductivityPageDrop();
   await initializeProductivityPage();

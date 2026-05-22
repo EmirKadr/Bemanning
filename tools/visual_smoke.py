@@ -1,4 +1,4 @@
-"""Capture visual smoke screenshots for the Bemanning web UI.
+"""Capture visual smoke screenshots for the flow web UI.
 
 Default mode creates a disposable SQLite database, seeds representative data,
 starts a local FastAPI server, logs in with test users, and screenshots the
@@ -69,7 +69,7 @@ TEST_USERS: dict[str, tuple[str, str]] = {
 
 PAGES: tuple[VisualPage, ...] = (
     VisualPage("login", "/login.html", "#login-form", ("public",)),
-    VisualPage("bemanning", "/index.html", "#scheduleTable", ("admin", "leader", "staffing", "viewer")),
+    VisualPage("flow", "/index.html", "#scheduleTable", ("admin", "leader", "staffing", "viewer")),
     VisualPage("oversikt", "/overblick.html", "#overviewTable", ("admin", "leader", "staffing", "viewer")),
     VisualPage("produktivitet", "/produktivitet.html", "#productivityStatus", ("admin",)),
     VisualPage("personer", "/personer.html", "#persons-table", ("admin", "leader", "staffing")),
@@ -84,13 +84,13 @@ PAGES: tuple[VisualPage, ...] = (
 )
 
 STATES: tuple[VisualState, ...] = (
-    VisualState("bemanning-alla-omraden", "/index.html", "#scheduleTable", "schedule_area_all", ("admin", "leader", "staffing")),
-    VisualState("bemanning-mestergruppen", "/index.html", "#scheduleTable", "schedule_area_mg", ("admin", "leader", "staffing")),
-    VisualState("bemanning-autostore", "/index.html", "#scheduleTable", "schedule_area_as", ("admin",)),
-    VisualState("bemanning-tomt-filter", "/index.html", "#scheduleTable", "schedule_empty_filter", ("admin",)),
-    VisualState("bemanning-kopiera-dag-modal", "/index.html", "#scheduleTable", "schedule_copy_modal", ("admin", "leader", "staffing")),
-    VisualState("bemanning-kalkyl-alla", "/index.html", "#scheduleTable", "schedule_calc_all", ("admin",)),
-    VisualState("bemanning-sidebar-kompakt", "/index.html", "#scheduleTable", "sidebar_collapsed", ("admin", "viewer")),
+    VisualState("flow-alla-omraden", "/index.html", "#scheduleTable", "schedule_area_all", ("admin", "leader", "staffing")),
+    VisualState("flow-mestergruppen", "/index.html", "#scheduleTable", "schedule_area_mg", ("admin", "leader", "staffing")),
+    VisualState("flow-autostore", "/index.html", "#scheduleTable", "schedule_area_as", ("admin",)),
+    VisualState("flow-tomt-filter", "/index.html", "#scheduleTable", "schedule_empty_filter", ("admin",)),
+    VisualState("flow-kopiera-dag-modal", "/index.html", "#scheduleTable", "schedule_copy_modal", ("admin", "leader", "staffing")),
+    VisualState("flow-kalkyl-alla", "/index.html", "#scheduleTable", "schedule_calc_all", ("admin",)),
+    VisualState("flow-sidebar-kompakt", "/index.html", "#scheduleTable", "sidebar_collapsed", ("admin", "viewer")),
     VisualState("oversikt-mestergruppen", "/overblick.html", "#overviewTable", "overview_area_mg", ("admin", "leader", "staffing")),
     VisualState("oversikt-manad", "/overblick.html", "#overviewTable", "overview_month"),
     VisualState("oversikt-manad-mestergruppen", "/overblick.html", "#overviewTable", "overview_month_mg"),
@@ -118,7 +118,7 @@ STATES: tuple[VisualState, ...] = (
     VisualState("staffing-nekad-produktivitet", "/produktivitet.html", "#scheduleTable", "noop", ("staffing",)),
     VisualState("staffing-nekad-uppladdningar", "/uppladdningar.html", "#scheduleTable", "noop", ("staffing",)),
     VisualState("viewer-nekad-uppladdningar", "/uppladdningar.html", "#scheduleTable", "noop", ("viewer",)),
-    VisualState("bemanning-fokus-mestergruppen", "/index.html", "#scheduleTable", "area_focus_mg", ("admin", "leader", "staffing")),
+    VisualState("flow-fokus-mestergruppen", "/index.html", "#scheduleTable", "area_focus_mg", ("admin", "leader", "staffing")),
     VisualState("oversikt-fokus-mestergruppen", "/overblick.html", "#overviewTable", "area_focus_mg", ("admin", "leader", "staffing")),
     VisualState("produktivitet-fokus-mestergruppen", "/produktivitet.html", "#productivityStatus", "area_focus_mg", ("admin",)),
     VisualState("personer-fokus-mestergruppen", "/personer.html", "#persons-table", "area_focus_mg", ("admin", "leader", "staffing")),
@@ -281,7 +281,7 @@ def _apply_state(page, state: VisualState) -> None:
     if state.action == "area_focus_mg":
         page.evaluate(
             """() => {
-                localStorage.setItem('bemanning-area-focus', 'MG');
+                localStorage.setItem('flow-area-focus', 'MG');
                 localStorage.removeItem('sidebar-collapsed');
             }"""
         )

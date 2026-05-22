@@ -1,16 +1,16 @@
 // Delade hjälpare: navbar, toast, auth-check.
 
-const THEME_STORAGE_KEY = "bemanning-theme";
-const SIDEBAR_USER_CACHE_KEY = "bemanning-sidebar-user";
-const SIDEBAR_LAYOUT_CACHE_KEY = "bemanning-sidebar-layout";
-const ROLE_VIEW_ACCESS_CACHE_KEY = "bemanning-role-view-access";
-const ALLOCATION_UPLOAD_NOTICE_KEY = "bemanning-allocation-upload-notice";
+const THEME_STORAGE_KEY = "flow-theme";
+const SIDEBAR_USER_CACHE_KEY = "flow-sidebar-user";
+const SIDEBAR_LAYOUT_CACHE_KEY = "flow-sidebar-layout";
+const ROLE_VIEW_ACCESS_CACHE_KEY = "flow-role-view-access";
+const ALLOCATION_UPLOAD_NOTICE_KEY = "flow-allocation-upload-notice";
 const UPLOAD_FILE_STORES = [
-  { dbName: "bemanning-allokering-files", storeName: "files" },
-  { dbName: "bemanning-productivity-files", storeName: "files" },
+  { dbName: "flow-allokering-files", storeName: "files" },
+  { dbName: "flow-productivity-files", storeName: "files" },
 ];
 const SHARED_ALLOCATION_API = "/api/allokering";
-const SHARED_ALLOCATION_DB_NAME = "bemanning-allokering-files";
+const SHARED_ALLOCATION_DB_NAME = "flow-allokering-files";
 const SHARED_ALLOCATION_STORE = "files";
 const SHARED_ALLOCATION_FILE_TYPE_KEYS = {
   orders: ["orders"],
@@ -50,7 +50,7 @@ const SHARED_ALLOCATION_FILE_WORDS = {
   wms_correct: ["v_ask_correct_log", "correct_log", "korrigeringslogg"],
   productivity_pallet: ["v_ask_palletloading_log", "palletloading_log", "palllastningslogg"],
 };
-const AREA_FOCUS_STORAGE_KEY = "bemanning-area-focus";
+const AREA_FOCUS_STORAGE_KEY = "flow-area-focus";
 const AREA_FOCUS_OPTIONS = [
   { value: "MG", label: "MG", title: "Mestergruppen" },
   { value: "GG", label: "GG", title: "Granngården" },
@@ -105,11 +105,11 @@ const ASSISTANT_CHAT_ICON = `
   </svg>
 `;
 
-const ASSISTANT_CHAT_STORAGE_KEY = "bemanning-assistant-chat";
-const ASSISTANT_CHAT_OPEN_KEY = "bemanning-assistant-chat-open";
-const ASSISTANT_CHAT_COUNT_KEY = "bemanning-assistant-chat-count";
-const ASSISTANT_CHAT_DRAFT_KEY = "bemanning-assistant-chat-draft";
-const ASSISTANT_CHAT_VERSION_KEY = "bemanning-assistant-chat-version";
+const ASSISTANT_CHAT_STORAGE_KEY = "flow-assistant-chat";
+const ASSISTANT_CHAT_OPEN_KEY = "flow-assistant-chat-open";
+const ASSISTANT_CHAT_COUNT_KEY = "flow-assistant-chat-count";
+const ASSISTANT_CHAT_DRAFT_KEY = "flow-assistant-chat-draft";
+const ASSISTANT_CHAT_VERSION_KEY = "flow-assistant-chat-version";
 const ASSISTANT_CHAT_STORAGE_VERSION = "2";
 const ASSISTANT_CHAT_MAX_QUESTIONS = 10;
 let assistantChatPending = false;
@@ -288,7 +288,7 @@ function writeAreaFocus(value) {
   const normalized = normalizeAreaFocus(value);
   try { localStorage.setItem(AREA_FOCUS_STORAGE_KEY, normalized); } catch (e) {}
   updateAreaFocusToggle(normalized);
-  window.dispatchEvent(new CustomEvent("bemanning:areaFocusChanged", { detail: { value: normalized } }));
+  window.dispatchEvent(new CustomEvent("flow:areaFocusChanged", { detail: { value: normalized } }));
   return normalized;
 }
 
@@ -386,7 +386,7 @@ window.addEventListener("storage", (event) => {
   if (event.key !== AREA_FOCUS_STORAGE_KEY) return;
   const value = normalizeAreaFocus(event.newValue);
   updateAreaFocusToggle(value);
-  window.dispatchEvent(new CustomEvent("bemanning:areaFocusChanged", { detail: { value } }));
+  window.dispatchEvent(new CustomEvent("flow:areaFocusChanged", { detail: { value } }));
 });
 
 async function loadCurrentUser() {
@@ -709,7 +709,7 @@ function sidebarPageDefinitions(user, activePage) {
   return [
     {
       id: "schedule",
-      label: "Bemanning",
+      label: "flow",
       href: "/index.html",
       icon: "📋",
       visible: canViewPage(user, "schedule"),
@@ -1659,7 +1659,7 @@ async function saveSharedAllocationFiles(files) {
     saved.push(file.name || keys[0]);
   }
   if (mappings) {
-    window.dispatchEvent(new CustomEvent("bemanning:allocationFilesChanged", {
+    window.dispatchEvent(new CustomEvent("flow:allocationFilesChanged", {
       detail: { saved: saved.length, mappings },
     }));
   }
@@ -1670,7 +1670,7 @@ async function clearAllUploadedFiles({ confirmUser = true } = {}) {
   if (confirmUser && !confirm("Rensa alla valda filer i Uppladdningar?")) return false;
   await Promise.all(UPLOAD_FILE_STORES.map((item) => clearUploadIndexedDbStore(item.dbName, item.storeName)));
   clearAllocationUploadNotice();
-  window.dispatchEvent(new CustomEvent("bemanning:uploadsCleared"));
+  window.dispatchEvent(new CustomEvent("flow:uploadsCleared"));
   showToast("Filvalen är rensade.", "success", 2500);
   return true;
 }
@@ -1971,7 +1971,7 @@ function setupImportHelpButton(buttonId, title = "Importera") {
 // ---- Date-selection persistence (sessionStorage) ----
 // Tabs hold their own selection across page navigation; login clears it so
 // the next session starts on today's date.
-const YWD_STORAGE_KEY = "bemanning-selected-date";
+const YWD_STORAGE_KEY = "flow-selected-date";
 
 function readSelectedDate() {
   try {

@@ -7,11 +7,11 @@ tags: [produkt, oversikt]
 
 # Projektoversikt
 
-Kort svar: Bemanning ersatter en Excel-bemanningsfil med en gemensam webbapp och Windows-app. Arbetsledare planerar personer mot aktiviteter per dag/timme, admin hanterar register och roller, super users kan se historik och produktivitet, och lagerroller kan anvanda lokala lagerverktyg.
+Kort svar: flow ersatter en Excel-bemanningsfil med en gemensam webbapp och Windows-app. Arbetsledare planerar personer mot aktiviteter per dag/timme, admin hanterar register och roller, super users kan se historik och produktivitet, och lagerroller kan anvanda lokala lagerverktyg.
 
 ## Produktens huvuddelar
 
-- Bemanning: dagsmatris med personer som rader och timmar 06-23 som kolumner. Celler sparas automatiskt.
+- flow: dagsmatris med personer som rader och timmar 06-23 som kolumner. Celler sparas automatiskt.
 - Oversikt: vecka/manad per person dar hela dagar kan bemannas enligt personens veckomall.
 - Personer: register med hemomrade, huvudaktivitet, sortering och veckomall.
 - Aktiviteter: register over bemanningsaktiviteter, farger, omraden, kategori och summeringsaktivitet.

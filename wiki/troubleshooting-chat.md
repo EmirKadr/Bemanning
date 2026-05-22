@@ -26,7 +26,7 @@ Kort svar: nar en anvandare fragar "varfor funkar inte X?" ska chatten oversatta
 | --- | --- | --- |
 | Vy saknas i menyn | Rollens vyatkomst ar `none` | Be admin/Super User kontrollera Anvandare -> Vybehorigheter. Skriv inte att anvandaren sjalv ska gora det om de saknar adminatkomst. |
 | Knapp for import saknas | Importvyn saknar edit-atkomst | Kontrollera `personImport`, `activityImport` eller `userImport`. |
-| Cell i Bemanning gar inte att andra | Read-only, cell-las, konflikt eller saknad edit-roll | Kontrollera toast; admin kan passera cell-las, viewer kan aldrig redigera. |
+| Cell i flow gar inte att andra | Read-only, cell-las, konflikt eller saknad edit-roll | Kontrollera toast; admin kan passera cell-las, viewer kan aldrig redigera. |
 | "Cellen andrades av nagon annan" | Versionskonflikt | Serverns senaste varde vann; gor andringen igen efter omladdning. |
 | Undo/redo fungerar inte | Tom stack eller fel dag | Undo/redo ar lokal och knuten till dagen/perioden dar andringen gjordes. |
 | Produktivitet visar inte rapport | Saknade lokala loggar eller KPI-mal | Lagg in Plocklogg, Translogg, Palllastningslogg och KPI-mal. |
@@ -64,7 +64,7 @@ Testa samma anvandare och samma data i webben. Om webben fungerar men Windows in
 - [Felkoder och felmeddelanden](error-reference.md)
 - [Apphjalp och LLM-chatt](app-chat.md)
 - [UI-karta och alla kontroller](ui-map.md)
-- [Bemanning dagsschema](bemanning-schedule.md)
+- [flow dagsschema](bemanning-schedule.md)
 - [Oversikt](overview-page.md)
 - [Personer](persons.md)
 - [Aktiviteter och omraden](activities-areas.md)

@@ -11,7 +11,7 @@ Kort svar: frontend visar oftast serverns `detail` direkt. I chatten ska statusk
 
 ## HTTP/statuskoder i appen
 
-| Kod | Namn | Typisk betydelse i Bemanning | Vad anvandaren ska gora |
+| Kod | Namn | Typisk betydelse i flow | Vad anvandaren ska gora |
 | --- | --- | --- | --- |
 | 0 | Klientens anslutningsfel | Fetch misslyckades innan servern svarade | Kontrollera adress, natverk, backend eller att appen inte oppnats direkt som fil. |
 | 200 | OK | Hamta/uppdatera lyckades | Ingen atgard. |
@@ -55,7 +55,7 @@ Kort svar: frontend visar oftast serverns `detail` direkt. I chatten ska statusk
 | 403 | "Visningsrollen kan inte andra bemanningen" | Viewer forsoker spara | Anvand edit-roll. |
 | 403 | "Bearbeta kraver Super User" | Lagerprocessflode utan processbehorighet | Be Super User kora Bearbeta eller anvand sjalvservicefloden som Dela/Harleda om de racker. |
 
-## Bemanning och schema
+## flow och schema
 
 | Status | Text | Orsak | Atgard |
 | --- | --- | --- | --- |
@@ -76,7 +76,7 @@ Kort svar: frontend visar oftast serverns `detail` direkt. I chatten ska statusk
 
 | Status | Text | Orsak | Atgard |
 | --- | --- | --- | --- |
-| 400 | Dag/person saknar schematimmar | Heldagsandring pa person utan mall/timmis | Satt veckomall eller planera i Bemanning. |
+| 400 | Dag/person saknar schematimmar | Heldagsandring pa person utan mall/timmis | Satt veckomall eller planera i flow. |
 | 400 | "For manga dagar (max 100)" | Drag over for manga dagceller | Dela upp draget. |
 | 404 | "Person ... hittades inte" | Person saknas | Ladda om. |
 | 404 | "Aktivitet ... hittades inte" | Aktivitet saknas | Ladda om. |
