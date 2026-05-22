@@ -1,7 +1,7 @@
 ---
 title: Felkoder och felmeddelanden
 status: aktiv
-updated: 2026-05-21
+updated: 2026-05-22
 tags: [felkoder, http, support, api, chat]
 ---
 
@@ -128,7 +128,7 @@ Kort svar: frontend visar oftast serverns `detail` direkt. I chatten ska statusk
 | 400 | "MiniMax-planen..." eller "Kolumnen ... finns inte" | Modellen valde okand vy/kolumn/operator eller svarade med fel JSON | Andra prompten eller kontrollera katalogen. Backend anropar inte extern datakälla nar planen ar ogiltig. |
 | 403 | "Sidan kraver behorighet" | Rollen saknar `dataFetch` | Be admin/Super User kontrollera Vybehorigheter. |
 | 404 | "Resultatet hittades inte..." | Export-sessionen saknas | Kor datahamtningen igen. |
-| 502 | "Extern datakälla kunde inte nås." | Extern datakälla svarade med fel eller kunde inte nas | Kontrollera serverns `DATA_SOURCE_*`-miljovarden och API-status. |
+| 502 | "Extern datakälla kunde inte nås." | Extern datakälla svarade inte, URL/sökvägsmall var fel eller TLS-certifikatet kunde inte verifieras | Kontrollera serverns `DATA_SOURCE_*`-miljovarden, API-status och eventuell `DATA_SOURCE_CA_BUNDLE`/`DATA_SOURCE_VERIFY_SSL`. |
 | 502 | "Extern datakälla svarade med HTTP ..." | Extern datakälla nekade eller failade anropet | Använd fel-id i Hämta data-panelen och sök samma id i Render-loggen. |
 | 500 | "Datahämtningen stoppades..." | Oväntat backendfel i datahämtningen | Använd fel-id i Hämta data-panelen och sök samma id i Render-loggen. |
 | 503 | "Extern datakatalog saknas..." | Katalogfil/env saknas | Kontrollera att `data/external_data_catalog.json` ar deployad eller satt katalog som env-override. |

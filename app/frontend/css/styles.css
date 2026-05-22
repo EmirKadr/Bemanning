@@ -2552,8 +2552,31 @@ tr.filter-row input {
   border-radius: 999px;
   background: var(--bg);
   padding: 6px 9px;
+  min-height: 32px;
   font-size: 12px;
   font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+
+.data-fetch-chip:hover,
+.data-fetch-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg));
+}
+
+.data-fetch-chip.is-removing {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: var(--danger);
+  text-decoration: line-through;
+}
+
+.data-fetch-chip span {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
 }
 
 .data-fetch-chip code,
@@ -2561,6 +2584,12 @@ tr.filter-row input {
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 600;
+}
+
+.data-fetch-column-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin: -2px 0 14px;
 }
 
 .data-fetch-filter-list ul {

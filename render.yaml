@@ -41,6 +41,10 @@ services:
         sync: false
       - key: DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE
         sync: false
+      - key: DATA_SOURCE_VERIFY_SSL
+        value: "true"
+      - key: DATA_SOURCE_CA_BUNDLE
+        sync: false
       - key: DATA_SOURCE_CATALOG_JSON
         sync: false
       - key: DATA_SOURCE_MAX_ROWS

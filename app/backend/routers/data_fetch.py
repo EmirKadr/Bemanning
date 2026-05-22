@@ -17,6 +17,7 @@ from ..config import settings
 from ..data_fetch_service import (
     DataFetchConfigError,
     DataFetchPlanError,
+    apply_prompt_period_hint,
     build_catalog_context,
     build_data_fetch_minimax_payload,
     catalog_summary,
@@ -99,6 +100,8 @@ def _api_client_or_503() -> ExternalDataClient:
         api_client_header=settings.DATA_SOURCE_API_CLIENT_HEADER.strip() or None,
         view_data_path_template=settings.DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE.strip(),
         timeout=settings.DATA_SOURCE_TIMEOUT_SECONDS,
+        verify_ssl=settings.DATA_SOURCE_VERIFY_SSL,
+        ca_bundle=settings.DATA_SOURCE_CA_BUNDLE.strip() or None,
     )
 
 
@@ -158,7 +161,8 @@ async def _plan_from_prompt(prompt: str) -> dict:
     minimax_payload = build_data_fetch_minimax_payload(prompt, catalog_context)
     raw_answer = await run_in_threadpool(_call_minimax, minimax_payload)
     try:
-        return validate_plan_payload(parse_minimax_plan(raw_answer), catalog)
+        plan = validate_plan_payload(parse_minimax_plan(raw_answer), catalog)
+        return apply_prompt_period_hint(plan, prompt, catalog)
     except DataFetchPlanError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

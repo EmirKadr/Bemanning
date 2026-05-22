@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import calendar
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 import json
 from pathlib import Path
 import re
@@ -51,6 +53,57 @@ STOP_WORDS = {
     "vyer",
     "vy",
 }
+MONTH_ALIASES = {
+    "januari": 1,
+    "jan": 1,
+    "februari": 2,
+    "feb": 2,
+    "mars": 3,
+    "mar": 3,
+    "april": 4,
+    "apr": 4,
+    "apil": 4,
+    "maj": 5,
+    "juni": 6,
+    "jun": 6,
+    "juli": 7,
+    "jul": 7,
+    "augusti": 8,
+    "aug": 8,
+    "september": 9,
+    "sep": 9,
+    "sept": 9,
+    "oktober": 10,
+    "okt": 10,
+    "november": 11,
+    "nov": 11,
+    "december": 12,
+    "dec": 12,
+}
+MONTH_PATTERN = re.compile(
+    r"\b(?:(?P<month>"
+    + "|".join(sorted((re.escape(key) for key in MONTH_ALIASES), key=len, reverse=True))
+    + r")\s+(?P<year>20\d{2}|\d{2})|(?P<year2>20\d{2}|\d{2})\s+(?P<month2>"
+    + "|".join(sorted((re.escape(key) for key in MONTH_ALIASES), key=len, reverse=True))
+    + r"))\b",
+    re.IGNORECASE,
+)
+DATE_COLUMN_PRIORITY = (
+    "time_stamp_int",
+    "date",
+    "timestamp",
+    "order_date",
+    "order_date_time",
+    "created_at",
+    "changed_date",
+    "date_time",
+)
+RELATIVE_DAYS_PATTERN = re.compile(
+    r"\b(?:senaste|sista)\s+(?P<days>\d{1,3})\s+dag(?:en|ar|arna)?\b",
+    re.IGNORECASE,
+)
+TODAY_PATTERN = re.compile(r"\b(?:idag|dagens(?:\s+(?:datum|timestamp|tid))?)\b", re.IGNORECASE)
+CODE_VALUE_COLUMNS = {"company"}
 
 
 class DataFetchConfigError(Exception):
@@ -153,6 +206,89 @@ def _match_score(prompt_norm: str, prompt_tokens: set[str], *values: object) -> 
     return score
 
 
+def _app_now() -> datetime:
+    return datetime.now().astimezone()
+
+
+def _date_period_payload(kind: str, start_date: date, end_date: date, **extra: Any) -> dict[str, Any]:
+    return {
+        "kind": kind,
+        "label": f"{start_date.isoformat()}..{end_date.isoformat()}",
+        "start_yyyymmdd": start_date.year * 10000 + start_date.month * 100 + start_date.day,
+        "end_yyyymmdd": end_date.year * 10000 + end_date.month * 100 + end_date.day,
+        "start_iso": start_date.isoformat(),
+        "end_iso": end_date.isoformat(),
+        **extra,
+    }
+
+
+def infer_prompt_period(prompt: object, today: date | None = None) -> dict[str, Any] | None:
+    normalized = _normalize(prompt)
+    match = MONTH_PATTERN.search(normalized)
+    if match:
+        month_key = (match.group("month") or match.group("month2") or "").lower()
+        year_text = match.group("year") or match.group("year2") or ""
+        month = MONTH_ALIASES.get(month_key)
+        if not month:
+            return None
+        year = int(year_text)
+        if year < 100:
+            year += 2000
+        last_day = calendar.monthrange(year, month)[1]
+        start_date = date(year, month, 1)
+        end_date = date(year, month, last_day)
+        return _date_period_payload("month", start_date, end_date, year=year, month=month)
+
+    relative_match = RELATIVE_DAYS_PATTERN.search(normalized)
+    if relative_match:
+        days = max(1, int(relative_match.group("days")))
+        end_date = today or _app_now().date()
+        start_date = end_date - timedelta(days=days - 1)
+        return _date_period_payload("relative_days", start_date, end_date, days=days)
+
+    if TODAY_PATTERN.search(normalized):
+        end_date = today or _app_now().date()
+        return _date_period_payload("today", end_date, end_date)
+
+    if re.search(r"\big[aå]r\b", normalized):
+        end_date = (today or _app_now().date()) - timedelta(days=1)
+        return _date_period_payload("yesterday", end_date, end_date)
+
+    return None
+
+
+def _preferred_date_column(view: DataView) -> DataColumn | None:
+    columns_by_id = view.column_by_id
+    for column_id in DATE_COLUMN_PRIORITY:
+        column = columns_by_id.get(column_id)
+        if column:
+            return column
+    for column in view.columns:
+        text = _normalize(f"{column.id} {column.label_en} {column.label_sv}")
+        if any(token in text for token in ("date", "datum", "timestamp", "skapad", "andrad")):
+            return column
+    return None
+
+
+def _period_values_for_column(period: dict[str, Any], column: DataColumn) -> list[Any]:
+    text = _normalize(f"{column.id} {column.label_en} {column.label_sv}")
+    if column.id.endswith("_int") or "int" in text:
+        return [period["start_yyyymmdd"], period["end_yyyymmdd"]]
+    if "timestamp" in text or column.id in {"date_time", "order_date_time", "created_at", "changed_date"}:
+        return [f"{period['start_iso']}T00:00:00", f"{period['end_iso']}T23:59:59"]
+    return [period["start_iso"], period["end_iso"]]
+
+
+def _normalize_filter_value(column_id: str, operator: str, value: Any) -> Any:
+    if column_id not in CODE_VALUE_COLUMNS:
+        return value
+    if operator == "Terms" and isinstance(value, list):
+        return [str(item).strip().upper() if isinstance(item, str) else item for item in value]
+    if isinstance(value, str):
+        return value.strip().upper()
+    return value
+
+
 def _catalog_source() -> tuple[str, str]:
     raw_json = settings.DATA_SOURCE_CATALOG_JSON.strip()
     if raw_json:
@@ -233,7 +369,9 @@ def catalog_summary(catalog: DataCatalog) -> dict[str, int]:
 
 def build_catalog_context(prompt: str, catalog: DataCatalog, limit: int = 12) -> dict[str, Any]:
     views = []
-    for view in catalog.candidate_views(prompt, limit=limit):
+    candidate_views = catalog.candidate_views(prompt, limit=limit)
+    app_now = _app_now()
+    for view in candidate_views:
         views.append(
             {
                 "view_id": view.id,
@@ -249,7 +387,22 @@ def build_catalog_context(prompt: str, catalog: DataCatalog, limit: int = 12) ->
                 ],
             }
         )
-    return {"operators": list(ALLOWED_OPERATORS), "candidate_views": views}
+    context: dict[str, Any] = {
+        "operators": list(ALLOWED_OPERATORS),
+        "current_date": app_now.date().isoformat(),
+        "current_datetime": app_now.isoformat(timespec="seconds"),
+        "candidate_views": views,
+    }
+    period = infer_prompt_period(prompt, app_now.date())
+    if period:
+        period_hint = dict(period)
+        period_hint["preferred_date_columns"] = {
+            view.id: column.id
+            for view in candidate_views
+            if (column := _preferred_date_column(view)) is not None
+        }
+        context["detected_period"] = period_hint
+    return context
 
 
 def build_data_fetch_minimax_payload(prompt: str, catalog_context: dict[str, Any]) -> dict[str, Any]:
@@ -259,6 +412,17 @@ Du tolkar en användares svenska önskan till en säker fråga mot en extern dat
 Du får bara använda vyer och kolumner i katalogutdraget. Du får aldrig hitta på
 endpoint, URL, API-nyckel, token, servernamn eller hemliga anslutningsuppgifter.
 Du ska bara returnera JSON, utan markdown.
+
+Katalogutdraget innehaller appens interna current_date och current_datetime.
+Anvand dem for uttryck som idag, dagens datum, dagens timestamp och senaste N
+dagarna. Gissa aldrig datum for relativa tidsuttryck.
+
+Om katalogutdraget innehaller detected_period ska perioden anvandas som
+datumfilter. Valj preferred_date_columns[view_id] om den finns. For int-baserade
+datumkolumner som time_stamp_int anvander du start_yyyymmdd och end_yyyymmdd
+med Between. For timestamp-kolumner anvander du hela dagens intervall
+YYYY-MM-DDT00:00:00 till YYYY-MM-DDT23:59:59. Lagg aldrig en tidsperiod i
+order_num eller kundref.
 
 Välj exakt en view_id. Använd alltid tekniska column_id i output_columns,
 filters och identifiers. Svenska namn i katalogen är alias för användaren.
@@ -436,6 +600,44 @@ def validate_plan_payload(payload: dict[str, Any], catalog: DataCatalog) -> dict
         "identifiers": identifiers,
         "reason": str(payload.get("reason") or "").strip(),
     }
+
+
+def apply_prompt_period_hint(plan: dict[str, Any], prompt: str, catalog: DataCatalog) -> dict[str, Any]:
+    app_today = _app_now().date()
+    period = infer_prompt_period(prompt, app_today)
+    if plan.get("status") != "ok":
+        return plan
+    try:
+        view = catalog.view(str(plan.get("view") or ""))
+    except DataFetchPlanError:
+        return plan
+    date_column = _preferred_date_column(view)
+
+    filters: list[dict[str, Any]] = []
+    for item in plan.get("filters") or []:
+        column_id = item.get("id")
+        operator = str(item.get("operator") or "")
+        value = item.get("value")
+        if period and date_column and column_id == date_column.id:
+            continue
+        if period and column_id != getattr(date_column, "id", None) and infer_prompt_period(value, app_today):
+            continue
+        filters.append({**item, "value": _normalize_filter_value(str(column_id or ""), operator, value)})
+
+    plan = dict(plan)
+    if period and date_column:
+        filters.append(
+            {
+                "id": date_column.id,
+                "operator": "Between",
+                "value": _period_values_for_column(period, date_column),
+            }
+        )
+        reason = str(plan.get("reason") or "").strip()
+        suffix = "Datumperioden tolkades fran prompten."
+        plan["reason"] = f"{reason} {suffix}".strip()
+    plan["filters"] = filters
+    return plan
 
 
 def _row_value(row: dict[str, Any], column_id: str) -> Any:

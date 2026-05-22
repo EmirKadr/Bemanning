@@ -29,10 +29,13 @@ class ExternalDataClient:
         api_client_header: Optional[str] = None,
         view_data_path_template: str = "",
         timeout: float = 30,
+        verify_ssl: bool = True,
+        ca_bundle: Optional[str] = None,
         session: Optional[requests.Session] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/") + "/"
         self.timeout = timeout
+        self.verify = ca_bundle.strip() if ca_bundle else verify_ssl
         self.view_data_path_template = view_data_path_template.strip()
         self.session = session or requests.Session()
 
@@ -58,6 +61,7 @@ class ExternalDataClient:
                 self._url(path),
                 json=payload,
                 timeout=self.timeout,
+                verify=self.verify,
             )
         except requests.RequestException as exc:
             raise ExternalDataClientError(

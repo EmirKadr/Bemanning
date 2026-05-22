@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     DATA_SOURCE_API_CLIENT_HEADER: str = ""
     DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE: str = ""
     DATA_SOURCE_TIMEOUT_SECONDS: float = 30
+    DATA_SOURCE_VERIFY_SSL: bool = True
+    DATA_SOURCE_CA_BUNDLE: str = ""
     DATA_SOURCE_MAX_ROWS: int = 1000
     DATA_SOURCE_CATALOG_PATH: str = ""
     DATA_SOURCE_CATALOG_JSON: str = ""

@@ -53,6 +53,14 @@ Datahämtningsvyn använder samma MiniMax-konfiguration, men skickar aldrig API-
 - `DATA_SOURCE_API_KEY_HEADER`
 - `DATA_SOURCE_API_CLIENT_HEADER`
 - `DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE`
+- `DATA_SOURCE_VERIFY_SSL` (standard `true`; kan sättas till `false` lokalt om certifikatkedjan saknas)
+- `DATA_SOURCE_CA_BUNDLE` (valfri sökväg till CA-bundle när SSL ska verifieras med intern CA)
+
+Bas-URL och sökvägsmall hålls separata: bas-URL ska normalt bara vara hosten,
+medan sökvägsmallen innehåller hela API-sökvägen och `{view}`-platsen. Klienten
+skickar JSON-payload och förväntar JSON-svar; CSV-läge används inte av appen.
+Prompten får appens aktuella datum/tid via backend, och backend efterkorrigerar
+relativa datum som `idag`, `dagens` och `senaste N dagarna` innan extern hämtning.
 
 Bygg vy-/kolumnkatalogen med:
 

@@ -81,3 +81,19 @@ Lade till `stop_local.bat` for att stanga gamla lokala `start_local.bat`/uvicorn
 ## [2026-05-21] polish | Enter skickar apphjalp
 
 Apphjalpens textfalt skickar nu fragan med Enter. `Shift+Enter` finns kvar for ny rad, och frontend ignorerar extra submit medan ett svar redan hamtas.
+
+## [2026-05-22] fix | Stabilare Hamta data-API
+
+Hämta data-klienten kan nu styras med `DATA_SOURCE_VERIFY_SSL` och `DATA_SOURCE_CA_BUNDLE` for lokala certifikatkedjor. Dokumenterade att bas-URL och sökvägsmall hålls separata, och lade till appklocka/periodhints så månad + år, dagens datum och senaste N dagarna styrs mot datumfält i stället for ordernummer eller hallucinerade datum.
+
+## [2026-05-22] feature | Redigerbara Hamta data-kolumner
+
+Planpanelen i Hämta data låter nu användaren markera MiniMax-valda kolumner för borttagning och trycka `Uppdatera plan`. Planens `output_columns` skrivs om lokalt, gammalt resultat rensas och nästa hämtning/export använder bara kvarvarande kolumner.
+
+## [2026-05-22] polish | Tar bort Las om katalog
+
+Tog bort den manuella `Läs om katalog`-knappen från Hämta data. Katalogen förväntas alltid finnas uppladdad i servermiljön och läses automatiskt av backend.
+
+## [2026-05-22] polish | Tydligare Hamta data-flode
+
+Bytte knapptexten från `Tolka med MiniMax` till `Tolka`. Hämta data och Excel-export räknar nu knappstatus från samma frontend-state: hämta kräver en godkänd tolkning, export kräver ett hämtat resultat, och ändrad prompt rensar gammal plan/resultat.

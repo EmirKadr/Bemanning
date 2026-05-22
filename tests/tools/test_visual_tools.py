@@ -495,6 +495,29 @@ def test_frontend_theme_toggle_is_wired_globally():
         assert "/js/common.js" in html
 
 
+def test_data_fetch_plan_columns_are_user_editable():
+    frontend = ROOT / "app" / "frontend"
+    html = (frontend / "hamta-data.html").read_text(encoding="utf-8")
+    data_fetch = (frontend / "js" / "data_fetch.js").read_text(encoding="utf-8")
+    styles = (frontend / "css" / "styles.css").read_text(encoding="utf-8")
+
+    assert ">Tolka</button>" in html
+    assert "Tolka med MiniMax</button>" not in html
+    assert 'id="dataFetchRun" type="button" disabled' in html
+    assert 'id="dataFetchExport" type="button" disabled' in html
+    assert "dataFetchUpdateActions" in data_fetch
+    assert "resetDataFetchForPromptEdit" in data_fetch
+    assert '!dataFetchState.result?.session_id' in data_fetch
+    assert "pendingRemovedColumns" in data_fetch
+    assert "data-remove-column" in data_fetch
+    assert "data-update-columns" in data_fetch
+    assert "updateDataFetchPlanColumns" in data_fetch
+    assert "renderDataFetchResult(null)" in data_fetch
+    assert "Minst en kolumn måste vara kvar." in data_fetch
+    assert ".data-fetch-chip.is-removing" in styles
+    assert ".data-fetch-column-actions" in styles
+
+
 def test_area_focus_toggle_is_wired_to_views():
     frontend = ROOT / "app" / "frontend"
     common = (frontend / "js" / "common.js").read_text(encoding="utf-8")

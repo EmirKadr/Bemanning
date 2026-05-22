@@ -1,7 +1,7 @@
 ---
 title: Hämta data
 status: aktiv
-updated: 2026-05-21
+updated: 2026-05-22
 tags: [datahamtning, extern-data, minimax, api]
 ---
 
@@ -17,19 +17,21 @@ miljövariabler och skickas aldrig till modellen.
 
 1. Användaren öppnar `hamta-data.html`.
 2. Användaren skriver en prompt, till exempel vilken vy, kolumner och filter som önskas.
-3. `Tolka med MiniMax` skickar prompten och ett begränsat katalogutdrag till MiniMax.
+3. `Tolka` skickar prompten och ett begränsat katalogutdrag till MiniMax.
 4. Backend validerar MiniMax-planen mot katalogen.
 5. Användaren ser vald vy, tekniska kolumner och filter.
-6. `Hämta data` kör API-anropet från backend.
-7. Resultatet visas som tabell och kan exporteras till Excel.
+6. Användaren kan klicka bort utdataplanens kolumner och trycka `Uppdatera plan`.
+7. `Hämta data` kör API-anropet från backend.
+8. Resultatet visas som tabell och kan exporteras till Excel.
 
 ## Knappar och kontroller
 
 | Kontroll | Var | Vem får | Vad händer | API/kod | Vanliga fel |
 | --- | --- | --- | --- | --- | --- |
 | Hämta data | Sidebar | Super User eller roll med vyåtkomst `dataFetch` | Öppnar datahämtningsvyn | `common.js`, `hamta-data.html` | Om vyn saknas: kontrollera Vybehörigheter. |
-| Läs om katalog | Vyns topp | `dataFetch` edit | Rensar backendens katalogcache och läser katalogen igen | `POST /api/query-data/catalog/reload` | Fel om katalogfil/env saknas. |
-| Tolka med MiniMax | Promptpanelen | `dataFetch` view | Skickar prompt + katalogutdrag till MiniMax och visar validerad plan | `POST /api/query-data/plan` | Fel om `MINIMAX_API_KEY` saknas eller modellen väljer okänd vy/kolumn. |
+| Tolka | Promptpanelen | `dataFetch` view | Skickar prompt + katalogutdrag till MiniMax och visar validerad plan | `POST /api/query-data/plan` | Fel om `MINIMAX_API_KEY` saknas eller modellen väljer okänd vy/kolumn. |
+| Kolumnchip | Planpanelen | `dataFetch` view | Markerar kolumn för borttagning ur `output_columns` | `data_fetch.js` | Minst en kolumn måste vara kvar. |
+| Uppdatera plan | Planpanelen | `dataFetch` view | Skriver om planen lokalt med kvarvarande kolumner och rensar gammalt resultat | `data_fetch.js` | Knappen är spärrad tills minst en kolumn markerats. |
 | Hämta data | Promptpanelen | `dataFetch` view | Kör validerad plan mot extern datakälla | `POST /api/query-data/run` | Fel om `DATA_SOURCE_API_BASE_URL`, `DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE` eller nyckel-/header-env saknas/fel. |
 | Exportera Excel | Resultatpanelen | `dataFetch` view | Laddar ner senaste begränsade resultat som `.xlsx` | `GET /api/query-data/export/{session_id}` | Fel om resultatet har gått förlorat och hämtningen måste köras igen. |
 
@@ -37,12 +39,13 @@ miljövariabler och skickas aldrig till modellen.
 
 - Hemliga anslutningsvärden ligger i serverns miljövariabler med generiska `DATA_SOURCE_*`-namn.
 - Endpointmall och headernamn ligger också i miljövariabler, så repot inte dokumenterar leverantörens privata API-kontrakt.
-- Katalogen med vyer och kolumner läses normalt från den committade filen `data/external_data_catalog.json`. Drift kan även override:a med `DATA_SOURCE_CATALOG_JSON` eller `DATA_SOURCE_CATALOG_PATH`.
-- MiniMax-prompten byggs av `data_fetch_service.py` och innehåller bara användarens prompt, tillåtna operatorer, kandidatvyer, kolumn-id:n och kolumnnamn.
+- Katalogen med vyer och kolumner ska finnas uppladdad i servermiljön och läses automatiskt från `data/external_data_catalog.json`, `DATA_SOURCE_CATALOG_JSON` eller `DATA_SOURCE_CATALOG_PATH`.
+- MiniMax-prompten byggs av `data_fetch_service.py` och innehåller bara användarens prompt, appens aktuella `current_date`/`current_datetime`, tillåtna operatorer, kandidatvyer, kolumn-id:n och kolumnnamn.
 - MiniMax får inte URL, endpoint-bas, headernamn, API-token, sessioncookie eller databasinfo.
 - Backend validerar alltid att vald vy och alla filter-/utdatakolumner finns i katalogen innan API-anropet körs.
+- Om prompten innehåller månad + år, `idag`, `dagens` eller `senaste N dagarna`, skickas en periodhint till MiniMax och backend reparerar uppenbara misstolkningar där perioden hamnat i fel fält eller fått fel datum.
 - `GET /api/query-data/health` använder inte MiniMax. Om katalog, API-env eller
-  MiniMax-nyckel saknas rapporterar den status till UI:t så `Tolka med MiniMax`
+  MiniMax-nyckel saknas rapporterar den status till UI:t så `Tolka`
   och `Hämta data` kan spärras innan någon AI-fråga eller extern API-fråga skickas.
 - Om extern datahämtning misslyckas loggar backend `error_id`, vy och filterstruktur
   i serverloggen utan URL:er eller hemligheter. Frontend visar samma fel-id i
@@ -52,8 +55,9 @@ miljövariabler och skickas aldrig till modellen.
 
 - `tools/build_external_data_catalog.py` bygger katalogen från lokala Excel-filer.
 - `.gitignore` ignorerar `private-data/` och lokala katalogvarianter som `data/external_data_catalog.local*.json`; standardkatalogen `data/external_data_catalog.json` commitas.
-- `app/backend/external_data_client.py` är en generisk fetch-klient där provider-specifika detaljer kommer från env.
-- `app/backend/data_fetch_service.py` laddar katalog, bygger MiniMax-prompt och validerar plan.
+- `app/backend/external_data_client.py` är en generisk fetch-klient där provider-specifika detaljer kommer från env. Den skickar JSON-payload, förväntar JSON-svar och kan styras med `DATA_SOURCE_VERIFY_SSL`/`DATA_SOURCE_CA_BUNDLE` för lokala certifikatkedjor.
+- `app/backend/data_fetch_service.py` laddar katalog, bygger MiniMax-prompt, lägger till appklocka/periodhints, normaliserar koder som `company=GG` och validerar plan.
+- `app/frontend/js/data_fetch.js` låter användaren ta bort kolumner ur MiniMax-planens `output_columns` innan `/api/query-data/run` körs. Servern validerar fortfarande den inskickade planen vid hämtning.
 - `app/backend/routers/data_fetch.py` kör planering, datahämtning och Excel-export.
 - Resultat hålls i minne per `session_id`, på samma sätt som lagerverktygens exportflöden.
 
@@ -68,14 +72,20 @@ Svar: Nej. Backend skickar bara vy-/kolumnstruktur och JSON-formatet som modelle
 Fråga: Varför säger den att katalog saknas?
 Svar: Servern hittar inte `data/external_data_catalog.json` och har inte `DATA_SOURCE_CATALOG_JSON`. Kontrollera att katalogfilen är committad/deployad eller bygg den lokalt med `python tools/build_external_data_catalog.py --views <views.xlsx> --columns <columns.xlsx>`. Detta fel skapar ingen MiniMax-usage.
 
-Fråga: Varför går det inte att klicka på Tolka med MiniMax?
+Fråga: Varför går det inte att klicka på Tolka?
 Svar: Knappen spärras när katalogen saknas eller när `MINIMAX_API_KEY` inte är satt. Då skickas ingen AI-fråga och ingen MiniMax-usage skapas.
 
 Fråga: Varför går det inte att klicka på Hämta data?
-Svar: Knappen kräver en godkänd plan och att den externa datakällan är konfigurerad med alla obligatoriska `DATA_SOURCE_*`-värden i servermiljön: bas-URL, API-nyckel, klientvärde, headernamn för nyckel/klient och endpointmall. Health-raden visar exakt vilka variabelnamn som saknas.
+Svar: Knappen kräver en godkänd plan från `Tolka` och att den externa datakällan är konfigurerad med alla obligatoriska `DATA_SOURCE_*`-värden i servermiljön: bas-URL, API-nyckel, klientvärde, headernamn för nyckel/klient och endpointmall. Health-raden visar exakt vilka variabelnamn som saknas.
+
+Fråga: Hur tar jag bort kolumner från resultatet?
+Svar: Klicka på kolumnchippen i planpanelen och tryck `Uppdatera plan`. Då tas kolumnerna bort från `output_columns`, gammalt resultat rensas och nästa `Hämta data` använder den uppdaterade planen. Det går inte att ta bort alla kolumner.
 
 Fråga: Varför fick jag HTTP 500/502 när planen såg rätt ut?
-Svar: Planen kan vara korrekt men externa datakällan kan ändå neka, stänga anslutningen, vara nere eller svara med fel. Vid sådana fel visar Hämta data ett fel-id. Leta på samma fel-id i Render-loggarna för att se vilken vy som kördes och om felet var nätåtkomst, endpointmall eller HTTP-status från datakällan.
+Svar: Planen kan vara korrekt men externa datakällan kan ändå neka, stänga anslutningen, vara nere eller svara med fel. Vid sådana fel visar Hämta data ett fel-id. Leta på samma fel-id i Render-loggarna för att se vilken vy som kördes och om felet var nätåtkomst, endpointmall, SSL-verifiering eller HTTP-status från datakällan.
+
+Fråga: Varför blev `april 2026` ett ordernummerfilter?
+Svar: Hämta data försöker nu känna igen svensk månad + år, `idag`, `dagens` och `senaste N dagarna` innan MiniMax-anropet. För loggvyer ska perioden användas på bästa datumkolumn, till exempel `time_stamp_int` i plockloggen eller `timestamp` i transloggen. Om modellen ändå lägger perioden i `order_num` eller hittar på fel datum reparerar backend filtret innan anropet körs.
 
 Fråga: Varför stoppas en MiniMax-plan?
 Svar: Backend accepterar bara vyer, kolumner och filteroperatorer som finns i katalogen. Om modellen hittar på något stoppas körningen innan extern datakälla anropas.

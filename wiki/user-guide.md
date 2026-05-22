@@ -108,7 +108,7 @@ Historik ar inte en generell "fel-logg"; den visar auditlogg for muterande appfl
 
 1. Ga till `Hamta data`.
 2. Skriv vilken extern data-vy du vill hamta, vilka kolumner du vill se och vilka filter som ska anvandas.
-3. Klicka `Tolka med MiniMax`.
+3. Klicka `Tolka`.
 4. Kontrollera planen: vy, kolumner och filter visas innan data hamtas.
 5. Klicka `Hamta data`.
 6. Granska tabellpreviewn och klicka `Exportera Excel` om resultatet ska sparas.

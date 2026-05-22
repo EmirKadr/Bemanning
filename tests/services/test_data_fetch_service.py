@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 import json
 from types import SimpleNamespace
 
@@ -25,6 +26,37 @@ SAMPLE_CATALOG = {
                 {"id": "type", "order": 1, "label_en": "Type", "label_sv": "Typ"},
                 {"id": "item_num", "order": 2, "label_en": "Item Num", "label_sv": "Artikel"},
                 {"id": "created_at", "order": 3, "label_en": "Created At", "label_sv": "Skapad"},
+            ],
+        }
+    ],
+}
+PICK_LOG_CATALOG = {
+    "version": 1,
+    "views": [
+        {
+            "id": "v_ask_pick_log_full",
+            "label_en": "Pick Log Full",
+            "label_sv": "Plocklogg Full",
+            "columns": [
+                {"id": "order_num", "order": 1, "label_en": "Order Num", "label_sv": "Ordernr"},
+                {"id": "time_stamp_int", "order": 2, "label_en": "Time Stamp Int", "label_sv": "Datum"},
+                {"id": "item_num", "order": 3, "label_en": "Item Num", "label_sv": "Artikel"},
+                {"id": "company", "order": 4, "label_en": "Company", "label_sv": "Bolag"},
+            ],
+        }
+    ],
+}
+TRANS_LOG_CATALOG = {
+    "version": 1,
+    "views": [
+        {
+            "id": "v_ask_trans_log",
+            "label_en": "Trans Log",
+            "label_sv": "Translogg",
+            "columns": [
+                {"id": "type", "order": 1, "label_en": "Type", "label_sv": "Typ"},
+                {"id": "timestamp", "order": 2, "label_en": "Timestamp", "label_sv": "Timestamp"},
+                {"id": "company", "order": 3, "label_en": "Company", "label_sv": "Bolag"},
             ],
         }
     ],
@@ -88,6 +120,125 @@ def test_validate_plan_normalizes_columns_and_filters():
     assert plan["view_label"] == "Aktivitetslogg"
     assert plan["output_column_labels"]["type"] == "Typ"
     assert plan["filters"] == [{"id": "type", "operator": "EQ", "value": "korrigering"}]
+
+
+def test_catalog_context_includes_month_period_hint_for_date_columns():
+    catalog = service.catalog_from_payload(PICK_LOG_CATALOG)
+
+    context = service.build_catalog_context("hamta plocklogg full for apil 2026", catalog)
+
+    assert context["detected_period"]["start_yyyymmdd"] == 20260401
+    assert context["detected_period"]["end_yyyymmdd"] == 20260430
+    assert context["detected_period"]["preferred_date_columns"] == {
+        "v_ask_pick_log_full": "time_stamp_int"
+    }
+
+
+def test_catalog_context_sends_current_app_clock(monkeypatch):
+    monkeypatch.setattr(
+        service,
+        "_app_now",
+        lambda: datetime(2026, 5, 22, 9, 30, tzinfo=timezone.utc),
+    )
+    catalog = service.catalog_from_payload(TRANS_LOG_CATALOG)
+
+    context = service.build_catalog_context("hamta translogg med dagens timestamp", catalog)
+
+    assert context["current_date"] == "2026-05-22"
+    assert context["current_datetime"].startswith("2026-05-22T09:30:00")
+    assert context["detected_period"]["preferred_date_columns"] == {"v_ask_trans_log": "timestamp"}
+
+
+def test_prompt_period_hint_replaces_misread_order_filter():
+    catalog = service.catalog_from_payload(PICK_LOG_CATALOG)
+    plan = service.validate_plan_payload(
+        {
+            "status": "ok",
+            "view": "v_ask_pick_log_full",
+            "output_columns": ["order_num", "time_stamp_int"],
+            "filters": [{"field": "order_num", "operator": "EQ", "value": "apil 2026"}],
+        },
+        catalog,
+    )
+
+    repaired = service.apply_prompt_period_hint(
+        plan,
+        "hamta plocklogg full for apil 2026",
+        catalog,
+    )
+
+    assert repaired["filters"] == [
+        {"id": "time_stamp_int", "operator": "Between", "value": [20260401, 20260430]}
+    ]
+
+
+def test_prompt_period_hint_uses_app_clock_for_today_and_normalizes_company(monkeypatch):
+    monkeypatch.setattr(
+        service,
+        "_app_now",
+        lambda: datetime(2026, 5, 22, 9, 30, tzinfo=timezone.utc),
+    )
+    catalog = service.catalog_from_payload(TRANS_LOG_CATALOG)
+    plan = service.validate_plan_payload(
+        {
+            "status": "ok",
+            "view": "v_ask_trans_log",
+            "output_columns": ["type", "timestamp", "company"],
+            "filters": [
+                {"field": "company", "operator": "EQ", "value": "gg"},
+                {
+                    "field": "timestamp",
+                    "operator": "Between",
+                    "value": ["2026-04-09T00:00:00", "2026-04-09T23:59:59"],
+                },
+            ],
+        },
+        catalog,
+    )
+
+    repaired = service.apply_prompt_period_hint(
+        plan,
+        "hamta translogg for bolag gg med dagens timestamp",
+        catalog,
+    )
+
+    assert repaired["filters"] == [
+        {"id": "company", "operator": "EQ", "value": "GG"},
+        {
+            "id": "timestamp",
+            "operator": "Between",
+            "value": ["2026-05-22T00:00:00", "2026-05-22T23:59:59"],
+        },
+    ]
+
+
+def test_relative_days_period_uses_app_clock(monkeypatch):
+    monkeypatch.setattr(
+        service,
+        "_app_now",
+        lambda: datetime(2026, 5, 22, 9, 30, tzinfo=timezone.utc),
+    )
+    catalog = service.catalog_from_payload(PICK_LOG_CATALOG)
+    plan = service.validate_plan_payload(
+        {
+            "status": "ok",
+            "view": "v_ask_pick_log_full",
+            "output_columns": ["order_num", "time_stamp_int", "company"],
+            "filters": [{"field": "company", "operator": "EQ", "value": "gg"}],
+        },
+        catalog,
+    )
+
+    repaired = service.apply_prompt_period_hint(
+        plan,
+        "hamta plocklogg full for bolag gg senaste 5 dagarna",
+        catalog,
+    )
+
+    assert repaired["filters"] == [
+        {"id": "company", "operator": "EQ", "value": "GG"},
+        {"id": "time_stamp_int", "operator": "Between", "value": [20260518, 20260522]},
+    ]
 
 
 def test_validate_plan_rejects_unknown_column():
@@ -260,6 +411,63 @@ def test_external_data_client_wraps_connection_errors():
         client.fetch_data("dblog_count_log")
 
     assert "Extern datakälla kunde inte nås" in str(exc_info.value)
+
+
+def test_external_data_client_builds_path_and_passes_tls_verify():
+    captured = {}
+
+    class OkResponse:
+        status_code = 200
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"rows": []}
+
+    class FakeSession:
+        headers = {}
+
+        def post(self, url, **kwargs):
+            captured["url"] = url
+            captured.update(kwargs)
+            return OkResponse()
+
+    client = ExternalDataClient(
+        base_url="https://secret.example",
+        view_data_path_template="/api/integration/views/{view}/data",
+        verify_ssl=False,
+        session=FakeSession(),
+    )
+
+    rows = client.fetch_data("v_ask_pick_log_full")
+
+    assert rows == []
+    assert captured["url"] == "https://secret.example/api/integration/views/v_ask_pick_log_full/data"
+    assert captured["verify"] is False
+
+
+def test_api_client_passes_tls_settings(monkeypatch):
+    captured = {}
+
+    class FakeExternalDataClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(settings, "DATA_SOURCE_API_BASE_URL", "https://secret.example/")
+    monkeypatch.setattr(settings, "DATA_SOURCE_API_KEY", "secret-key")
+    monkeypatch.setattr(settings, "DATA_SOURCE_API_CLIENT", "secret-client")
+    monkeypatch.setattr(settings, "DATA_SOURCE_API_KEY_HEADER", "secret-key-header")
+    monkeypatch.setattr(settings, "DATA_SOURCE_API_CLIENT_HEADER", "secret-client-header")
+    monkeypatch.setattr(settings, "DATA_SOURCE_VIEW_DATA_PATH_TEMPLATE", "/api/integration/views/{view}/data")
+    monkeypatch.setattr(settings, "DATA_SOURCE_VERIFY_SSL", False)
+    monkeypatch.setattr(settings, "DATA_SOURCE_CA_BUNDLE", "")
+    monkeypatch.setattr(data_fetch, "ExternalDataClient", FakeExternalDataClient)
+
+    data_fetch._api_client_or_503()
+
+    assert captured["verify_ssl"] is False
+    assert captured["ca_bundle"] is None
 
 
 def test_run_data_fetch_returns_logged_external_error(monkeypatch):

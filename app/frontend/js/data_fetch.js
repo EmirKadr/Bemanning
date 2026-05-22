@@ -1,5 +1,6 @@
 const dataFetchState = {
   plan: null,
+  pendingRemovedColumns: new Set(),
   result: null,
   busy: false,
   catalogReady: false,
@@ -54,16 +55,38 @@ function renderDataFetchError(error, fallback) {
   `;
 }
 
-function dataFetchSetBusy(active, text = "") {
-  dataFetchState.busy = Boolean(active);
-  document.getElementById("dataFetchPlan").disabled =
-    dataFetchState.busy || !dataFetchState.catalogReady || !dataFetchState.minimaxReady;
-  document.getElementById("dataFetchRun").disabled =
-    dataFetchState.busy
+function dataFetchColumnLabel(plan, columnId) {
+  return plan?.output_column_labels?.[columnId] || columnId;
+}
+
+function dataFetchRemainingColumns(plan = dataFetchState.plan) {
+  const removed = dataFetchState.pendingRemovedColumns || new Set();
+  return (plan?.output_columns || []).filter((columnId) => !removed.has(columnId));
+}
+
+function dataFetchUpdateActions() {
+  const planButton = document.getElementById("dataFetchPlan");
+  const runButton = document.getElementById("dataFetchRun");
+  const exportButton = document.getElementById("dataFetchExport");
+  if (planButton) {
+    planButton.disabled =
+      dataFetchState.busy || !dataFetchState.catalogReady || !dataFetchState.minimaxReady;
+  }
+  if (runButton) {
+    runButton.disabled =
+      dataFetchState.busy
       || !dataFetchState.catalogReady
       || !dataFetchState.apiReady
       || dataFetchState.plan?.status !== "ok";
-  document.getElementById("dataFetchReloadCatalog").disabled = dataFetchState.busy;
+  }
+  if (exportButton) {
+    exportButton.disabled = dataFetchState.busy || !dataFetchState.result?.session_id;
+  }
+}
+
+function dataFetchSetBusy(active, text = "") {
+  dataFetchState.busy = Boolean(active);
+  dataFetchUpdateActions();
   const status = document.getElementById("dataFetchStatus");
   status.classList.remove("error");
   status.textContent = text;
@@ -74,11 +97,59 @@ function dataFetchMaxRows() {
   return Math.min(5000, Math.max(1, Number.isFinite(value) ? value : 500));
 }
 
-function renderDataFetchPlan(plan) {
+function updateDataFetchPlanColumns() {
+  const plan = dataFetchState.plan;
+  if (!plan || plan.status !== "ok" || !dataFetchState.pendingRemovedColumns?.size) return;
+  const outputColumns = dataFetchRemainingColumns(plan);
+  if (!outputColumns.length) {
+    showToast("Minst en kolumn måste vara kvar.", "warn", 5000);
+    return;
+  }
+  const labels = {};
+  outputColumns.forEach((columnId) => {
+    labels[columnId] = dataFetchColumnLabel(plan, columnId);
+  });
+  const updatedPlan = {
+    ...plan,
+    output_columns: outputColumns,
+    output_column_labels: labels,
+  };
+  dataFetchState.pendingRemovedColumns = new Set();
+  renderDataFetchResult(null);
+  renderDataFetchPlan(updatedPlan, { keepColumnDraft: true });
+  dataFetchSetBusy(false, "Planen är uppdaterad.");
+}
+
+function bindDataFetchPlanControls(panel) {
+  panel.querySelectorAll("[data-remove-column]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const columnId = button.dataset.removeColumn;
+      if (!columnId) return;
+      const removed = dataFetchState.pendingRemovedColumns || new Set();
+      if (removed.has(columnId)) {
+        removed.delete(columnId);
+      } else {
+        const remainingCount = dataFetchRemainingColumns().length;
+        if (remainingCount <= 1) {
+          showToast("Minst en kolumn måste vara kvar.", "warn", 5000);
+          return;
+        }
+        removed.add(columnId);
+      }
+      dataFetchState.pendingRemovedColumns = removed;
+      renderDataFetchPlan(dataFetchState.plan, { keepColumnDraft: true });
+    });
+  });
+  panel.querySelector("[data-update-columns]")?.addEventListener("click", updateDataFetchPlanColumns);
+}
+
+function renderDataFetchPlan(plan, options = {}) {
   const panel = document.getElementById("dataFetchPlanPanel");
+  if (!options.keepColumnDraft) {
+    dataFetchState.pendingRemovedColumns = new Set();
+  }
   dataFetchState.plan = plan;
-  document.getElementById("dataFetchRun").disabled =
-    dataFetchState.busy || !dataFetchState.catalogReady || !dataFetchState.apiReady || plan?.status !== "ok";
+  dataFetchUpdateActions();
   if (!plan) {
     panel.hidden = true;
     panel.innerHTML = "";
@@ -94,12 +165,25 @@ function renderDataFetchPlan(plan) {
     `;
     return;
   }
+  const removedColumns = dataFetchState.pendingRemovedColumns || new Set();
+  const remainingColumns = dataFetchRemainingColumns(plan);
+  const updateDisabled = dataFetchState.busy || !removedColumns.size || !remainingColumns.length;
   const filters = (plan.filters || []).map((filter) => `
     <li><code>${dataFetchEscape(filter.id)}</code> ${dataFetchEscape(filter.operator)}
       <strong>${dataFetchEscape(dataFetchValueText(filter.value))}</strong></li>
   `).join("");
   const columns = (plan.output_columns || []).map((columnId) => `
-    <span class="data-fetch-chip">${dataFetchEscape(plan.output_column_labels?.[columnId] || columnId)} <code>${dataFetchEscape(columnId)}</code></span>
+    <button
+      type="button"
+      class="data-fetch-chip${removedColumns.has(columnId) ? " is-removing" : ""}"
+      data-remove-column="${dataFetchEscape(columnId)}"
+      aria-pressed="${removedColumns.has(columnId) ? "true" : "false"}"
+      title="${removedColumns.has(columnId) ? "Behåll kolumn" : "Ta bort kolumn"}"
+    >
+      ${dataFetchEscape(dataFetchColumnLabel(plan, columnId))}
+      <code>${dataFetchEscape(columnId)}</code>
+      <span aria-hidden="true">×</span>
+    </button>
   `).join("");
   panel.innerHTML = `
     <div class="data-fetch-panel-head">
@@ -110,17 +194,21 @@ function renderDataFetchPlan(plan) {
     </div>
     ${plan.reason ? `<p>${dataFetchEscape(plan.reason)}</p>` : ""}
     <div class="data-fetch-column-list">${columns}</div>
+    <div class="data-fetch-column-actions">
+      <button type="button" data-update-columns ${updateDisabled ? "disabled" : ""}>Uppdatera plan</button>
+    </div>
     <div class="data-fetch-filter-list">
       <strong>Filter</strong>
       ${filters ? `<ul>${filters}</ul>` : '<p class="note">Inga filter.</p>'}
     </div>
   `;
+  bindDataFetchPlanControls(panel);
 }
 
 function renderDataFetchResult(result) {
   const panel = document.getElementById("dataFetchResultPanel");
   dataFetchState.result = result;
-  document.getElementById("dataFetchExport").disabled = !result?.session_id;
+  dataFetchUpdateActions();
   if (!result || !result.columns?.length) {
     panel.hidden = true;
     panel.innerHTML = "";
@@ -205,6 +293,7 @@ async function planDataFetch() {
     return;
   }
   dataFetchSetBusy(true, "MiniMax tolkar prompten...");
+  renderDataFetchPlan(null);
   renderDataFetchResult(null);
   try {
     const result = await api.post("/api/query-data/plan", { prompt });
@@ -233,18 +322,6 @@ async function runDataFetch() {
   }
 }
 
-async function reloadDataFetchCatalog() {
-  dataFetchSetBusy(true, "Läser om katalog...");
-  try {
-    await api.post("/api/query-data/catalog/reload", {});
-    await loadDataFetchHealth();
-    dataFetchSetBusy(false, "Katalogen är omläst.");
-  } catch (error) {
-    dataFetchSetBusy(false, "");
-    showToast(error.message || "Kunde inte läsa om katalogen.", "error", 7000);
-  }
-}
-
 async function exportDataFetch() {
   const sessionId = dataFetchState.result?.session_id;
   if (!sessionId) return;
@@ -255,14 +332,21 @@ async function exportDataFetch() {
   }
 }
 
+function resetDataFetchForPromptEdit() {
+  if (!dataFetchState.plan && !dataFetchState.result) return;
+  renderDataFetchPlan(null);
+  renderDataFetchResult(null);
+  dataFetchSetBusy(false, "");
+}
+
 async function initDataFetchPage() {
   const user = await initPage("dataFetch");
   if (!user) return;
   await loadDataFetchHealth();
+  document.getElementById("dataFetchPrompt").addEventListener("input", resetDataFetchForPromptEdit);
   document.getElementById("dataFetchPlan").addEventListener("click", planDataFetch);
   document.getElementById("dataFetchRun").addEventListener("click", runDataFetch);
   document.getElementById("dataFetchExport").addEventListener("click", exportDataFetch);
-  document.getElementById("dataFetchReloadCatalog").addEventListener("click", reloadDataFetchCatalog);
 }
 
 initDataFetchPage();

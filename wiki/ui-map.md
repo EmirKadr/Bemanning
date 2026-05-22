@@ -36,7 +36,7 @@ Kort svar: de flesta sidor delar sidebar, omradesfokus, tema, logg och auth-guar
 | Aktiviteter | `aktiviteter.html` | Ny aktivitet, importmall, importera Excel, hjalp, Redigera, Ta bort | [Aktiviteter och omraden](activities-areas.md) |
 | Anvandare | `anvandare.html` | Ny anvandare, importmall, importera Excel, Vybehorigheter, cell-las, Visa inaktiva | [Anvandare och installningar](users-settings.md) |
 | Historik | `historik.html` | Period, anvandare, typ, atgard, objekt-id, Uppdatera | [Historik och audit](history-audit.md) |
-| Hamta data | `hamta-data.html` | Prompt, max rader, Las om katalog, Tolka med MiniMax, Hamta data, Exportera Excel | [Hamta data](data-fetch.md) |
+| Hamta data | `hamta-data.html` | Prompt, max rader, Tolka, Hamta data, Exportera Excel | [Hamta data](data-fetch.md) |
 | Produktivitet | `produktivitet.html` | Datum, prev/next, block, sok, filkrav/drag-drop | [Produktivitet](productivity.md) |
 | Uppladdningar | `uppladdningar.html` | Valj filer, Rensa alla, per-slot Valj/rensa, drag-drop | [Lagerverktyg](warehouse-tools.md) |
 | Bearbeta | `bearbeta.html` | Valj filer, flodesknappar, info, resultat, Excel/CSV | [Lagerverktyg](warehouse-tools.md) |
