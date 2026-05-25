@@ -1212,7 +1212,7 @@ async function handleProductivityUploadsCleared() {
 }
 
 (async () => {
-  const user = await initPage("productivity", { requireSuperUser: true });
+  const user = await initPage("productivity");
   if (!user) return;
 
   document.getElementById("productivityDate").addEventListener("change", () => {

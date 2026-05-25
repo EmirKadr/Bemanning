@@ -1,7 +1,7 @@
 ---
 title: Anvandarhandbok
 status: aktiv
-updated: 2026-05-22
+updated: 2026-05-25
 tags: [handbok, anvandare, support, chat]
 ---
 
@@ -17,7 +17,7 @@ Kort svar: denna sida beskriver hur en vanlig anvandare faktiskt anvander flow. 
 | Arbetsledare | Planerar dag/vecka, andrar celler, personer och aktiviteter om rollen har edit | Kan stoppas av cell-las om annan anvandare fyllt cellen. |
 | Bemanningsansvarig | Samma planeringsfloden som arbetsledare, ofta bredare ansvar | Beror pa vybehorigheter. |
 | Administrator | Skapar anvandare, personer, aktiviteter och settings | Kan inte automatiskt allt som Super User om rollen saknas. |
-| Super User | Historik, produktivitet, avancerade importer och vissa kodandringar | Ska anvandas varsamt eftersom rollen kan andra mer. |
+| Super User | Historik, verksamheter, avancerade importer och vissa kodandringar | Ska anvandas varsamt eftersom rollen kan andra mer. Produktivitet styrs via vybehorigheter. |
 | Lagerkontorist | Uppladdningar och Dela | Bearbeta-floden kan vara blockerade utan processbehorighet. |
 | Artikelplacerare | Lagerverktyg for artikel-/lagerarbete | Samma princip som lagerkontorist. |
 
@@ -118,6 +118,8 @@ Felkodsvyn ar en felsokningsvy ovanpa auditloggen. Den visar klientrapporterade 
 MiniMax far bara vy-/kolumnstruktur och exempel pa fragor. API-lank och nycklar ligger i servermiljon och skickas inte till modellen.
 
 ## Produktivitet
+
+Behorighet till vyn styrs via `Vybehorigheter` for `Produktivitet`. Visa racker for att oppna rapporten; Redigera kravs for serverhanterade KPI-/produktivitetsfiler.
 
 1. Ga till `Produktivitet`.
 2. Lagg in Plocklogg, Translogg och Palllastningslogg via dropzoner eller filval.

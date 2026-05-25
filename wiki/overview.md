@@ -1,13 +1,13 @@
 ---
 title: Projektoversikt
 status: aktiv
-updated: 2026-05-22
+updated: 2026-05-25
 tags: [produkt, oversikt]
 ---
 
 # Projektoversikt
 
-Kort svar: flow ersatter en Excel-bemanningsfil med en gemensam webbapp och Windows-app. Arbetsledare planerar personer mot aktiviteter per dag/timme, admin hanterar register och roller, super users kan se historik och produktivitet, och lagerroller kan anvanda lokala lagerverktyg.
+Kort svar: flow ersatter en Excel-bemanningsfil med en gemensam webbapp och Windows-app. Arbetsledare planerar personer mot aktiviteter per dag/timme, admin hanterar register och roller, Super User kan se historik och verksamheter, Produktivitet styrs via vybehorigheter och lagerroller kan anvanda lokala lagerverktyg.
 
 ## Produktens huvuddelar
 

@@ -7,6 +7,18 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-25] fix | Vybehorigheter ar globala
+
+Rollernas `Vybehorigheter` laser och sparar nu en global matris i stallet for en separat matris per verksamhet. Det gor att exempelvis `Lagerkontorist = Bearbeta/Redigera` galler bade Stigamo och R3, medan verksamhetsspecifika settings som cell-lasning och menyordning fortsatt kan vara separata.
+
+## [2026-05-25] fix | Verksamhetsseparerar produktivitetens KPI-karnfil
+
+Produktivitetens permanenta KPI-mal (`v_ask_kpi_target*.csv`) sparas och lases nu per verksamhet, pa samma princip som lagerverktygens `artikel_max.csv`. Stigamo, R3 och nya verksamheter far separata produktivitetskataloger under `data/coredata/` nar den finns, annars under `data/`; Stigamo har en bakatkompatibel fallback till den gamla root-filen tills en Stigamo-scopead KPI-fil finns.
+
+## [2026-05-25] fix | Produktivitet foljer vybehorigheter
+
+Produktivitetssidan kraver inte langre hard Super User-flagga i frontend. Sidan och API:t styrs av `productivity=view` for lasning och `productivity=edit` for serverhanterade produktivitetsfiler, sa admin kan ge atkomst via Vybehorigheter utan att ge Super User-roll.
+
 ## [2026-05-25] fix | Bearbeta följer vybehörigheter
 
 Bearbeta använder nu samma `allocationProcess=edit`-behörighet i backend som i menyn. Det gör att exempelvis Lagerkontorist kan se och köra Bearbeta när rollen satts till Redigera i Vybehörigheter. Utan edit-behörighet visas fortsatt bara självserviceflöden som Dela.

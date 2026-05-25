@@ -7,7 +7,7 @@ tags: [anvandare, settings, roller, ui]
 
 # Anvandare och installningar
 
-Kort svar: Anvandare-sidan hanterar konton, roller, omrade, forsta losenord, verksamhetsspecifik cell-lasning och rollernas vyatkomst. Anvandare ar alltid aktiva; konton som inte ska finnas kvar tas bort. Super User har dessutom vyn Verksamheter dar verksamheter och deras omraden administreras.
+Kort svar: Anvandare-sidan hanterar konton, roller, omrade, forsta losenord, verksamhetsspecifik cell-lasning och rollernas globala vyatkomst. Anvandare ar alltid aktiva; konton som inte ska finnas kvar tas bort. Super User har dessutom vyn Verksamheter dar verksamheter och deras omraden administreras.
 
 Omradesfokus i sidebar filtrerar anvandarlistan inom anvandarens verksamhet. `∞` visar alla omraden i den verksamheten; for Super User betyder `∞` globalt allt. Nar en ny anvandare skapas forvalt valt omradesfokus som anvandarens omrade, men omradet kan fortfarande andras i modalen eller lamnas tomt.
 
@@ -19,7 +19,7 @@ Omradesfokus i sidebar filtrerar anvandarlistan inom anvandarens verksamhet. `�
 | Flera nya anvandare | Oppnar tabellmodal | Skapar flera konton direkt i appen med samma falt som importmallen | `POST /api/users/import-rows` | Dubbletter, okanda roller och okanda omraden visas i resultatmodal. |
 | Ladda ner importmall | Hamter Excelmall | Laddar ner mall | `GET /api/users/import-template` | Kräver `userImport` edit/super user enligt backend. |
 | Importera Excel | Oppnar filval | Importerar anvandare | `POST /api/users/import` | Importerade utan losenord far `must_change_password=true`. |
-| Vybehorigheter | Oppnar rollmatris | Sparar vyatkomst per verksamhet | `GET/PUT /api/settings/role-access` | Fel matris kan dolja vyer for roller i aktuell verksamhet. |
+| Vybehorigheter | Oppnar rollmatris | Sparar global vyatkomst for roller | `GET/PUT /api/settings/role-access` | Fel matris kan dolja vyer for rollen i alla verksamheter. |
 | Import-hjalp | Oppnar hjalpmodal | Visar importstod | `setupImportHelpButton` | Ingen serverkoppling. |
 | Las bemanningsceller... | Checkbox | Sparar setting per verksamhet | `PUT /api/settings` | Nar aktiv kan ledare stoppas fran celler andra fyllt i aktuell verksamhet. |
 | Redigera | Oppnar modal | Uppdaterar konto | `PUT /api/users/{id}` | Sista admin kan inte nedgraderas. |
@@ -55,7 +55,7 @@ Knappar:
 
 ## Vybehorigheter-modal
 
-Rollmatrisen visar vyer som rader och roller som kolumner for aktuell verksamhet. Varje knapp cyklar:
+Rollmatrisen visar vyer som rader och roller som kolumner. Matrisen ar global, sa samma roll far samma vyatkomst i Stigamo och R3. Varje knapp cyklar:
 
 `Ingen` -> `Visa` -> `Redigera` -> `Ingen`
 
@@ -63,7 +63,7 @@ Knappar:
 
 - `Standard`: aterstaller modalens draft till defaultmatris.
 - `Avbryt`: stanger utan att spara.
-- `Spara`: skickar `PUT /api/settings/role-access`.
+- `Spara`: skickar `PUT /api/settings/role-access` och galler alla verksamheter.
 
 ## Importregler
 
@@ -100,7 +100,7 @@ Denna finns i sidebar, inte i `anvandare.html`, men hor till settings:
 
 | Fraga | Svar |
 | --- | --- |
-| "Varfor syns inte en sida for en roll?" | Kontrollera `Vybehorigheter`; vyn kan sta pa `Ingen`. |
+| "Varfor syns inte en sida for en roll?" | Kontrollera `Vybehorigheter`; vyn kan sta pa `Ingen` globalt for rollen. |
 | "Varfor finns ingen aktiv-checkbox?" | Anvandare ar alltid aktiva. Konton som inte ska vara kvar tas bort med `Ta bort`. |
 | "Varfor kan jag inte ta bort anvandaren?" | Backend hindrar borttagning av eget konto och sista admin i en verksamhet. |
 | "Varfor maste anvandaren skapa losenord?" | Kontot skapades/importerades utan losenord och har `must_change_password=true`. |

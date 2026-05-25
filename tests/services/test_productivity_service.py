@@ -15,6 +15,7 @@ from app.backend.productivity_service import (
 
 
 def write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content.strip() + "\n", encoding="utf-8")
 
 
@@ -76,6 +77,116 @@ GG\t404\tOUTBOUND\tManual_Pick\tManuellt plock\t10\t0\t0
             "pallar": 0,
         }
     ]
+
+
+def test_productivity_kpi_targets_are_scoped_per_business(tmp_path):
+    stigamo_source = tmp_path / "stigamo-mal.csv"
+    r3_source = tmp_path / "r3-mal.csv"
+    new_source = tmp_path / "new-mal.csv"
+    write(
+        stigamo_source,
+        """
+Bolag\tLager\tFlÃ¶desnamn\tProcessnamn\tBeskrivning\tRader\tKollin\tPallar
+GG\t404\tOUTBOUND\tManual_Pick\tStigamo mÃ¥l\t10\t0\t0
+""",
+    )
+    write(
+        r3_source,
+        """
+Bolag\tLager\tFlÃ¶desnamn\tProcessnamn\tBeskrivning\tRader\tKollin\tPallar
+R3\t404\tOUTBOUND\tManual_Pick\tR3 mÃ¥l\t20\t0\t0
+""",
+    )
+    write(
+        new_source,
+        """
+Bolag\tLager\tFlÃ¶desnamn\tProcessnamn\tBeskrivning\tRader\tKollin\tPallar
+NY\t404\tOUTBOUND\tManual_Pick\tNy verksamhet\t30\t0\t0
+""",
+    )
+
+    save_productivity_file(
+        source_path=stigamo_source,
+        filename=stigamo_source.name,
+        file_type="kpi",
+        reference_dir=tmp_path,
+        business_code="STIGAMO",
+    )
+    save_productivity_file(
+        source_path=r3_source,
+        filename=r3_source.name,
+        file_type="kpi",
+        reference_dir=tmp_path,
+        business_code="R3",
+    )
+    save_productivity_file(
+        source_path=new_source,
+        filename=new_source.name,
+        file_type="kpi",
+        reference_dir=tmp_path,
+        business_code="Ny verksamhet!",
+    )
+
+    stigamo = read_productivity_targets(tmp_path, business_code="STIGAMO")
+    r3 = read_productivity_targets(tmp_path, business_code="R3")
+    new = read_productivity_targets(tmp_path, business_code="Ny verksamhet!")
+
+    assert stigamo["targets"][0]["description"] == "Stigamo mÃ¥l"
+    assert r3["targets"][0]["description"] == "R3 mÃ¥l"
+    assert new["targets"][0]["description"] == "Ny verksamhet"
+    assert "stigamo" in [part.lower() for part in Path(stigamo["source"]["path"]).parts]
+    assert "r3" in [part.lower() for part in Path(r3["source"]["path"]).parts]
+    assert "ny_verksamhet" in [part.lower() for part in Path(new["source"]["path"]).parts]
+
+
+def test_productivity_kpi_legacy_stigamo_fallback_does_not_leak_to_other_businesses(tmp_path):
+    write(
+        tmp_path / "v_ask_kpi_target-20260518080915.csv",
+        """
+Bolag\tLager\tFlÃ¶desnamn\tProcessnamn\tBeskrivning\tRader\tKollin\tPallar
+GG\t404\tOUTBOUND\tManual_Pick\tLegacy Stigamo\t10\t0\t0
+""",
+    )
+
+    assert read_productivity_targets(tmp_path, business_code="STIGAMO")["targets"][0]["description"] == "Legacy Stigamo"
+
+    with pytest.raises(ProductivitySourceError, match="r3"):
+        read_productivity_targets(tmp_path, business_code="R3")
+
+
+def test_productivity_kpi_prefers_coredata_business_directory_when_present(tmp_path):
+    write(
+        tmp_path / "stigamo" / "v_ask_kpi_target-20260518080915.csv",
+        """
+Bolag\tLager\tFlÃ¶desnamn\tProcessnamn\tBeskrivning\tRader\tKollin\tPallar
+GG\t404\tOUTBOUND\tManual_Pick\tScoped fallback\t10\t0\t0
+""",
+    )
+    write(
+        tmp_path / "coredata" / "stigamo" / "v_ask_kpi_target-20260525120644.csv",
+        """
+Bolag\tLager\tFlÃ¶desnamn\tProcessnamn\tBeskrivning\tRader\tKollin\tPallar
+GG\t404\tOUTBOUND\tManual_Pick\tCoredata Stigamo\t20\t0\t0
+""",
+    )
+
+    targets = read_productivity_targets(tmp_path, business_code="STIGAMO")
+
+    assert targets["targets"][0]["description"] == "Coredata Stigamo"
+    assert "coredata" in [part.lower() for part in Path(targets["source"]["path"]).parts]
+
+
+def test_productivity_session_status_uses_business_specific_kpi(tmp_path):
+    write(
+        tmp_path / "stigamo" / "v_ask_kpi_target-20260518080915.csv",
+        "Bolag\tLager\tFlÃ¶desnamn\tProcessnamn\tBeskrivning\tRader\tKollin\tPallar",
+    )
+
+    stigamo_status = build_productivity_session_file_status({}, tmp_path, business_code="STIGAMO")
+    r3_status = build_productivity_session_file_status({}, tmp_path, business_code="R3")
+
+    assert stigamo_status["kpi_loaded"] is True
+    assert r3_status["kpi_loaded"] is False
 
 
 def test_productivity_session_status_uses_local_logs_and_permanent_kpi(tmp_path):

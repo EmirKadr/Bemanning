@@ -108,6 +108,27 @@ def test_role_view_access_setting_roundtrips():
         engine.dispose()
 
 
+def test_role_view_access_is_global_across_businesses():
+    engine, session = make_session()
+    try:
+        set_role_view_access(
+            session,
+            {"warehouse_clerk": {"allocationProcess": "edit"}},
+            user_id=9,
+            business_id=2,
+        )
+        session.commit()
+
+        row = session.get(AppSetting, {"business_id": 1, "key": ROLE_VIEW_ACCESS_KEY})
+        assert row is not None
+        assert get_role_view_access(session, business_id=1)["warehouse_clerk"]["allocationProcess"] == "edit"
+        assert get_role_view_access(session, business_id=2)["warehouse_clerk"]["allocationProcess"] == "edit"
+    finally:
+        session.close()
+        drop_session_tables(engine)
+        engine.dispose()
+
+
 def test_role_view_access_router_cleans_unknown_roles_views_and_levels():
     engine, session = make_session()
     try:
@@ -128,6 +149,7 @@ def test_role_view_access_router_cleans_unknown_roles_views_and_levels():
         }
         entry = session.query(AuditLog).filter_by(entity_type="app_setting", action="update_role_access").one()
         assert entry.user_id == admin.id
+        assert entry.business_id is None
         assert entry.old_value == {"key": ROLE_VIEW_ACCESS_KEY, "value": {"access": {}}}
         assert entry.new_value["value"]["access"]["viewer"]["users"] == "edit"
     finally:

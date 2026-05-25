@@ -62,7 +62,8 @@ eller skapa/importera med explicit verksamhet.
 
 - `GET /api/audit`, `GET /api/audit/summary`, `GET /api/audit/errors` - historik, analytics och felkodsdashboard.
 - `POST /api/audit/client-error` - tyst klientrapportering av API-fel som anvandaren traffar; sparar sanerad path/status/felkod utan request body eller queryvarden.
-- `GET /api/productivity/files`, `GET /api/productivity/targets`, `POST /api/productivity/files`, `POST /api/productivity/files/raw`, `DELETE /api/productivity/files/{file_type}`, `GET /api/productivity` - produktivitet.
+- `GET /api/productivity/files`, `GET /api/productivity/targets`, `GET /api/productivity` - produktivitet, kraver `productivity=view`.
+- `POST /api/productivity/files`, `POST /api/productivity/files/raw`, `DELETE /api/productivity/files/{file_type}` - serverhanterade produktivitetsfiler, kraver `productivity=edit`.
 - `GET /api/allokering/health`, `/flows`, `/pool`, `POST /detect`, `POST /flow/{flow_id}`, `POST /open-excel`, `GET /table-column/...`, `GET /download/...` - lagerverktyg.
 - `GET /api/public/...` - publika text/CSV-summeringar for timmar/personer. Queryparametern `business` defaultar till `STIGAMO`; publika endpoints summerar inte globalt.
 

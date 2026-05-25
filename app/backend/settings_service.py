@@ -136,7 +136,7 @@ def set_sidebar_layout(
 
 
 def get_role_view_access(db: Session, business_id: int | None = None) -> dict:
-    value = get_json_setting(db, ROLE_VIEW_ACCESS_KEY, default={}, business_id=business_id)
+    value = get_json_setting(db, ROLE_VIEW_ACCESS_KEY, default={})
     return normalize_role_view_access_ids(value) if isinstance(value, dict) else {}
 
 
@@ -147,4 +147,4 @@ def set_role_view_access(
     user_id: int | None = None,
     business_id: int | None = None,
 ) -> AppSetting:
-    return set_json_setting(db, ROLE_VIEW_ACCESS_KEY, access, user_id=user_id, business_id=business_id)
+    return set_json_setting(db, ROLE_VIEW_ACCESS_KEY, access, user_id=user_id)

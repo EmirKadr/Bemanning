@@ -44,11 +44,12 @@ Kort svar: Verksamhet är isoleringsnivån ovanför område. Vanliga användare,
 - Unika regler för område, person och aktivitet är verksamhetsscopeade där samma namn/kod får finnas i flera verksamheter. Användarnamn är fortsatt globalt unika.
 - `business_scope.py` är den gemensamma spärren för listfilter, detail/update/delete och write-inferens.
 - Schemaceller pekar fortfarande på person och aktivitet, men writes validerar att person och aktivitet tillhör samma verksamhet.
-- `app_settings` är per verksamhet. Sidebar, vybehörigheter och cell-lås kan därför skilja mellan Stigamo och R3.
+- `app_settings` är normalt per verksamhet. Sidebar och cell-lås kan därför skilja mellan Stigamo och R3, men `role_view_access` behandlas som global rollmatris.
 - Publika `/api/public/*` tar `business` och defaultar till `STIGAMO`; de får inte summera globalt utan verksamhet.
 - Webben och Windows-appen använder samma frontend via `app/`, så desktop-paritet kontrolleras med `tools.visual_smoke --via-desktop-proxy`.
 
-- Lagerverktygens buffertpall-observations och framraknade `artikel_max.csv` ar verksamhetsseparerade. Stigamo anvander legacy-filerna i `warehouse_tools/vendor/lowfreqdata/buffertpall/`; R3 anvander egna filer under `warehouse_tools/vendor/lowfreqdata/buffertpall/r3/`. Ordersaldo, LYX och Pafyllnadsprio anvander verksamhetens karnfil nar anvandaren inte laddar upp en egen `artikel_max.csv`.
+- Lagerverktygens buffertpall-observations och framraknade `artikel_max.csv` ar verksamhetsseparerade. Stigamo anvander legacy-filerna i `warehouse_tools/vendor/lowfreqdata/buffertpall/`; R3 och framtida verksamheter anvander egna undermappar. Ordersaldo, LYX och Pafyllnadsprio anvander verksamhetens karnfil nar anvandaren inte laddar upp en egen `artikel_max.csv`.
+- Produktivitetens permanenta KPI-mal ar ocksa verksamhetsseparerat. Filer med samma typ/prefix (`v_ask_kpi_target`) sparas och lases i verksamhetens produktivitetskatalog; om `data/coredata/` finns anvands `data/coredata/<verksamhetskod>/`, annars `data/<verksamhetskod>/`.
 
 ## Testkontrakt
 
@@ -73,7 +74,7 @@ python -m tools.visual_smoke --via-desktop-proxy --roles admin,r3 --output artif
 | "Varför betyder `∞` olika saker?" | För vanliga användare betyder `∞` alla områden i egen verksamhet. För Super User betyder `∞` globalt allt. |
 | "Varför måste Super User välja verksamhet?" | Backend kan inte alltid härleda verksamhet från område/person/aktivitet. Då krävs ett explicit val för att undvika fel verksamhet. |
 | "Varför hittas inte ett id som jag vet finns?" | Det kan tillhöra en annan verksamhet. API:t svarar då som saknad resurs för att inte avslöja annan verksamhet. |
-| "Varför påverkar inte vybehörigheten den andra verksamheten?" | Vybehörigheter och sidebar sparas per verksamhet. Ändringen gäller verksamheten som settings anropades för. |
+| "Varför påverkar vybehörigheten även den andra verksamheten?" | Vybehörigheter är globala per roll. Menyordning och vissa settings kan vara verksamhetsspecifika, men rollens vyåtkomst är samma i Stigamo och R3. |
 
 ## Källor
 

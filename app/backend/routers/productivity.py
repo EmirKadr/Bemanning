@@ -9,8 +9,9 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Upl
 from sqlalchemy.orm import Session
 
 from .. import audit
+from ..business_scope import DEFAULT_BUSINESS_CODE, normalize_business_code, user_business_id
 from ..deps import get_db, require_view_access
-from ..models import User
+from ..models import Business, User
 from ..productivity_service import (
     ProductivitySourceError,
     build_productivity_report_from_files,
@@ -28,6 +29,15 @@ router = APIRouter(prefix="/api/productivity", tags=["productivity"])
 logger = logging.getLogger(__name__)
 
 LOCAL_FILE_TYPES = {"pick", "trans", "pallet"}
+
+
+def _productivity_business_code(db: Session, user: User) -> str:
+    try:
+        business_id = user_business_id(db, user)
+        business = db.get(Business, business_id) if business_id is not None else None
+        return normalize_business_code(getattr(business, "code", None)) or DEFAULT_BUSINESS_CODE
+    except Exception:
+        return DEFAULT_BUSINESS_CODE
 
 
 def _session_upload_dir(request: Request) -> Path:
@@ -125,6 +135,7 @@ def _save_classified_productivity_file(
     temp_path: Path,
     filename: str | None,
     sample: bytes,
+    business_code: str,
 ) -> tuple[list[dict], list[str]]:
     file_type = classify_productivity_file(filename, sample)
     if file_type is None:
@@ -143,6 +154,7 @@ def _save_classified_productivity_file(
             source_path=temp_path,
             filename=filename,
             file_type=file_type,
+            business_code=business_code,
         )
     ], []
 
@@ -195,17 +207,21 @@ def _audit_productivity_files(
 @router.get("/files")
 def get_productivity_files(
     request: Request,
-    _: User = Depends(require_view_access("productivity", "view")),
+    user: User = Depends(require_view_access("productivity", "view")),
+    db: Session = Depends(get_db),
 ) -> dict:
-    return build_productivity_session_file_status(_session_log_files(request))
+    business_code = _productivity_business_code(db, user)
+    return build_productivity_session_file_status(_session_log_files(request), business_code=business_code)
 
 
 @router.get("/targets")
 def get_productivity_targets(
-    _: User = Depends(require_view_access("productivity", "view")),
+    user: User = Depends(require_view_access("productivity", "view")),
+    db: Session = Depends(get_db),
 ) -> dict:
     try:
-        return read_productivity_targets()
+        business_code = _productivity_business_code(db, user)
+        return read_productivity_targets(business_code=business_code)
     except ProductivitySourceError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -239,6 +255,7 @@ async def upload_productivity_files(
     saved: list[dict] = []
     unknown: list[str] = []
     try:
+        business_code = _productivity_business_code(db, user)
         for upload in files:
             temp_path, sample = await _save_upload_temp(upload)
             try:
@@ -247,6 +264,7 @@ async def upload_productivity_files(
                     temp_path=temp_path,
                     filename=upload.filename,
                     sample=sample,
+                    business_code=business_code,
                 )
                 saved.extend(saved_items)
                 unknown.extend(unknown_items)
@@ -269,7 +287,7 @@ async def upload_productivity_files(
     return {
         "saved": saved,
         "unknown": unknown,
-        "status": build_productivity_session_file_status(_session_log_files(request)),
+        "status": build_productivity_session_file_status(_session_log_files(request), business_code=business_code),
     }
 
 
@@ -280,6 +298,7 @@ async def upload_productivity_file_raw(
     user: User = Depends(require_view_access("productivity", "edit")),
     db: Session = Depends(get_db),
 ) -> dict:
+    business_code = _productivity_business_code(db, user)
     try:
         temp_path, sample = await _save_raw_upload_temp(request, filename)
         try:
@@ -288,6 +307,7 @@ async def upload_productivity_file_raw(
                 temp_path=temp_path,
                 filename=filename,
                 sample=sample,
+                business_code=business_code,
             )
         finally:
             temp_path.unlink(missing_ok=True)
@@ -306,7 +326,7 @@ async def upload_productivity_file_raw(
     return {
         "saved": saved,
         "unknown": unknown,
-        "status": build_productivity_session_file_status(_session_log_files(request)),
+        "status": build_productivity_session_file_status(_session_log_files(request), business_code=business_code),
     }
 
 
@@ -317,13 +337,14 @@ def delete_productivity_file(
     user: User = Depends(require_view_access("productivity", "edit")),
     db: Session = Depends(get_db),
 ) -> dict:
+    business_code = _productivity_business_code(db, user)
     if file_type not in LOCAL_FILE_TYPES:
         try:
-            clear_productivity_file(file_type)
+            clear_productivity_file(file_type, business_code=business_code)
         except ProductivitySourceError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         _audit_productivity_files(db, user, action="delete", file_type=file_type, scope="server")
-        return build_productivity_session_file_status(_session_log_files(request))
+        return build_productivity_session_file_status(_session_log_files(request), business_code=business_code)
     existing = request.session.get("productivity_files") or {}
     old_path = existing.pop(file_type, None)
     if old_path:
@@ -331,17 +352,19 @@ def delete_productivity_file(
     request.session["productivity_files"] = existing
     clear_productivity_cache()
     _audit_productivity_files(db, user, action="delete", file_type=file_type, scope="session")
-    return build_productivity_session_file_status(_session_log_files(request))
+    return build_productivity_session_file_status(_session_log_files(request), business_code=business_code)
 
 
 @router.get("")
 def get_productivity(
     request: Request,
     date_filter: date | None = Query(default=None, alias="date"),
-    _: User = Depends(require_view_access("productivity", "view")),
+    user: User = Depends(require_view_access("productivity", "view")),
+    db: Session = Depends(get_db),
 ) -> dict:
     try:
-        files = source_files_from_session_logs(_session_log_files(request))
+        business_code = _productivity_business_code(db, user)
+        files = source_files_from_session_logs(_session_log_files(request), business_code=business_code)
         return build_productivity_report_from_files(files, report_date=date_filter)
     except ProductivitySourceError as exc:
         raise HTTPException(

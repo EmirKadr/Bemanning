@@ -1,13 +1,17 @@
 ---
 title: Produktivitet
 status: aktiv
-updated: 2026-05-22
+updated: 2026-05-25
 tags: [produktivitet, filer, kpi, ui]
 ---
 
 # Produktivitet
 
-Kort svar: Produktivitet analyserar stora lokala CSV-loggar i klienten och kombinerar dem med permanenta KPI-mal fran servern. Tre synliga loggar kravs lokalt: Plocklogg, Translogg och Palllastningslogg.
+Kort svar: Produktivitet analyserar stora lokala CSV-loggar i klienten och kombinerar dem med permanenta KPI-mal fran servern. KPI-malet ar en verksamhetsseparerad karnfil: Stigamo, R3 och framtida verksamheter har samma filtyp men egna data. Tre synliga loggar kravs lokalt: Plocklogg, Translogg och Palllastningslogg. Atkomst styrs via Vybehorigheter for `productivity`, inte via hard Super User-krav.
+
+## Behorighet
+
+Rollen behover minst `productivity=view` for att oppna sidan och lasa status/KPI-mal. `productivity=edit` kravs for serverhanterade produktivitetsfiler, till exempel uppladdning eller rensning av permanent KPI-mal. Super User har fortfarande full atkomst automatiskt.
 
 ## Knappar och kontroller pa sidan
 
@@ -28,7 +32,15 @@ Kort svar: Produktivitet analyserar stora lokala CSV-loggar i klienten och kombi
 | `pick` | Plocklogg | `v_ask_pick_log_full`, headers `Zon`, `Plockat`, `Anvandare`, `Andrad`, `Bolag` | IndexedDB lokalt |
 | `trans` | Translogg | `v_ask_trans_log`, headers `Pallid`, `Fran`, `Till`, `Antal`, `Timestamp` | IndexedDB lokalt |
 | `pallet` | Palllastningslogg | `v_ask_palletloading_log`, headers `Plockpallsnr.`, `Palltyp`, `Pallplacering`, `Transnr.`, `Vikt` | IndexedDB lokalt |
-| `kpi` | KPI-mal | `v_ask_kpi_target`, headers `Flodesnamn`, `Processnamn`, `Beskrivning`, `Rader`, `Kollin` | Server/permanent data-dir |
+| `kpi` | KPI-mal | `v_ask_kpi_target`, headers `Flodesnamn`, `Processnamn`, `Beskrivning`, `Rader`, `Kollin` | Server/permanent verksamhetskatalog |
+
+## Karnfiler och verksamhet
+
+- KPI-mal ar permanent serverdata och fungerar som produktivitetens karnfil.
+- Backend laser och sparar KPI-mal via inloggad anvandares verksamhetskod.
+- Stigamo, R3 och nyare verksamheter far separata kataloger under produktivitetsdata. Om `data/coredata/` finns anvands den som bas, till exempel `data/coredata/stigamo/` och `data/coredata/r3/`; annars anvands `data/stigamo/`, `data/r3/` och `data/<verksamhetskod>/`.
+- En KPI-fil uppladdad for R3 ska aldrig anvandas for Stigamo, och tvartom.
+- Stigamo kan lasa den gamla root-filen i `data/` som bakatkompatibel fallback om ingen `data/stigamo/`-fil finns. Nya uppladdningar sparas verksamhetsscopeat.
 
 ## Berakningsgrupper
 
@@ -44,8 +56,8 @@ Vissa anvandare exkluderas hardkodat i frontend/backendlogik for specifika grupp
 ## Tekniskt flode
 
 1. `productivity_uploads.js` sparar synliga loggar lokalt i IndexedDB.
-2. KPI-fil laddas upp via `/api/productivity/files/raw` och sparas server-side.
-3. `productivity.js` laser lokala filer radvis i browsern, bygger dataset och hamtar KPI-mal via `/api/productivity/targets`.
+2. KPI-fil laddas upp via `/api/productivity/files/raw` och sparas server-side i anvandarens verksamhetskatalog.
+3. `productivity.js` laser lokala filer radvis i browsern, bygger dataset och hamtar verksamhetens KPI-mal via `/api/productivity/targets`.
 4. Rapport for vald dag byggs lokalt och cachas. Intilliggande datum kan forhamtas.
 5. Backend har motsvarande service for serverklassning/status och permanenta KPI-mal.
 6. Serverhanterade uppladdningar/rensningar via `/api/productivity/files*` auditloggas som `productivity_file` med filtyp, antal forsokta, antal sparade och antal okanda filer. Om uppladdningen kraschar innan svar loggas `upload_failed` med feltyp och eventuell HTTP-status. Privata filnamn sparas inte i auditloggen.
@@ -54,11 +66,11 @@ Vissa anvandare exkluderas hardkodat i frontend/backendlogik for specifika grupp
 
 | Fraga | Svar |
 | --- | --- |
-| "Varfor raknas inte Produktivitet?" | Kontrollera att Plocklogg, Translogg, Palllastningslogg och permanent KPI-mal finns. |
+| "Varfor raknas inte Produktivitet?" | Kontrollera att Plocklogg, Translogg, Palllastningslogg och permanent KPI-mal finns for anvandarens verksamhet. |
 | "Varfor ar nasta/foregaende datum disabled?" | Datasetet har inget tillgangligt datum i den riktningen. |
 | "Varfor kanner appen inte igen filen?" | Filnamnet maste matcha prefix eller header-raden maste innehalla forvantade kolumner. |
-| "Varfor syns KPI inte som fil jag kan rensa?" | KPI-mal ar permanent serverdata, inte lokal loggfil. |
-| "Varfor skiljer Produktivitet fran annan anvandares dator?" | De stora loggfilerna ar lokala per klient; KPI-mal ar gemensamt. |
+| "Varfor syns KPI inte som fil jag kan rensa?" | KPI-mal ar permanent serverdata for verksamheten, inte lokal loggfil. |
+| "Varfor skiljer Produktivitet fran annan anvandares dator?" | De stora loggfilerna ar lokala per klient; KPI-mal ar gemensamt inom verksamheten. |
 
 ## Kallor
 

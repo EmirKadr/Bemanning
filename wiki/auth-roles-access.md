@@ -1,7 +1,7 @@
 ---
 title: Roller och behorighet
 status: aktiv
-updated: 2026-05-22
+updated: 2026-05-25
 tags: [auth, roller, behorighet]
 ---
 
@@ -35,14 +35,14 @@ Kort svar: inloggning ar sessionsbaserad. Roller styr vad anvandaren ser och far
 | `leader` | Arbetsledare | Redigera Bemanning/Oversikt och normalt Personer/Aktiviteter |
 | `staffing_manager` | Bemanningsansvarig | Liknar arbetsledare med planeringsansvar |
 | `admin` | Administrator | Register, anvandare och settings, men inte automatiskt super user |
-| `super_user` | Super User | Kravs for historik och produktivitet enligt skyddade vyer/API |
+| `super_user` | Super User | Kravs for historik, verksamheter och vissa kodandringar; kan alltid redigera vyer |
 | `warehouse_clerk` | Lagerkontorist | Lagerverktyg, framfor allt uppladdning och Dela |
 | `article_placer` | Artikelplacerare | Lagerverktyg med liknande sjalvservicebehov |
 | `viewer` | Visning | Laslage for Bemanning/Oversikt |
 
 ## Vyatkomst
 
-`common.js` och backendens `require_view_access` anvander samma koncept: varje roll kan ha `none`, `view` eller `edit` per vy. Super user kan fa extra vyer beroende pa installning och serverregler.
+`common.js` och backendens `require_view_access` anvander samma koncept: varje roll kan ha `none`, `view` eller `edit` per vy. Vybehorigheter ar globala for rollen och galler over verksamheter. Super user kan fa extra vyer beroende pa installning och serverregler.
 
 Viktigt for support/chat: att "kontrollera Vybehorigheter" ar inte en atgard en vanlig anvandare kan gora sjalv. Knappen `Vybehorigheter` finns pa Anvandare-sidan och kraver atkomst till skyddade admin/installningsvyer. Svara darfor: "Be en admin eller Super User kontrollera Vybehorigheter", inte "ga till Vybehorigheter" om anvandaren sjalv saknar den atkomsten.
 
@@ -71,7 +71,7 @@ Om anvandaren bara har `view`:
 - Vyn syns inte i sidebar: rollen har `none` for vyn eller sidan filtreras bort.
 - Knappen syns men fungerar inte: anvandaren har `view`, inte `edit`.
 - Importknapp ar dold: importvyn saknar edit-atkomst.
-- Historik/Produktivitet nekas: kraver super user/vyatkomst.
+- Historik nekas: kraver Super User. Produktivitet nekas: rollen saknar `productivity` i vyatkomst.
 - Hamta data saknas eller nekas: `dataFetch` saknas i vyatkomst. Eftersom vyn kan hamta data fran extern datakalla har inga basroller standardatkomst; Super User kan oppna den.
 - Bearbeta saknas eller nekas: rollen saknar `allocationProcess=edit` i vyatkomst. Lagerroller har som standard Uppladdningar och Dela, men kan fa Bearbeta via Vybehorigheter.
 

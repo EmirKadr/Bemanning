@@ -44,7 +44,7 @@ def _sidebar_layout_out(db: Session, business_id: int | None) -> SidebarLayoutOu
 
 
 def _role_view_access_out(db: Session, business_id: int | None) -> RoleViewAccessOut:
-    return RoleViewAccessOut(access=get_role_view_access(db, business_id=business_id))
+    return RoleViewAccessOut(access=get_role_view_access(db))
 
 
 def _audit_setting_change(
@@ -200,8 +200,7 @@ def get_role_access_settings(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> RoleViewAccessOut:
-    scoped_business_id = visible_business_id(db, user, business_id)
-    return _role_view_access_out(db, scoped_business_id)
+    return _role_view_access_out(db, None)
 
 
 @router.put("/role-access", response_model=RoleViewAccessOut)
@@ -211,10 +210,9 @@ def update_role_access_settings(
     admin: User = Depends(require_view_access("roleAccess", "edit")),
     business_id: int | None = Query(None),
 ) -> RoleViewAccessOut:
-    scoped_business_id = visible_business_id(db, admin, business_id)
-    before = {"access": get_role_view_access(db, business_id=scoped_business_id)}
-    set_role_view_access(db, _clean_role_view_access(payload), user_id=admin.id, business_id=scoped_business_id)
-    after = {"access": get_role_view_access(db, business_id=scoped_business_id)}
+    before = {"access": get_role_view_access(db)}
+    set_role_view_access(db, _clean_role_view_access(payload), user_id=admin.id)
+    after = {"access": get_role_view_access(db)}
     _audit_setting_change(
         db,
         key=ROLE_VIEW_ACCESS_KEY,
@@ -222,7 +220,7 @@ def update_role_access_settings(
         old_value=before,
         new_value=after,
         user_id=admin.id,
-        business_id=scoped_business_id,
+        business_id=None,
     )
     db.commit()
-    return _role_view_access_out(db, scoped_business_id)
+    return _role_view_access_out(db, None)

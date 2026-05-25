@@ -67,6 +67,7 @@ GROUPS = (
 )
 
 GROUP_TITLES = {group["id"]: group["title"] for group in GROUPS}
+DEFAULT_BUSINESS_CODE = "STIGAMO"
 
 
 def _repo_root() -> Path:
@@ -83,6 +84,45 @@ def default_reference_dir() -> Path:
     return _repo_root() / "data"
 
 
+def normalize_reference_business_code(value: str | None) -> str:
+    return str(value or "").strip().upper()
+
+
+def business_reference_segment(value: str | None) -> str:
+    code = normalize_reference_business_code(value)
+    if not code:
+        return ""
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", code).strip("._-").lower()
+    return safe or "business"
+
+
+def business_reference_dir(
+    reference_dir: Path | str | None = None,
+    business_code: str | None = None,
+) -> Path:
+    base_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
+    if base_dir.name.lower() != "coredata":
+        coredata_dir = base_dir / "coredata"
+        if coredata_dir.exists():
+            base_dir = coredata_dir
+    segment = business_reference_segment(business_code)
+    return base_dir / segment if segment else base_dir
+
+
+def _business_reference_read_dirs(
+    reference_dir: Path | str | None,
+    business_code: str | None,
+) -> list[Path]:
+    base_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
+    dirs = [business_reference_dir(base_dir, business_code)]
+    segment = business_reference_segment(business_code)
+    if segment:
+        legacy_scoped_dir = base_dir / segment
+        if legacy_scoped_dir not in dirs:
+            dirs.append(legacy_scoped_dir)
+    return dirs
+
+
 def _latest_file(reference_dir: Path, prefix: str) -> Path:
     matches = [
         path
@@ -94,24 +134,50 @@ def _latest_file(reference_dir: Path, prefix: str) -> Path:
     return max(matches, key=lambda path: (path.stat().st_mtime_ns, path.name))
 
 
-def find_source_files(reference_dir: Path) -> dict[str, Path]:
-    if not reference_dir.exists():
-        raise ProductivitySourceError(f"Produktivitetsmappen finns inte: {reference_dir}")
-    return {spec.key: _latest_file(reference_dir, spec.prefix) for spec in SOURCE_SPECS}
+def _latest_business_file(
+    reference_dir: Path | str | None,
+    prefix: str,
+    business_code: str | None = None,
+) -> Path:
+    if business_code is None:
+        target_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
+        if not target_dir.exists():
+            raise ProductivitySourceError(f"Produktivitetsmappen finns inte: {target_dir}")
+        return _latest_file(target_dir, prefix)
+
+    business_code_normalized = normalize_reference_business_code(business_code)
+    read_dirs = _business_reference_read_dirs(reference_dir, business_code_normalized)
+    for target_dir in read_dirs:
+        if target_dir.exists():
+            try:
+                return _latest_file(target_dir, prefix)
+            except ProductivitySourceError:
+                pass
+
+    # Legacy Stigamo fallback keeps existing deployments working until the
+    # first scoped KPI upload creates data/stigamo. Other businesses never use it.
+    base_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
+    if business_code_normalized == DEFAULT_BUSINESS_CODE and base_dir.exists():
+        try:
+            return _latest_file(base_dir, prefix)
+        except ProductivitySourceError:
+            pass
+
+    raise ProductivitySourceError(f"Saknar referensfil med prefix {prefix} i {read_dirs[0]}")
 
 
-def find_kpi_file(reference_dir: Path | str | None = None) -> Path:
-    target_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
-    if not target_dir.exists():
-        raise ProductivitySourceError(f"Produktivitetsmappen finns inte: {target_dir}")
-    return _latest_file(target_dir, SOURCE_SPEC_BY_KEY["kpi"].prefix)
+def find_source_files(
+    reference_dir: Path | str | None = None,
+    business_code: str | None = None,
+) -> dict[str, Path]:
+    return {
+        spec.key: _latest_business_file(reference_dir, spec.prefix, business_code)
+        for spec in SOURCE_SPECS
+    }
 
 
-def _try_find_file(reference_dir: Path, prefix: str) -> Path | None:
-    try:
-        return _latest_file(reference_dir, prefix)
-    except ProductivitySourceError:
-        return None
+def find_kpi_file(reference_dir: Path | str | None = None, business_code: str | None = None) -> Path:
+    return _latest_business_file(reference_dir, SOURCE_SPEC_BY_KEY["kpi"].prefix, business_code)
 
 
 def _detect_dialect(sample: str) -> csv.Dialect:
@@ -216,9 +282,10 @@ def save_productivity_file(
     filename: str | None,
     file_type: str,
     reference_dir: Path | str | None = None,
+    business_code: str | None = None,
 ) -> dict[str, Any]:
     spec = SOURCE_SPEC_BY_KEY[file_type]
-    target_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
+    target_dir = business_reference_dir(reference_dir, business_code)
     target_dir.mkdir(parents=True, exist_ok=True)
     target_path = target_dir / _safe_upload_name(filename, spec)
     tmp_path = target_path.with_name(f".{target_path.name}.{os.getpid()}.tmp")
@@ -229,11 +296,15 @@ def save_productivity_file(
     return _file_status_payload(spec, target_path)
 
 
-def clear_productivity_file(file_type: str, reference_dir: Path | str | None = None) -> None:
+def clear_productivity_file(
+    file_type: str,
+    reference_dir: Path | str | None = None,
+    business_code: str | None = None,
+) -> None:
     spec = SOURCE_SPEC_BY_KEY.get(file_type)
     if spec is None or not spec.visible:
         raise ProductivitySourceError("Okänd produktivitetsfil")
-    target_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
+    target_dir = business_reference_dir(reference_dir, business_code)
     _remove_existing_files(target_dir, spec)
     clear_productivity_cache()
 
@@ -273,12 +344,25 @@ def _file_status_payload(spec: SourceFileSpec, path: Path | None) -> dict[str, A
     return payload
 
 
-def build_productivity_file_status(reference_dir: Path | str | None = None) -> dict[str, Any]:
-    target_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
+def _try_find_business_file(
+    reference_dir: Path | str | None,
+    prefix: str,
+    business_code: str | None = None,
+) -> Path | None:
+    try:
+        return _latest_business_file(reference_dir, prefix, business_code)
+    except ProductivitySourceError:
+        return None
+
+
+def build_productivity_file_status(
+    reference_dir: Path | str | None = None,
+    business_code: str | None = None,
+) -> dict[str, Any]:
     files = {
         spec.key: _file_status_payload(
             spec,
-            _try_find_file(target_dir, spec.prefix) if target_dir.exists() else None,
+            _try_find_business_file(reference_dir, spec.prefix, business_code),
         )
         for spec in SOURCE_SPECS
     }
@@ -299,6 +383,7 @@ def build_productivity_file_status(reference_dir: Path | str | None = None) -> d
 def build_productivity_session_file_status(
     log_files: dict[str, Path],
     reference_dir: Path | str | None = None,
+    business_code: str | None = None,
 ) -> dict[str, Any]:
     files = {
         spec.key: _file_status_payload(
@@ -314,7 +399,7 @@ def build_productivity_session_file_status(
     ]
     kpi_path: Path | None = None
     try:
-        kpi_path = find_kpi_file(reference_dir)
+        kpi_path = find_kpi_file(reference_dir, business_code)
     except ProductivitySourceError:
         kpi_path = None
     return {
@@ -328,6 +413,7 @@ def build_productivity_session_file_status(
 def source_files_from_session_logs(
     log_files: dict[str, Path],
     reference_dir: Path | str | None = None,
+    business_code: str | None = None,
 ) -> dict[str, Path]:
     missing = [
         spec.label
@@ -337,12 +423,15 @@ def source_files_from_session_logs(
     if missing:
         raise ProductivitySourceError(f"Saknar produktivitetsunderlag: {', '.join(missing)}")
     files = {key: Path(path) for key, path in log_files.items() if key in SOURCE_SPEC_BY_KEY}
-    files["kpi"] = find_kpi_file(reference_dir)
+    files["kpi"] = find_kpi_file(reference_dir, business_code)
     return files
 
 
-def read_productivity_targets(reference_dir: Path | str | None = None) -> dict[str, Any]:
-    path = find_kpi_file(reference_dir)
+def read_productivity_targets(
+    reference_dir: Path | str | None = None,
+    business_code: str | None = None,
+) -> dict[str, Any]:
+    path = find_kpi_file(reference_dir, business_code)
     rows = _read_csv(path)
     targets = _parse_kpi_rows(rows)
     return {
@@ -883,9 +972,9 @@ def clear_productivity_cache() -> None:
 def build_productivity_report(
     reference_dir: Path | str | None = None,
     report_date: date | str | None = None,
+    business_code: str | None = None,
 ) -> dict[str, Any]:
-    base_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
-    files = find_source_files(base_dir)
+    files = find_source_files(reference_dir, business_code)
     return build_productivity_report_from_files(files, report_date=report_date)
 
 

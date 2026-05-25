@@ -1,7 +1,7 @@
 ---
 title: Felkoder och felmeddelanden
 status: aktiv
-updated: 2026-05-22
+updated: 2026-05-25
 tags: [felkoder, http, support, api, chat]
 ---
 
@@ -114,6 +114,7 @@ Kort svar: frontend visar oftast serverns `detail` direkt. I chatten ska statusk
 
 | Status | Text | Orsak | Atgard |
 | --- | --- | --- | --- |
+| 403 | "Sidan kraver behorighet" | Rollen saknar `productivity` | Be admin/Super User kontrollera Vybehorigheter for Produktivitet. |
 | 400 | "Inga filer skickades" | Upload utan filer | Valj fil igen. |
 | 404 | "Produktivitetsmappen finns inte..." | Serverns data-dir saknas | Kontrollera serverkonfiguration. |
 | 404 | "Saknar referensfil med prefix..." | KPI eller referensfil saknas | Ladda upp KPI eller kontrollera data-dir. |
