@@ -30,7 +30,7 @@ Kort svar: Lagerverktygen ar tre vyer ovanpa `warehouse_tools`: Uppladdningar fo
 
 ## Karnfiler i coredata
 
-Uppladdningar visar en separat lista for permanenta karnfiler. `artikel_max.csv` visas ihop med coredata-filerna och uppdaterar samma verksamhetsfil som Ordersaldo, LYX och Pafyllnadsprio anvander. Coredata-prefixen `custom`, `dimension`, `item`, `item_alias`, `item_attribute`, `item_option`, `kpi_target_rule` och `pallet_type` sparas server-side under `data/coredata/<verksamhetskod>/`. Om en anvandare laddar upp en ny fil med samma prefix for sin verksamhet tas den gamla filen med samma prefix bort och den nya blir sanningen. Andra verksamheters filer rors inte.
+Uppladdningar visar en separat lista for permanenta karnfiler. `artikel_max.csv` visas ihop med coredata-filerna och uppdaterar samma verksamhetsfil som Ordersaldo, LYX och Pafyllnadsprio anvander. Coredata-prefixen `custom`, `dimension`, `item`, `item_alias`, `item_attribute`, `item_option`, `kpi_target_rule`, `location`, `location_cost` och `pallet_type` sparas server-side under `data/coredata/<verksamhetskod>/`. Om en anvandare laddar upp en ny fil med samma prefix for sin verksamhet tas den gamla filen med samma prefix bort och den nya blir sanningen. Andra verksamheters filer rors inte.
 
 Allokering anvander verksamhetens `item_option`-karnfil nar anvandaren inte laddat upp en egen Item option-fil. En uppladdad lokal fil i sloten vinner for den korningen, men den permanenta karnfilen ligger kvar som verksamhetens fallback.
 

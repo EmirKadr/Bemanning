@@ -31,6 +31,8 @@ CORE_DATA_SPECS = (
     CoreDataFileSpec("item_attribute", "Item attribute", "item_attribute"),
     CoreDataFileSpec("item_option", "Item option", "item_option"),
     CoreDataFileSpec("kpi_target_rule", "KPI target rule", "kpi_target_rule"),
+    CoreDataFileSpec("location", "Location", "location"),
+    CoreDataFileSpec("location_cost", "Location cost", "location_cost"),
     CoreDataFileSpec("pallet_type", "Pallet type", "pallet_type"),
     CoreDataFileSpec("kpi", "KPI-Mal", "v_ask_kpi_target"),
 )

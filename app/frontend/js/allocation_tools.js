@@ -125,10 +125,12 @@ const ALLOCATION_COREDATA_UPLOAD_SPECS = [
   { key: "article_max", prefix: "article_max" },
   { key: "item_attribute", prefix: "item_attribute" },
   { key: "kpi_target_rule", prefix: "kpi_target_rule" },
+  { key: "location_cost", prefix: "location_cost" },
   { key: "item_option", prefix: "item_option" },
   { key: "pallet_type", prefix: "pallet_type" },
   { key: "item_alias", prefix: "item_alias" },
   { key: "dimension", prefix: "dimension" },
+  { key: "location", prefix: "location" },
   { key: "custom", prefix: "custom" },
   { key: "item", prefix: "item" },
 ];
@@ -145,6 +147,8 @@ const ALLOCATION_COREDATA_DISPLAY_ORDER = [
   "item_attribute",
   "item_option",
   "kpi_target_rule",
+  "location",
+  "location_cost",
   "pallet_type",
   "kpi",
 ];
@@ -157,6 +161,8 @@ const ALLOCATION_COREDATA_LABELS = {
   item_attribute: "Item attribute",
   item_option: "Item option",
   kpi_target_rule: "KPI target rule",
+  location: "Location",
+  location_cost: "Location cost",
   pallet_type: "Pallet type",
   kpi: "KPI-Mål",
 };
