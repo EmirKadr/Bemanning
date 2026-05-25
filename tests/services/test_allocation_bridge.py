@@ -275,7 +275,7 @@ def test_process_area_filter_reuses_cached_filtered_file(tmp_path, monkeypatch):
     source.write_text(
         "Bolag\tKund\tArtikel\n"
         "GG\t6005\tA1\n"
-        "GG\t1234\tA3\n",
+        "GG\t1234\tA333\n",
         encoding="utf-8",
     )
     third_files, _third_temp_paths, _third_log = bridge.apply_process_area_filters({"orders": source}, "GG")

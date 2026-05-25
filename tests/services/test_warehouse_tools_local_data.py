@@ -217,6 +217,43 @@ def test_allocate_flow_ignores_order_rows_above_status_33(tmp_path):
     assert any("Status > 33" in line for line in result["log"])
 
 
+def test_allocate_flow_reuses_cached_outputs_for_same_file_versions(monkeypatch, tmp_path):
+    flows.clear_allocation_cache()
+    orders_path = tmp_path / "orders.csv"
+    buffer_path = tmp_path / "buffer.csv"
+    orders_path.write_text("orders-v1\n", encoding="utf-8")
+    buffer_path.write_text("buffer-v1\n", encoding="utf-8")
+    calls = {"allocate": 0}
+
+    monkeypatch.setattr(flows, "_read", lambda path: pd.DataFrame({"source": [Path(path).name]}))
+
+    def fake_allocate(_orders, _buffer, log=None):
+        calls["allocate"] += 1
+        if log:
+            log(f"allocate {calls['allocate']}")
+        return pd.DataFrame({"Artikel": ["A1"], "Källtyp": ["HELPALL"]}), pd.DataFrame()
+
+    monkeypatch.setattr(flows.E, "allocate", fake_allocate)
+    monkeypatch.setattr(flows.E.App, "_reclassify_skrymmande", lambda result, _saldo: result)
+    monkeypatch.setattr(flows.E, "_merge_item_flags", lambda result, _items: result)
+    monkeypatch.setattr(
+        flows.E,
+        "calculate_refill",
+        lambda _result, _buffer, saldo_df=None, not_putaway_df=None: (pd.DataFrame(), pd.DataFrame()),
+    )
+    monkeypatch.setattr(flows.E, "compute_pallet_spaces", lambda _result: pd.DataFrame())
+
+    flows.FLOW_BY_ID["allocate"]["handler"]({"orders": orders_path, "buffer": buffer_path}, {})
+    second = flows.FLOW_BY_ID["allocate"]["handler"]({"orders": orders_path, "buffer": buffer_path}, {})
+
+    orders_path.write_text("orders-version-2\n", encoding="utf-8")
+    flows.FLOW_BY_ID["allocate"]["handler"]({"orders": orders_path, "buffer": buffer_path}, {})
+
+    assert calls["allocate"] == 2
+    assert second["log"] == ["allocate 1"]
+    flows.clear_allocation_cache()
+
+
 def test_read_cache_reuses_same_file_without_shared_dataframe_mutation(tmp_path, monkeypatch):
     source = tmp_path / "orders.csv"
     source.write_text("Artikel;Antal\nA1;2\n", encoding="utf-8")
