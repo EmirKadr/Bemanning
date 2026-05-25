@@ -2259,14 +2259,6 @@ function _showDemoTourPrompt(user, activePage) {
       <div class="modal demo-tour-welcome">
         <h2>Välkommen till demo-läget av flow</h2>
         <p>Du ser samma data som finns i produktion just nu. Du kan ändra, skapa, ta bort — <strong>inget sparas till den riktiga databasen</strong> och allt nollställs när du loggar ut.</p>
-        <p class="demo-tour-hints"><strong>Grundläggande interaktion:</strong></p>
-        <ul class="demo-tour-hints-list">
-          <li><strong>Vänsterklick</strong> väljer eller fokuserar — på en cell öppnar det listan med aktiviteter, på en rad markeras den.</li>
-          <li><strong>Högerklick</strong> öppnar samma val direkt i en kontextmeny på de flesta ställen.</li>
-          <li><strong>Dubbelklick</strong> i Bemanning delar en timme i två halvor.</li>
-          <li><strong>Dra</strong> över flera celler för att fylla dem med samma värde.</li>
-          <li>Många tabeller har <strong>inline-redigering</strong> — klicka i en cell, skriv och tryck Enter.</li>
-        </ul>
         <p>Vill du se en kort rundtur av vyerna först, med konkreta tips per vy?</p>
         <div class="actions">
           <button id="demo-tour-no" type="button">Nej tack, jag klickar runt själv</button>
