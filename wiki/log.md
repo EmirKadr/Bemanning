@@ -7,6 +7,10 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-25] feature | Demo-läge med per-session SQLite-sandbox
+
+flow har fått ett fast `demo`-konto för säljpresentationer. Vid inloggning snapshottas live-databasen till en privat SQLite-fil i temp-mappen och en privat datakatalog skapas. Alla skrivningar routas dit via `get_db()` (engine-byte) och `demo_data_root_var` (filsystem). Vid utloggning raderas SQLite-filen och datakatalogen så nästa demo startar rent. Frontend visar gul/röd `DEMO`-banner och en valbar guidad rundtur genom alla synliga vyer (state via `sessionStorage`). Demo-användaren är låst i Användare-vyn — kan inte tas bort, döpas om eller fråntas admin-rollen, men lösenord/visningsnamn/område kan rotateras. Se [demo-laget](demo-mode.md).
+
 ## [2026-05-25] feature | Drag-sortering av personer i planeringsvyer
 
 Bemanning och Oversikt kan nu dra personnamn for att uppdatera personernas `sort_order` i Personer. Ny behorighet `personSortOrder` visas som Personsortering i Vybehorigheter och backend kraver Bemanningsansvarig/admin/Super User, `edit`-atkomst, anvandaromrade och samma hemomrade pa personerna.

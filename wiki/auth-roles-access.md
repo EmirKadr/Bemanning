@@ -40,6 +40,8 @@ Kort svar: inloggning ar sessionsbaserad. Roller styr vad anvandaren ser och far
 | `article_placer` | Artikelplacerare | Lagerverktyg med liknande sjalvservicebehov |
 | `viewer` | Visning | Laslage for Bemanning/Oversikt |
 
+Utöver rollerna finns det fasta `demo`-kontot (username = `demo`, admin-roll mot Stigamo) som triggar [demo-laget](demo-mode.md): en privat SQLite-snapshot per inloggning som städas vid utloggning. `is_demo`-flaggan i `UserOut`/`UserAdminOut` styr DEMO-bannern, guidad rundtur och låsning av kontot i Användare-vyn.
+
 ## Vyatkomst
 
 `common.js` och backendens `require_view_access` anvander samma koncept: varje roll kan ha `none`, `view` eller `edit` per vy. Vybehorigheter ar globala for rollen och galler over verksamheter. Super user kan fa extra vyer beroende pa installning och serverregler.

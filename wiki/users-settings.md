@@ -23,7 +23,7 @@ Omradesfokus i sidebar filtrerar anvandarlistan inom anvandarens verksamhet. `�
 | Import-hjalp | Oppnar hjalpmodal | Visar importstod | `setupImportHelpButton` | Ingen serverkoppling. |
 | Las bemanningsceller... | Checkbox | Sparar setting per verksamhet | `PUT /api/settings` | Nar aktiv kan ledare stoppas fran celler andra fyllt i aktuell verksamhet. |
 | Redigera | Oppnar modal | Uppdaterar konto | `PUT /api/users/{id}` | Sista admin kan inte nedgraderas. |
-| Ta bort | Bekraftar borttagning | Tar bort konto permanent och nollar gamla `updated_by`/audit-referenser | `DELETE /api/users/{id}` | Eget konto och sista admin i en verksamhet skyddas. |
+| Ta bort | Bekraftar borttagning | Tar bort konto permanent och nollar gamla `updated_by`/audit-referenser | `DELETE /api/users/{id}` | Eget konto, sista admin i en verksamhet och demo-användaren skyddas. |
 | Verksamheter | Sidebar-vy for Super User | Skapar/redigerar verksamheter och omraden | `GET/POST/PUT /api/businesses`, `GET/POST/PUT/DELETE /api/areas` | Vanliga anvandare ser inte vyn. Omraden med kopplad data inaktiveras i stallet for att hardraderas. |
 
 Andringar i anvandare, forsta losenord och verksamhetens installningar skrivs till Historik. Loggen visar till exempel `user/set_password`, `app_setting/update_lock`, `app_setting/update_sidebar_layout` och `app_setting/update_role_access`, men aldrig sjalva losenordet.
@@ -52,6 +52,10 @@ Knappar:
 
 - `Avbryt`: stanger utan att spara.
 - `Spara`: skickar `POST` eller `PUT`.
+
+### Demo-anvandaren
+
+Det fasta `demo`-kontot (se [demo-laget](demo-mode.md)) visas med en `DEMO`-pill i listan, har dold delete-knapp och har disablade `Anvandarnamn` + `Roller` i edit-modalen. Lösenord, visningsnamn och omrade kan fortfarande andras av super_user — backend nekar 409 om någon försoker dopa om, ta bort admin-rollen eller inaktivera kontot. Konton skapas och uppdateras automatiskt vid varje deploy av `seed_demo_user()`.
 
 ## Vybehorigheter-modal
 
