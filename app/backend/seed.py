@@ -112,7 +112,8 @@ def seed_areas(db: Session, business: Business, specs: list[dict]) -> dict[str, 
             area.business_id = business.id
             area.name = spec["name"]
             area.sort_order = spec["sort_order"]
-            area.is_active = spec.get("is_active", True)
+            if area.is_active is not False:
+                area.is_active = spec.get("is_active", True)
         by_code[spec["code"]] = area
     db.flush()
     return by_code
@@ -121,8 +122,14 @@ def seed_areas(db: Session, business: Business, specs: list[dict]) -> dict[str, 
 def seed_activities(db: Session, business: Business, areas: dict[str, Area], specs: list[dict]) -> None:
     for spec in specs:
         area_code = spec.get("area")
-        area_id = areas[area_code].id if area_code else None
+        area = areas[area_code] if area_code else None
         existing = db.query(Activity).filter_by(business_id=business.id, code=spec["code"]).one_or_none()
+        if area is not None and area.is_active is False:
+            if existing is not None:
+                existing.area_id = None
+                existing.is_active = False
+            continue
+        area_id = area.id if area is not None else None
         payload = {
             "code": spec["code"],
             "label": spec["label"],

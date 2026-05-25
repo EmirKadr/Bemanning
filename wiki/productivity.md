@@ -38,9 +38,9 @@ Rollen behover minst `productivity=view` for att oppna sidan och lasa status/KPI
 
 - KPI-mal ar permanent serverdata och fungerar som produktivitetens karnfil.
 - Backend laser och sparar KPI-mal via inloggad anvandares verksamhetskod.
-- Stigamo, R3 och nyare verksamheter far separata kataloger under produktivitetsdata. Om `data/coredata/` finns anvands den som bas, till exempel `data/coredata/stigamo/` och `data/coredata/r3/`; annars anvands `data/stigamo/`, `data/r3/` och `data/<verksamhetskod>/`.
+- Stigamo, R3 och nyare verksamheter far separata kataloger under `data/coredata/`, till exempel `data/coredata/stigamo/`, `data/coredata/r3/` och `data/coredata/<verksamhetskod>/`.
 - En KPI-fil uppladdad for R3 ska aldrig anvandas for Stigamo, och tvartom.
-- Stigamo kan lasa den gamla root-filen i `data/` som bakatkompatibel fallback om ingen `data/stigamo/`-fil finns. Nya uppladdningar sparas verksamhetsscopeat.
+- Stigamo kan lasa den gamla root-filen i `data/` som bakatkompatibel fallback om ingen Stigamo-scopead KPI-fil finns. Nya uppladdningar sparas alltid verksamhetsscopeat i `data/coredata/`.
 
 ## Berakningsgrupper
 
@@ -78,4 +78,5 @@ Vissa anvandare exkluderas hardkodat i frontend/backendlogik for specifika grupp
 - `../app/frontend/js/productivity.js`
 - `../app/frontend/js/productivity_uploads.js`
 - `../app/backend/productivity_service.py`
+- `../app/backend/coredata_service.py`
 - `../app/backend/routers/productivity.py`

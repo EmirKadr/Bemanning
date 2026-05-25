@@ -48,8 +48,9 @@ Kort svar: Verksamhet är isoleringsnivån ovanför område. Vanliga användare,
 - Publika `/api/public/*` tar `business` och defaultar till `STIGAMO`; de får inte summera globalt utan verksamhet.
 - Webben och Windows-appen använder samma frontend via `app/`, så desktop-paritet kontrolleras med `tools.visual_smoke --via-desktop-proxy`.
 
-- Lagerverktygens buffertpall-observations och framraknade `artikel_max.csv` ar verksamhetsseparerade. Stigamo anvander legacy-filerna i `warehouse_tools/vendor/lowfreqdata/buffertpall/`; R3 och framtida verksamheter anvander egna undermappar. Ordersaldo, LYX och Pafyllnadsprio anvander verksamhetens karnfil nar anvandaren inte laddar upp en egen `artikel_max.csv`.
-- Produktivitetens permanenta KPI-mal ar ocksa verksamhetsseparerat. Filer med samma typ/prefix (`v_ask_kpi_target`) sparas och lases i verksamhetens produktivitetskatalog; om `data/coredata/` finns anvands `data/coredata/<verksamhetskod>/`, annars `data/<verksamhetskod>/`.
+- Lagerverktygens buffertpall-observations och framraknade `artikel_max.csv` ar verksamhetsseparerade. Stigamo anvander legacy-filerna i `warehouse_tools/vendor/lowfreqdata/buffertpall/`; R3 och framtida verksamheter anvander egna undermappar. Ordersaldo, LYX och Pafyllnadsprio anvander verksamhetens karnfil nar anvandaren inte laddar upp en egen `artikel_max.csv`. For Super User styr sidebarens omradestoggle vilken verksamhet lagerverktygen skriver/laster: R3-toggle ger R3, Stigamo-omraden ger Stigamo och `∞` faller tillbaka till kontots egen verksamhet.
+- Gemensamma karnfiler under `data/coredata/` ar verksamhetsseparerade. Varje verksamhet far en egen katalog, till exempel `data/coredata/stigamo/`, `data/coredata/r3/` och `data/coredata/<ny-verksamhet>/`. En ny uppladdning ersatter bara gamla filer med samma prefix i anvandarens egen verksamhet.
+- De kanda karnfilsprefixen i Uppladdningar ar `artikel_max`, `custom`, `dimension`, `item`, `item_alias`, `item_attribute`, `item_option`, `kpi_target_rule`, `pallet_type` och produktivitetens `v_ask_kpi_target`. Samma filtyper far finnas i alla verksamheter, men datan far aldrig blandas mellan katalogerna.
 
 ## Testkontrakt
 
@@ -80,6 +81,7 @@ python -m tools.visual_smoke --via-desktop-proxy --roles admin,r3 --output artif
 
 - `../app/backend/business_scope.py`
 - `../app/backend/routers/businesses.py`
+- `../app/backend/coredata_service.py`
 - `../app/backend/routers/persons.py`
 - `../app/backend/routers/activities.py`
 - `../app/backend/routers/users.py`

@@ -11,6 +11,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .config import settings
+from .coredata_service import (
+    business_coredata_dir,
+    coredata_business_segment,
+    coredata_read_dirs,
+    find_coredata_file,
+    save_coredata_file,
+    try_find_coredata_file,
+)
 
 
 HOURS = tuple(range(6, 24))
@@ -89,11 +97,7 @@ def normalize_reference_business_code(value: str | None) -> str:
 
 
 def business_reference_segment(value: str | None) -> str:
-    code = normalize_reference_business_code(value)
-    if not code:
-        return ""
-    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", code).strip("._-").lower()
-    return safe or "business"
+    return coredata_business_segment(value)
 
 
 def business_reference_dir(
@@ -101,10 +105,8 @@ def business_reference_dir(
     business_code: str | None = None,
 ) -> Path:
     base_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
-    if base_dir.name.lower() != "coredata":
-        coredata_dir = base_dir / "coredata"
-        if coredata_dir.exists():
-            base_dir = coredata_dir
+    if base_dir.name.lower() == "coredata" or (base_dir / "coredata").exists():
+        return business_coredata_dir(base_dir, business_code)
     segment = business_reference_segment(business_code)
     return base_dir / segment if segment else base_dir
 
@@ -114,7 +116,10 @@ def _business_reference_read_dirs(
     business_code: str | None,
 ) -> list[Path]:
     base_dir = Path(reference_dir) if reference_dir is not None else default_reference_dir()
-    dirs = [business_reference_dir(base_dir, business_code)]
+    if base_dir.name.lower() == "coredata" or (base_dir / "coredata").exists():
+        dirs = coredata_read_dirs(base_dir, business_code)
+    else:
+        dirs = [business_reference_dir(base_dir, business_code)]
     segment = business_reference_segment(business_code)
     if segment:
         legacy_scoped_dir = base_dir / segment
@@ -177,6 +182,11 @@ def find_source_files(
 
 
 def find_kpi_file(reference_dir: Path | str | None = None, business_code: str | None = None) -> Path:
+    if business_code is not None:
+        try:
+            return find_coredata_file("kpi", reference_dir, business_code)
+        except Exception as exc:
+            raise ProductivitySourceError(str(exc)) from exc
     return _latest_business_file(reference_dir, SOURCE_SPEC_BY_KEY["kpi"].prefix, business_code)
 
 
@@ -285,6 +295,26 @@ def save_productivity_file(
     business_code: str | None = None,
 ) -> dict[str, Any]:
     spec = SOURCE_SPEC_BY_KEY[file_type]
+    if file_type == "kpi" and business_code is not None:
+        payload = save_coredata_file(
+            source_path=source_path,
+            filename=filename,
+            file_type="kpi",
+            reference_dir=reference_dir,
+            business_code=business_code,
+        )
+        clear_productivity_cache()
+        result = _file_status_payload(spec, None)
+        result.update(
+            {
+                "uploaded": True,
+                "name": payload.get("name"),
+                "modified_at": payload.get("modified_at"),
+                "size": payload.get("size"),
+                "size_label": payload.get("size_label"),
+            }
+        )
+        return result
     target_dir = business_reference_dir(reference_dir, business_code)
     target_dir.mkdir(parents=True, exist_ok=True)
     target_path = target_dir / _safe_upload_name(filename, spec)
@@ -349,6 +379,8 @@ def _try_find_business_file(
     prefix: str,
     business_code: str | None = None,
 ) -> Path | None:
+    if prefix == SOURCE_SPEC_BY_KEY["kpi"].prefix and business_code is not None:
+        return try_find_coredata_file("kpi", reference_dir, business_code)
     try:
         return _latest_business_file(reference_dir, prefix, business_code)
     except ProductivitySourceError:

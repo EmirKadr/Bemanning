@@ -54,6 +54,49 @@ def business_user(user_id: int, business_id: int, role: str = "super_user"):
     )
 
 
+class FakeQuery:
+    def __init__(self, item):
+        self.item = item
+
+    def filter(self, *args, **kwargs):
+        return self
+
+    def order_by(self, *args, **kwargs):
+        return self
+
+    def first(self):
+        return self.item
+
+    def one_or_none(self):
+        return self.item
+
+
+class FakeBusinessScopeDb:
+    def __init__(self, *, user_business_code="STIGAMO", focus_business_code="R3"):
+        self.user_business = SimpleNamespace(id=10, code=user_business_code)
+        self.focus_business = SimpleNamespace(id=20, code=focus_business_code)
+        self.focus_area = SimpleNamespace(id=200, code=focus_business_code, business_id=self.focus_business.id)
+
+    def get(self, model, object_id):
+        name = getattr(model, "__name__", "")
+        if name == "Business":
+            if object_id == self.user_business.id:
+                return self.user_business
+            if object_id == self.focus_business.id:
+                return self.focus_business
+        if name == "Area" and object_id == self.focus_area.id:
+            return self.focus_area
+        return None
+
+    def query(self, model):
+        name = getattr(model, "__name__", "")
+        if name == "Area":
+            return FakeQuery(self.focus_area)
+        if name == "Business":
+            return FakeQuery(self.focus_business)
+        return FakeQuery(None)
+
+
 def test_df_to_table_serializes_preview_without_nan_values():
     pd = pytest.importorskip("pandas")
     df = pd.DataFrame(
@@ -160,6 +203,143 @@ def test_form_to_flow_payload_uses_cached_uploads_without_temp_cleanup(tmp_path,
     assert temp_paths == []
 
 
+def test_process_area_filter_filters_gg_company_and_customer(tmp_path):
+    pd = pytest.importorskip("pandas")
+    source = tmp_path / "orders.csv"
+    source.write_text(
+        "Bolag\tKund\tArtikel\n"
+        "GG\t6005\tA1\n"
+        "GG\t1234\tA2\n"
+        "MG\t1234\tA3\n"
+        "GG\t6005.0\tA4\n",
+        encoding="utf-8",
+    )
+
+    files, temp_paths, log = bridge.apply_process_area_filters({"orders": source}, "GG")
+    try:
+        filtered = pd.read_csv(files["orders"], dtype=str)
+    finally:
+        for path in temp_paths:
+            path.unlink(missing_ok=True)
+
+    assert filtered["Artikel"].tolist() == ["A2"]
+    assert log == [
+        "Omradesfilter GG: Bolag=GG, Kundnr!=6005.",
+        "orders: 4 -> 1 rader (Bolag, Kund).",
+    ]
+
+
+def test_process_area_filter_filters_mg_excluded_customers(tmp_path):
+    pd = pytest.importorskip("pandas")
+    source = tmp_path / "overview.csv"
+    source.write_text(
+        "company;custom_num;order_num\n"
+        "MG;40002;O1\n"
+        "MG;90002;O2\n"
+        "MG;50000;O3\n"
+        "GG;50000;O4\n",
+        encoding="utf-8",
+    )
+
+    files, temp_paths, _log = bridge.apply_process_area_filters({"overview": source}, "MG")
+    try:
+        filtered = pd.read_csv(files["overview"], dtype=str)
+    finally:
+        for path in temp_paths:
+            path.unlink(missing_ok=True)
+
+    assert filtered["order_num"].tolist() == ["O3"]
+
+
+def test_process_area_filter_other_toggles_see_everything(tmp_path):
+    source = tmp_path / "orders.csv"
+    source.write_text("Bolag\tKund\tArtikel\nGG\t6005\tA1\n", encoding="utf-8")
+
+    files, temp_paths, log = bridge.apply_process_area_filters({"orders": source}, "AS")
+
+    assert files == {"orders": source}
+    assert temp_paths == []
+    assert log == []
+
+
+def test_process_flow_visibility_matrix_defaults_to_all_flows(monkeypatch):
+    assert bridge.process_flow_visible("allocate", "GG")
+    monkeypatch.setitem(
+        bridge.PROCESS_AREA_RULES,
+        "GG",
+        {
+            "company": "GG",
+            "exclude_customers": {"6005"},
+            "label": "test",
+            "visible_flow_ids": {"allocate"},
+        },
+    )
+
+    assert bridge.process_flow_visible("allocate", "GG")
+    assert not bridge.process_flow_visible("ordersaldo", "GG")
+
+
+def test_process_matrix_override_controls_filter_and_visibility(tmp_path):
+    pd = pytest.importorskip("pandas")
+    source = tmp_path / "orders.csv"
+    source.write_text(
+        "Bolag\tKundnr\tArtikel\n"
+        "GG\t6005\tA1\n"
+        "GG\t7777\tA2\n"
+        "MG\t7777\tA3\n",
+        encoding="utf-8",
+    )
+    matrix = bridge.normalize_process_matrix(
+        {
+            "AS": {
+                "company": "GG",
+                "excludeCustomers": ["6005"],
+                "visibleFlowIds": ["allocate"],
+            }
+        }
+    )
+
+    assert bridge.process_flow_visible("allocate", "AS", matrix)
+    assert not bridge.process_flow_visible("ordersaldo", "AS", matrix)
+
+    files, temp_paths, log = bridge.apply_process_area_filters({"orders": source}, "AS", matrix)
+    try:
+        filtered = pd.read_csv(files["orders"], dtype=str)
+    finally:
+        for path in temp_paths:
+            path.unlink(missing_ok=True)
+
+    assert filtered["Artikel"].tolist() == ["A2"]
+    assert log[:1] == ["Omradesfilter AS: Bolag=GG, Kundnr!=6005."]
+
+
+def test_process_matrix_public_payload_exposes_editable_rules():
+    flows = [{"id": "allocate", "label": "Allokering", "category": "Allokering"}]
+    matrix = bridge.normalize_process_matrix(
+        {"GG": {"company": "GG", "excludeCustomers": ["6005"], "visibleFlowIds": ["allocate", "hidden"]}},
+        flows=flows,
+    )
+
+    payload = bridge.process_matrix_public_payload(matrix, flows=flows)
+
+    assert payload["flows"] == flows
+    assert {"code": "GG", "label": "GG"} in payload["areas"]
+    assert payload["matrix"]["GG"] == {
+        "company": "GG",
+        "excludeCustomers": ["6005"],
+        "visibleFlowIds": ["allocate"],
+        "label": "Bolag=GG, Kundnr!=6005",
+        "filterLabel": "Filter: Bolag GG, exkl. kundnr 6005",
+    }
+
+
+def test_process_matrix_empty_visible_flow_list_hides_all_flows():
+    matrix = bridge.normalize_process_matrix({"GG": {"visibleFlowIds": []}})
+
+    assert not bridge.process_flow_visible("allocate", "GG", matrix)
+    assert bridge.process_matrix_storage_payload(matrix)["GG"]["visibleFlowIds"] == []
+
+
 def test_allocation_result_session_is_limited_to_owner_user():
     owner = business_user(1, 10)
     other_same_business = business_user(2, 10)
@@ -237,6 +417,185 @@ def test_allocation_run_flow_uses_business_article_max_when_missing_upload(monke
     assert captured["business_code"] == "R3"
     assert captured["default_max_csv_path"] == str(tmp_path / "r3" / "artikel_max.csv")
     assert captured["files"] == {"orders": tmp_path / "orders.csv"}
+
+
+def test_allocation_run_flow_uses_area_focus_business_for_super_user(monkeypatch, tmp_path):
+    user = business_user(7, 10)
+    captured = {}
+
+    class FakeRequest:
+        async def form(self):
+            return object()
+
+    async def fake_form_to_flow_payload(_form, **kwargs):
+        assert kwargs == {"cache_scope": "user:7"}
+        return {"orders": tmp_path / "orders.csv"}, {bridge.PROCESS_AREA_FOCUS_PARAM: "R3"}, []
+
+    def fake_business_paths(business_code):
+        captured["business_code"] = business_code
+        return {
+            "observations_path": str(tmp_path / business_code.lower() / "observations.csv.gz"),
+            "article_max_path": str(tmp_path / business_code.lower() / "artikel_max.csv"),
+        }
+
+    def fake_run_flow_handler(flow_id, files, params, *, default_max_csv_path=None):
+        captured["flow_id"] = flow_id
+        captured["files"] = dict(files)
+        captured["default_max_csv_path"] = default_max_csv_path
+        return {"flow_id": flow_id, "tables": [], "summary": {}}
+
+    monkeypatch.setattr(bridge, "form_to_flow_payload", fake_form_to_flow_payload)
+    monkeypatch.setattr(bridge, "business_allocation_data_paths", fake_business_paths)
+    monkeypatch.setattr(bridge, "run_flow_handler", fake_run_flow_handler)
+    monkeypatch.setattr(allocation_router, "_audit_allocation_event", lambda *args, **kwargs: None)
+
+    result = asyncio.run(allocation_router.run_flow("ordersaldo", FakeRequest(), user=user, db=FakeBusinessScopeDb()))
+
+    assert result["flow_id"] == "ordersaldo"
+    assert captured["business_code"] == "R3"
+    assert captured["default_max_csv_path"] == str(tmp_path / "r3" / "artikel_max.csv")
+    assert captured["files"] == {"orders": tmp_path / "orders.csv"}
+
+
+def test_allocation_run_flow_uses_business_coredata_item_option(monkeypatch, tmp_path):
+    user = business_user(7, 20)
+    item_option_path = tmp_path / "coredata" / "r3" / "item_option-20260525120000.csv"
+    item_option_path.parent.mkdir(parents=True, exist_ok=True)
+    item_option_path.write_text("Artikel\tPack Klass\nA1\tX\n", encoding="utf-8")
+    captured = {}
+
+    class FakeDb:
+        def get(self, model, object_id):
+            return SimpleNamespace(code="R3")
+
+    class FakeRequest:
+        async def form(self):
+            return object()
+
+    async def fake_form_to_flow_payload(_form, **kwargs):
+        assert kwargs == {"cache_scope": "user:7"}
+        return {"orders": tmp_path / "orders.csv", "buffer": tmp_path / "buffer.csv"}, {}, []
+
+    def fake_find_coredata_file(file_type, **kwargs):
+        assert file_type == "item_option"
+        assert kwargs["business_code"] == "R3"
+        return item_option_path
+
+    def fake_run_flow_handler(flow_id, files, params, *, default_max_csv_path=None):
+        captured["flow_id"] = flow_id
+        captured["files"] = dict(files)
+        captured["default_max_csv_path"] = default_max_csv_path
+        return {"flow_id": flow_id, "tables": [], "summary": {}}
+
+    monkeypatch.setattr(bridge, "form_to_flow_payload", fake_form_to_flow_payload)
+    monkeypatch.setattr(allocation_router, "find_coredata_file", fake_find_coredata_file)
+    monkeypatch.setattr(bridge, "run_flow_handler", fake_run_flow_handler)
+    monkeypatch.setattr(allocation_router, "_audit_allocation_event", lambda *args, **kwargs: None)
+
+    result = asyncio.run(allocation_router.run_flow("allocate", FakeRequest(), user=user, db=FakeDb()))
+
+    assert result["flow_id"] == "allocate"
+    assert captured["files"]["items"] == item_option_path
+    assert captured["files"]["orders"] == tmp_path / "orders.csv"
+    assert captured["default_max_csv_path"] is None
+
+
+def test_allocation_run_flow_filters_uploaded_files_from_area_focus(monkeypatch, tmp_path):
+    pd = pytest.importorskip("pandas")
+    user = business_user(7, 20)
+    source = tmp_path / "orders.csv"
+    source.write_text(
+        "Bolag\tKund\tArtikel\n"
+        "GG\t6005\tA1\n"
+        "GG\t1234\tA2\n"
+        "MG\t1234\tA3\n",
+        encoding="utf-8",
+    )
+    captured = {}
+
+    class FakeDb:
+        def get(self, model, object_id):
+            return SimpleNamespace(code="STIGAMO")
+
+    class FakeRequest:
+        async def form(self):
+            return object()
+
+    async def fake_form_to_flow_payload(_form, **kwargs):
+        assert kwargs == {"cache_scope": "user:7"}
+        return {"orders": source}, {bridge.PROCESS_AREA_FOCUS_PARAM: "GG"}, []
+
+    def fake_run_flow_handler(flow_id, files, params, *, default_max_csv_path=None):
+        captured["flow_id"] = flow_id
+        captured["params"] = dict(params)
+        captured["rows"] = pd.read_csv(files["orders"], dtype=str)["Artikel"].tolist()
+        return {"flow_id": flow_id, "tables": [], "summary": {}, "log": ["handler log"]}
+
+    monkeypatch.setattr(bridge, "form_to_flow_payload", fake_form_to_flow_payload)
+    monkeypatch.setattr(bridge, "run_flow_handler", fake_run_flow_handler)
+    monkeypatch.setattr(allocation_router, "_audit_allocation_event", lambda *args, **kwargs: None)
+
+    result = asyncio.run(allocation_router.run_flow("vecka27-check", FakeRequest(), user=user, db=FakeDb()))
+
+    assert result["flow_id"] == "vecka27-check"
+    assert captured["params"] == {}
+    assert captured["rows"] == ["A2"]
+    assert result["log"][:2] == [
+        "Omradesfilter GG: Bolag=GG, Kundnr!=6005.",
+        "orders: 3 -> 1 rader (Bolag, Kund).",
+    ]
+
+
+def test_allocation_run_flow_uses_saved_process_matrix(monkeypatch, tmp_path):
+    pd = pytest.importorskip("pandas")
+    user = business_user(7, 20)
+    source = tmp_path / "orders.csv"
+    source.write_text(
+        "Bolag\tKund\tArtikel\n"
+        "GG\t6005\tA1\n"
+        "GG\t1234\tA2\n"
+        "MG\t1234\tA3\n",
+        encoding="utf-8",
+    )
+    captured = {}
+
+    class FakeDb:
+        def get(self, model, object_id):
+            return SimpleNamespace(code="STIGAMO")
+
+    class FakeRequest:
+        async def form(self):
+            return object()
+
+    async def fake_form_to_flow_payload(_form, **kwargs):
+        assert kwargs == {"cache_scope": "user:7"}
+        return {"orders": source}, {bridge.PROCESS_AREA_FOCUS_PARAM: "AS"}, []
+
+    def fake_run_flow_handler(flow_id, files, params, *, default_max_csv_path=None):
+        captured["flow_id"] = flow_id
+        captured["rows"] = pd.read_csv(files["orders"], dtype=str)["Artikel"].tolist()
+        return {"flow_id": flow_id, "tables": [], "summary": {}, "log": []}
+
+    monkeypatch.setattr(bridge, "form_to_flow_payload", fake_form_to_flow_payload)
+    monkeypatch.setattr(bridge, "run_flow_handler", fake_run_flow_handler)
+    monkeypatch.setattr(
+        allocation_router,
+        "get_json_setting",
+        lambda *args, **kwargs: {
+            "AS": {
+                "company": "GG",
+                "excludeCustomers": ["6005"],
+                "visibleFlowIds": ["vecka27-check"],
+            }
+        },
+    )
+    monkeypatch.setattr(allocation_router, "_audit_allocation_event", lambda *args, **kwargs: None)
+
+    result = asyncio.run(allocation_router.run_flow("vecka27-check", FakeRequest(), user=user, db=FakeDb()))
+
+    assert result["flow_id"] == "vecka27-check"
+    assert captured["rows"] == ["A2"]
+    assert result["area_filter"]["area_focus"] == "AS"
 
 
 def test_run_flow_handler_passes_business_default_article_max(monkeypatch, tmp_path):
@@ -334,6 +693,67 @@ def test_update_observations_writes_to_user_business_paths(monkeypatch, tmp_path
         "push_to_github": True,
         "business_code": "R3",
     }
+    assert not upload_path.exists()
+
+
+def test_update_observations_uses_area_focus_business_for_super_user(monkeypatch, tmp_path):
+    upload_path = tmp_path / "buffer.csv"
+    upload_path.write_text("Artikel,Pallid,Antal,Status\nA1,P1,10,30\n", encoding="utf-8")
+    captured = {}
+    user = business_user(8, 10)
+
+    async def fake_save_upload(_file):
+        return upload_path
+
+    def fake_business_paths(business_code):
+        captured["path_business_code"] = business_code
+        return {
+            "observations_path": str(tmp_path / business_code.lower() / "observations.csv.gz"),
+            "article_max_path": str(tmp_path / business_code.lower() / "artikel_max.csv"),
+        }
+
+    def fake_build(buffer_df, **kwargs):
+        captured["build_kwargs"] = kwargs
+        return SimpleNamespace(
+            new_row_count=1,
+            github_sent_rows=1,
+            article_max_rows=1,
+            article_max_changed_rows=1,
+            article_max_increased_rows=1,
+            article_max_decreased_rows=0,
+            article_max_new_rows=1,
+            article_max_removed_rows=0,
+            article_max_changed_examples=[],
+            pushed_to_github=True,
+            observations_path=kwargs["observations_path"],
+            article_max_path=kwargs["artikel_max_out"],
+        )
+
+    engine = SimpleNamespace(
+        read_table=lambda path: {"path": path},
+        build_observations_update_result=fake_build,
+    )
+
+    fake_available(monkeypatch, engine_module=engine)
+    monkeypatch.setattr(bridge, "save_upload", fake_save_upload)
+    monkeypatch.setattr(bridge, "business_allocation_data_paths", fake_business_paths)
+    monkeypatch.setattr(allocation_router, "_audit_allocation_event", lambda *args, **kwargs: None)
+
+    response = asyncio.run(
+        allocation_router.update_observations(
+            file=upload_file("buffer.csv", b""),
+            area_focus="R3",
+            user=user,
+            db=FakeBusinessScopeDb(),
+        )
+    )
+
+    assert response["area_focus"] == "R3"
+    assert response["business_code"] == "R3"
+    assert response["observations_path"] == str(tmp_path / "r3" / "observations.csv.gz")
+    assert response["article_max_path"] == str(tmp_path / "r3" / "artikel_max.csv")
+    assert captured["path_business_code"] == "R3"
+    assert captured["build_kwargs"]["business_code"] == "R3"
     assert not upload_path.exists()
 
 

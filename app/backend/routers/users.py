@@ -258,7 +258,7 @@ def _parse_user_import_values(raw_rows: list[tuple[int, dict[str, object]]]) -> 
 
 def _area_lookup(db: Session, business_id: int | None) -> dict[str, Area]:
     lookup: dict[str, Area] = {}
-    query = db.query(Area)
+    query = db.query(Area).filter(Area.is_active.is_(True))
     if business_id is not None:
         query = query.filter(Area.business_id == business_id)
     for area in query.all():
@@ -273,10 +273,10 @@ def _validate_area_id(db: Session, area_id: int | None, user: User, business_id:
     if area_id is None:
         return
     area = scoped_get(db, Area, area_id, user, detail="Område hittades inte")
+    if area.is_active is not True:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
     if business_id is not None and area.business_id != business_id:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Område tillhör annan verksamhet")
-    if False:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
 
 
 def build_user_import_template_excel() -> bytes:
@@ -466,6 +466,8 @@ def create_user(
     area = db.get(Area, payload.area_id) if payload.area_id is not None else None
     if payload.area_id is not None:
         assert_scoped_object(db, admin, area, detail="Område hittades inte")
+        if area.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
     business_id = resolve_write_business_id(
         db,
         admin,
@@ -522,6 +524,8 @@ def update_user(
     area = db.get(Area, payload.area_id) if payload.area_id is not None else None
     if payload.area_id is not None:
         assert_scoped_object(db, admin, area, detail="Område hittades inte")
+        if area.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
     target_business_id = user.business_id
     if payload.business_id is not None:
         target_business_id = resolve_write_business_id(

@@ -28,8 +28,10 @@ from ..schemas import (
     PersonImportResult,
     PersonImportRowsRequest,
     PersonOut,
+    PersonSortOrderUpdate,
     PersonUpdate,
 )
+from ..user_access import can_sort_person_order
 
 router = APIRouter(prefix="/api/persons", tags=["persons"])
 
@@ -280,8 +282,8 @@ def _import_person_rows(
 ) -> PersonImportResult:
     errors = list(errors)
     default_business_id = visible_business_id(db, user)
-    area_query = db.query(Area)
-    activity_query = db.query(Activity)
+    area_query = db.query(Area).filter(Area.is_active.is_(True))
+    activity_query = db.query(Activity).filter(Activity.is_active.is_(True))
     if default_business_id is not None:
         area_query = area_query.filter(Area.business_id == default_business_id)
         activity_query = activity_query.filter(Activity.business_id == default_business_id)
@@ -394,7 +396,9 @@ def list_persons(
     if not include_inactive:
         q = q.filter(Person.is_active.is_(True))
     if area_id is not None:
-        scoped_get(db, Area, area_id, user, detail="Område hittades inte")
+        area = scoped_get(db, Area, area_id, user, detail="Område hittades inte")
+        if area.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
         q = q.filter(Person.home_area_id == area_id)
     return q.order_by(Person.sort_order, Person.name).all()
 
@@ -432,6 +436,88 @@ def import_person_rows(
     return _import_person_rows(rows, errors, db, user, duplicate_error="Dubblett i tabellen")
 
 
+def _normalized_sort_slots(persons: list[Person]) -> list[int]:
+    slots = sorted(int(person.sort_order or 0) for person in persons)
+    normalized: list[int] = []
+    previous: int | None = None
+    for slot in slots:
+        next_slot = slot if previous is None or slot > previous else previous + 1
+        normalized.append(next_slot)
+        previous = next_slot
+    return normalized
+
+
+@router.put("/sort-order", response_model=list[PersonOut])
+def reorder_person_sort_order(
+    payload: PersonSortOrderUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_view_access("personSortOrder", "edit")),
+) -> list[Person]:
+    if not can_sort_person_order(user):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Personsortering kräver bemanningsansvarig, admin eller Super User",
+        )
+    if user.area_id is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Användaren saknar område för personsortering")
+
+    home_area = scoped_get(db, Area, user.area_id, user, detail="Område hittades inte")
+    if home_area.is_active is not True:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
+    ordered_ids = [int(person_id) for person_id in payload.person_ids]
+    if len(ordered_ids) != len(set(ordered_ids)):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Personlistan innehåller dubbletter")
+
+    requested_people = db.query(Person).filter(Person.id.in_(ordered_ids)).all()
+    requested_by_id = {person.id: person for person in requested_people}
+    if len(requested_by_id) != len(ordered_ids):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Person hittades inte")
+    for person in requested_people:
+        assert_scoped_object(db, user, person, detail="Person hittades inte")
+        if person.is_active is not True or person.home_area_id != home_area.id:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="Du kan bara sortera personer med samma hemområde som ditt användarområde",
+            )
+
+    area_people_query = db.query(Person).filter(
+        Person.is_active.is_(True),
+        Person.home_area_id == home_area.id,
+    )
+    if home_area.business_id is not None:
+        area_people_query = area_people_query.filter(Person.business_id == home_area.business_id)
+    area_people = area_people_query.order_by(Person.sort_order, Person.name, Person.id).all()
+    area_ids = {person.id for person in area_people}
+    if set(ordered_ids) != area_ids:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Personlistan har ändrats. Läs om vyn och försök igen.")
+
+    before_by_id = {person.id: _person_snapshot(person) for person in area_people}
+    person_by_id = {person.id: person for person in area_people}
+    for person_id, sort_order in zip(ordered_ids, _normalized_sort_slots(area_people), strict=True):
+        person_by_id[person_id].sort_order = sort_order
+
+    for person_id in ordered_ids:
+        person = person_by_id[person_id]
+        before = before_by_id[person_id]
+        after = _person_snapshot(person)
+        if before == after:
+            continue
+        audit_log(
+            db,
+            entity_type="person",
+            entity_id=person.id,
+            action="reorder",
+            old_value=before,
+            new_value=after,
+            user_id=user.id,
+            business_id=person.business_id,
+        )
+    db.commit()
+    for person in area_people:
+        db.refresh(person)
+    return [person_by_id[person_id] for person_id in ordered_ids]
+
+
 @router.post("", response_model=PersonOut, status_code=status.HTTP_201_CREATED)
 def create_person(
     payload: PersonCreate,
@@ -441,9 +527,13 @@ def create_person(
     area = db.get(Area, payload.home_area_id) if payload.home_area_id is not None else None
     if payload.home_area_id is not None:
         assert_scoped_object(db, user, area, detail="Hemområde hittades inte")
+        if area.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Hemområde hittades inte")
     activity = db.get(Activity, payload.home_activity_id) if payload.home_activity_id is not None else None
     if payload.home_activity_id is not None:
         assert_scoped_object(db, user, activity, detail="Huvudaktivitet hittades inte")
+        if activity.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Huvudaktivitet hittades inte")
     business_id = resolve_write_business_id(
         db,
         user,
@@ -505,10 +595,14 @@ def update_person(
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Person kan inte flyttas mellan verksamheter")
     if "home_area_id" in data and data["home_area_id"] is not None:
         area = scoped_get(db, Area, data["home_area_id"], user, detail="Hemområde hittades inte")
+        if area.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Hemområde hittades inte")
         if area.business_id != person.business_id:
             raise HTTPException(status.HTTP_409_CONFLICT, detail="Hemområde tillhör annan verksamhet")
     if "home_activity_id" in data and data["home_activity_id"] is not None:
         activity = scoped_get(db, Activity, data["home_activity_id"], user, detail="Huvudaktivitet hittades inte")
+        if activity.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Huvudaktivitet hittades inte")
         if activity.business_id != person.business_id:
             raise HTTPException(status.HTTP_409_CONFLICT, detail="Huvudaktivitet tillhör annan verksamhet")
     for key, value in data.items():

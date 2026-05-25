@@ -1,7 +1,7 @@
 ---
 title: Oversikt
 status: aktiv
-updated: 2026-05-22
+updated: 2026-05-25
 tags: [oversikt, ui, knappar]
 ---
 
@@ -22,6 +22,7 @@ Kort svar: Oversikt visar Bemanning pa dag-niva i vecka eller manad. En cell rep
 | Ovre horisontell scrollbar | Drar tabellen i sidled ovanfor oversikten | Synkar med tabellens vanliga scroll nederst | `setupSyncedHorizontalScroll` | Visas bara nar tabellen ar bredare an ytan. |
 | Undo/Redo | Angra/gor om dagandringar | Restore av snapshots via schema-API | `/api/schedule/hours/restore` | Disabled om stacken ar tom eller read-only. |
 | Personfilter | Skriver soktext | Filtrerar personer klient-side | `refreshPersons` | Shift-klick pa header sorterar. |
+| Dra personnamn | Drar ett namn upp eller ned | Sparar ny personsortering direkt pa personernas `sort_order` | `PUT /api/persons/sort-order` | Kraver `personSortOrder=edit`, roll Bemanningsansvarig/admin/Super User och att personens hemomrade matchar anvandarens omrade. Rensa personfilter innan sortering. |
 | Dagcell-dropdown | Valjer aktivitet/tomt for hel dag | Skriver/tommer personens schematimmar for dagen | `POST /api/overview/day` | Om dagen ar blandad visas confirm innan overskrivning. |
 | Drag over dagceller | Fyller flera dagar/personer | Skickar bulk-dagar | `POST /api/overview/days/bulk` | Max 100 celler. Fel per cell kan rapporteras. |
 
@@ -39,6 +40,7 @@ Kort svar: Oversikt visar Bemanning pa dag-niva i vecka eller manad. En cell rep
 - Heldagsandring anvander personens veckomall. Om personen saknar fast mall/timmis kan API stoppa andringen.
 - Vid blandad dag fragar klienten innan den skriver over med ett enda varde.
 - Drag skapar manga heldagsandringar och pushar undo-snapshot for de lyckade.
+- Drag pa personnamn andrar inte bemanningsceller utan personernas sorteringsnummer i registret. Samma backendregel som Bemanning anvands: bara anvandarens eget omrade och bara Bemanningsansvarig/admin/Super User med `Personsortering=Redigera`.
 - Oversikt cachar bara API-svar som redan ar synliga for inloggad anvandare och aktuell verksamhet. Cachen ar separat for veckovy och manadsvy och ogiltigforklaras vid dagandring, drag och undo/redo.
 - Nar en period finns i cache kontrollerar klienten `/api/overview/revision` eller `/api/overview/revision/month` tyst i bakgrunden. Aktiv vy kontrollerar ungefär var 10:e sekund, idle-vy ungefär var 30:e sekund, och dold browserflik pausar. Vid ny revision hamtas all-data och bara andrade synliga dagceller patchas om anvandaren inte haller pa i just den cellen.
 
@@ -50,6 +52,7 @@ Kort svar: Oversikt visar Bemanning pa dag-niva i vecka eller manad. En cell rep
 | "Vad betyder randig/blandad dag?" | Dagen innehaller flera aktiviteter eller segment och kan skrivas over med confirm. |
 | "Varfor raknas inte timmis som ledig?" | Timmis utan fast mall betraktas inte som en standardledig dag for heldagsandring. |
 | "Varfor visar Oversikt andra timmar an Bemanning?" | Kontrollera att samma ar/vecka/dag/omrade anvands och att malltider plus explicita celler raknas. |
+| "Varfor gar det inte att sortera med drag?" | Personsortering kraver ratt roll, `Personsortering=Redigera`, anvandaromrade och att personen har samma hemomrade. Personfiltret maste vara tomt. |
 
 ## Kallor
 

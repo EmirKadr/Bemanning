@@ -13,6 +13,7 @@ WAREHOUSE_CLERK_ROLE = "warehouse_clerk"
 ARTICLE_PLACER_ROLE = "article_placer"
 ADMIN_ROLES = {"admin", SUPER_USER_ROLE, LEGACY_SUPER_USER_ROLE}
 EDITOR_ROLES = {"leader", STAFFING_MANAGER_ROLE, *ADMIN_ROLES}
+PERSON_SORT_ORDER_ROLES = {STAFFING_MANAGER_ROLE, "admin"}
 ALLOCATION_TOOL_ROLES = {WAREHOUSE_CLERK_ROLE, ARTICLE_PLACER_ROLE}
 PLANNING_VIEW_ROLES = {VIEWER_ROLE, *EDITOR_ROLES}
 BASE_ROLES = {"admin", "leader", STAFFING_MANAGER_ROLE, VIEWER_ROLE, WAREHOUSE_CLERK_ROLE, ARTICLE_PLACER_ROLE}
@@ -29,8 +30,10 @@ ROLE_VIEW_IDS = {
     "dataFetch",
     "allocationUploads",
     "allocationProcess",
+    "allocationProcessMatrix",
     "allocationSplit",
     "persons",
+    "personSortOrder",
     "personImport",
     "activities",
     "activityImport",
@@ -56,6 +59,7 @@ ROLE_VIEW_DEFAULT_ACCESS = {
         "schedule": "edit",
         "overview": "edit",
         "persons": "edit",
+        "personSortOrder": "edit",
         "personImport": "edit",
         "activities": "edit",
         "activityImport": "edit",
@@ -64,12 +68,14 @@ ROLE_VIEW_DEFAULT_ACCESS = {
         "schedule": "edit",
         "overview": "edit",
         "persons": "edit",
+        "personSortOrder": "edit",
         "personImport": "edit",
         "activities": "edit",
         "activityImport": "edit",
         "areas": "edit",
         "users": "edit",
         "appSettings": "edit",
+        "allocationProcessMatrix": "edit",
     },
     WAREHOUSE_CLERK_ROLE: {
         "allocationUploads": "edit",
@@ -180,6 +186,10 @@ def can_view_planning(user: User) -> bool:
 
 def can_admin(user: User) -> bool:
     return is_super_user(user) or bool(set(user_roles(user)) & ADMIN_ROLES)
+
+
+def can_sort_person_order(user: User) -> bool:
+    return is_super_user(user) or bool(set(user_roles(user)) & PERSON_SORT_ORDER_ROLES)
 
 
 def role_view_access_level(user: User, access: dict | None, view_id: str) -> str:

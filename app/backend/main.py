@@ -18,6 +18,7 @@ from .routers import (
     auth,
     bulk,
     businesses,
+    coredata,
     data_fetch,
     overview,
     person_schedules,
@@ -92,6 +93,7 @@ app.include_router(persons.router)
 app.include_router(person_schedules.router)
 app.include_router(schedule.router)
 app.include_router(bulk.router)
+app.include_router(coredata.router)
 app.include_router(data_fetch.router)
 app.include_router(overview.router)
 app.include_router(productivity.router)

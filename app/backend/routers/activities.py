@@ -349,7 +349,7 @@ def _import_activity_rows(
 ) -> ActivityImportResult:
     errors = list(errors)
     default_business_id = visible_business_id(db, admin)
-    area_query = db.query(Area)
+    area_query = db.query(Area).filter(Area.is_active.is_(True))
     activity_query = db.query(Activity)
     if default_business_id is not None:
         area_query = area_query.filter(Area.business_id == default_business_id)
@@ -466,7 +466,8 @@ def list_activities(
     user: User = Depends(get_current_user),
 ) -> list[Activity]:
     q = filter_query_for_business(db.query(Activity), Activity, db, user, business_id)
-    _ = include_inactive
+    if not include_inactive:
+        q = q.filter(Activity.is_active.is_(True))
     return q.order_by(Activity.sort_order, Activity.label).all()
 
 
@@ -512,6 +513,8 @@ def create_activity(
     area = db.get(Area, payload.area_id) if payload.area_id is not None else None
     if payload.area_id is not None:
         assert_scoped_object(db, admin, area, detail="Område hittades inte")
+        if area.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
     summary_activity = db.get(Activity, payload.summary_activity_id) if payload.summary_activity_id is not None else None
     if payload.summary_activity_id is not None:
         assert_scoped_object(db, admin, summary_activity, detail="Summeringsaktivitet hittades inte")
@@ -579,6 +582,8 @@ def update_activity(
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Aktivitet kan inte flyttas mellan verksamheter")
     if "area_id" in data and data["area_id"] is not None:
         area = scoped_get(db, Area, data["area_id"], admin, detail="Område hittades inte")
+        if area.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
         if area.business_id != activity.business_id:
             raise HTTPException(status.HTTP_409_CONFLICT, detail="Område tillhör annan verksamhet")
     if "summary_activity_id" in data:

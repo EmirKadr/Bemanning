@@ -7,13 +7,33 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-25] feature | Drag-sortering av personer i planeringsvyer
+
+Bemanning och Oversikt kan nu dra personnamn for att uppdatera personernas `sort_order` i Personer. Ny behorighet `personSortOrder` visas som Personsortering i Vybehorigheter och backend kraver Bemanningsansvarig/admin/Super User, `edit`-atkomst, anvandaromrade och samma hemomrade pa personerna.
+
+## [2026-05-25] change | Bearbeta-matris far egen behorighet
+
+Matris-knappen i Bearbeta styrs nu av `allocationProcessMatrix`: `view` kan oppna matrisen lasande och `edit` kan spara. Admin har `edit` som standard och Super User har fortsatt alltid full atkomst.
+
+## [2026-05-25] feature | Redigerbar Bearbeta-matris
+
+Bearbeta har nu knappen `Matris` for roller med `allocationProcessMatrix=view`; `allocationProcessMatrix=edit` kravs for att spara. Matrisen sparas globalt som `allocation_process_matrix` och styr per toggle bade radfilter (`Bolag`, exkluderade kundnummer) och vilka Bearbeta-funktioner som syns. Standard ar fortsatt GG=`Bolag GG` utan kund 6005, MG=`Bolag MG` utan 40002/90002 och ovriga toggles ser allt.
+
+## [2026-05-25] fix | Lagerverktyg foljer verksamhetstoggle
+
+Super User styr nu lagerverktygens verksamhet via sidebarens omradestoggle. Buffertpall-observations, verksamhetens `artikel_max.csv` och Bearbetas coredata-defaults anvander R3 nar togglen star pa R3 och Stigamo nar togglen star pa ett Stigamo-omrade; `∞` faller tillbaka till kontots egen verksamhet.
+
 ## [2026-05-25] fix | Vybehorigheter ar globala
 
 Rollernas `Vybehorigheter` laser och sparar nu en global matris i stallet for en separat matris per verksamhet. Det gor att exempelvis `Lagerkontorist = Bearbeta/Redigera` galler bade Stigamo och R3, medan verksamhetsspecifika settings som cell-lasning och menyordning fortsatt kan vara separata.
 
+## [2026-05-25] feature | Coredata-karnfiler ar verksamhetsseparerade
+
+Filerna under `data/coredata/` hanteras nu per verksamhet for prefixen `custom`, `dimension`, `item`, `item_alias`, `item_attribute`, `item_option`, `kpi_target_rule`, `pallet_type` och `v_ask_kpi_target`. `artikel_max.csv` visas i samma karnfilslista och sparas till lagerverktygens verksamhetsspecifika artikel_max-sokvag. Ny uppladdning ersatter bara gammal fil med samma prefix i anvandarens egen verksamhet. Allokering anvander dessutom verksamhetens `item_option` som karnfil nar ingen lokal Item option-fil laddats upp.
+
 ## [2026-05-25] fix | Verksamhetsseparerar produktivitetens KPI-karnfil
 
-Produktivitetens permanenta KPI-mal (`v_ask_kpi_target*.csv`) sparas och lases nu per verksamhet, pa samma princip som lagerverktygens `artikel_max.csv`. Stigamo, R3 och nya verksamheter far separata produktivitetskataloger under `data/coredata/` nar den finns, annars under `data/`; Stigamo har en bakatkompatibel fallback till den gamla root-filen tills en Stigamo-scopead KPI-fil finns.
+Produktivitetens permanenta KPI-mal (`v_ask_kpi_target*.csv`) sparas och lases nu per verksamhet, pa samma princip som lagerverktygens `artikel_max.csv`. Stigamo, R3 och nya verksamheter far separata kataloger under `data/coredata/`; Stigamo har en bakatkompatibel fallback till den gamla root-filen tills en Stigamo-scopead KPI-fil finns.
 
 ## [2026-05-25] fix | Produktivitet foljer vybehorigheter
 
@@ -225,3 +245,7 @@ Fixade lokal SQLite-bootstrap så äldre `app/flow_local.db` med globala unika o
 ## [2026-05-22] fix | Personer följer R3-fokus
 
 Fixade Personer-vyn så Super User inte längre ser global personlista när områdestogglen står på R3. Vyn skickar nu valt `area_id` till `/api/persons`, filtrerar även klient-side och laddar om listan när områdesfokus ändras.
+
+## [2026-05-25] change | GG/MG-filter i Bearbeta
+
+Bearbeta skickar nu aktuell omradestoggle till `/api/allokering/flow/*`. Backend filtrerar tabellfiler per korning for GG (`Bolag=GG`, exkl. kundnr `6005`) och MG (`Bolag=MG`, exkl. kundnr `40002` och `90002`) nar filen har Bolag-/Kundnr-kolumner. Ovriga toggles ser hela underlaget. Frontenden har en processmatris for framtida flodessynlighet per toggle.

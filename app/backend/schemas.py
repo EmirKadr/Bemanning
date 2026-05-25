@@ -182,6 +182,10 @@ class PersonImportRowsRequest(BaseModel):
     rows: list[PersonImportRowInput] = Field(default_factory=list, max_length=500)
 
 
+class PersonSortOrderUpdate(BaseModel):
+    person_ids: list[int] = Field(min_length=2, max_length=500)
+
+
 class CellOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     person_id: int

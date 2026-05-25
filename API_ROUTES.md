@@ -74,12 +74,16 @@ verksamheter.
 | `allocation.health` | `GET` | `/api/allokering/health` | Lagerverktyg health |
 | `allocation.flows` | `GET` | `/api/allokering/flows` | Lista lagerverktygsflöden |
 | `allocation.pool` | `GET` | `/api/allokering/pool` | Lista lagerverktygens uppladdningsslots |
+| `allocation.process_matrix_get` | `GET` | `/api/allokering/process-matrix` | Hämta Bearbeta-matris |
+| `allocation.process_matrix_update` | `PUT` | `/api/allokering/process-matrix` | Uppdatera Bearbeta-matris |
 | `allocation.detect` | `POST` | `/api/allokering/detect` | Identifiera lagerverktygsfil |
 | `allocation.observations_update` | `POST` | `/api/allokering/observations/update` | Uppdatera observations från buffert |
 | `allocation.run_flow` | `POST` | `/api/allokering/flow/{flow_id}` | Kör lagerverktygsflöde |
 | `allocation.open_excel` | `POST` | `/api/allokering/open-excel` | Öppna lagerverktygsresultat i Excel |
 | `allocation.table_column` | `GET` | `/api/allokering/table-column/{session_id}/{key}/{column_index}` | Hämta resultatkolumn |
 | `allocation.download` | `GET` | `/api/allokering/download/{session_id}/{key}` | Ladda ner Allokering-resultat |
+| `coredata.files` | `GET` | `/api/coredata/files` | Coredata-karnfiler for verksamheten |
+| `coredata.upload_raw` | `POST` | `/api/coredata/files/raw` | Ladda upp coredata-karnfil |
 | `areas.list` | `GET` | `/api/areas` | Lista områden |
 | `areas.create` | `POST` | `/api/areas` | Skapa område |
 | `areas.update` | `PUT` | `/api/areas/{area_id}` | Uppdatera område |
@@ -106,6 +110,7 @@ verksamheter.
 | `persons.import` | `POST` | `/api/persons/import` | Importera personer |
 | `persons.import_rows` | `POST` | `/api/persons/import-rows` | Importera personrader |
 | `persons.create` | `POST` | `/api/persons` | Skapa person |
+| `persons.sort_order` | `PUT` | `/api/persons/sort-order` | Sortera personer inom anvandarens omrade |
 | `persons.get` | `GET` | `/api/persons/{person_id}` | Hämta person |
 | `persons.update` | `PUT` | `/api/persons/{person_id}` | Uppdatera person |
 | `persons.delete` | `DELETE` | `/api/persons/{person_id}` | Ta bort person |

@@ -47,7 +47,9 @@ def _visible_schedule_persons(
     if scoped_business_id is not None:
         persons_q = persons_q.where(Person.business_id == scoped_business_id)
     if area_id is not None:
-        scoped_get(db, Area, area_id, user, detail="Område hittades inte")
+        area = scoped_get(db, Area, area_id, user, detail="Område hittades inte")
+        if area.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
         persons_q = persons_q.where(Person.home_area_id == area_id)
     persons_q = persons_q.order_by(Person.sort_order, Person.name)
     return db.execute(persons_q).scalars().all(), scoped_business_id
@@ -301,7 +303,9 @@ def get_schedule(
     if scoped_business_id is not None:
         persons_q = persons_q.where(Person.business_id == scoped_business_id)
     if area_id is not None:
-        scoped_get(db, Area, area_id, user, detail="Område hittades inte")
+        area = scoped_get(db, Area, area_id, user, detail="Område hittades inte")
+        if area.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
         persons_q = persons_q.where(Person.home_area_id == area_id)
     persons_q = persons_q.order_by(Person.sort_order, Person.name)
     persons = db.execute(persons_q).scalars().all()
@@ -1083,7 +1087,9 @@ def get_summary(
     if scoped_business_id is not None:
         persons_q = persons_q.where(Person.business_id == scoped_business_id)
     if area_id is not None:
-        scoped_get(db, Area, area_id, user, detail="Område hittades inte")
+        area = scoped_get(db, Area, area_id, user, detail="Område hittades inte")
+        if area.is_active is not True:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
         persons_q = persons_q.where(Person.home_area_id == area_id)
     persons = db.execute(persons_q).scalars().all()
     person_ids = [person.id for person in persons]

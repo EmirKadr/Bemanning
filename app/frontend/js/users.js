@@ -31,8 +31,10 @@ const VIEW_ACCESS_OPTIONS = [
   { id: "dataFetch", label: "Hämta data" },
   { id: "allocationUploads", label: "Uppladdningar" },
   { id: "allocationProcess", label: "Bearbeta" },
+  { id: "allocationProcessMatrix", label: "Bearbeta-matris" },
   { id: "allocationSplit", label: "Dela" },
   { id: "persons", label: "Personer" },
+  { id: "personSortOrder", label: "Personsortering" },
   { id: "personImport", label: "Personimport" },
   { id: "activities", label: "Aktiviteter" },
   { id: "activityImport", label: "Aktivitetsimport" },
@@ -153,7 +155,7 @@ async function loadRoleViewAccess() {
 }
 
 async function loadAreas() {
-  areas = await api.get("/api/areas?include_inactive=true");
+  areas = await api.get("/api/areas");
 }
 
 async function loadBusinesses() {

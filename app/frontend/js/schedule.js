@@ -7,7 +7,7 @@ const HALF_SEGMENTS = [
   { minute_start: 0, minute_end: 30 },
   { minute_start: 30, minute_end: 60 },
 ];
-const CALC_AREA_KEYS = ["GG", "MG", "AS", "EH"];
+const CALC_AREA_FALLBACK_KEYS = ["GG", "MG", "AS", "EH"];
 
 const state = {
   currentUser: null,
@@ -35,12 +35,7 @@ const state = {
   allSummaryRows: [],
   lockForeignScheduleCells: false,
   calcSelection: "",
-  calcInputs: {
-    GG: { rows: "", time: "", goal: "" },
-    MG: { rows: "", time: "", goal: "" },
-    AS: { rows: "", time: "", goal: "" },
-    EH: { rows: "", time: "", goal: "" },
-  },
+  calcInputs: {},
 };
 
 const drag = {
@@ -60,6 +55,12 @@ const drag = {
   targetRangesByCell: new Map(),
   startX: 0,
   startY: 0,
+};
+
+const personOrderDrag = {
+  sourceId: null,
+  targetId: null,
+  position: "after",
 };
 
 const summaryState = {
@@ -189,7 +190,10 @@ function scheduleRevalidateDelay() {
 }
 
 function scheduleIsBusyForBackgroundUpdate() {
-  return drag.active || drag.pending || Boolean(document.querySelector("#scheduleBody .pending-save"));
+  return drag.active
+    || drag.pending
+    || personOrderDrag.sourceId != null
+    || Boolean(document.querySelector("#scheduleBody .pending-save"));
 }
 
 function scheduleNextScheduleRevalidate(delay = scheduleRevalidateDelay()) {
@@ -502,6 +506,164 @@ function refreshPersons() {
   document.querySelectorAll("table.matrix th[data-sort]").forEach((th) => {
     const ind = th.querySelector(".sort-ind");
     if (ind) ind.textContent = th.dataset.sort === state.sortKey ? (state.sortAsc ? "▲" : "▼") : "";
+  });
+}
+
+function canUsePersonSortOrder() {
+  const user = state.currentUser || {};
+  const roles = typeof userRoles === "function" ? userRoles(user) : [user.role];
+  const hasAllowedRole = Boolean(user.is_super_user) || roles.includes("admin") || roles.includes("staffing_manager");
+  const hasArea = user.area_id != null && Number.isFinite(Number(user.area_id));
+  return hasAllowedRole && hasArea && typeof canEditPage === "function" && canEditPage(user, "personSortOrder");
+}
+
+function canReorderPerson(person) {
+  return canUsePersonSortOrder()
+    && Number(person?.home_area_id) === Number(state.currentUser?.area_id);
+}
+
+function setupPersonOrderNameCell(cell, person) {
+  cell.dataset.personId = person.id;
+  if (canReorderPerson(person)) {
+    cell.draggable = true;
+    cell.classList.add("person-order-draggable");
+    cell.title = "Dra namnet för att ändra sorteringen.";
+  } else if (canUsePersonSortOrder()) {
+    cell.classList.add("person-order-locked");
+    cell.title = "Du kan bara sortera personer med samma hemområde som ditt användarområde.";
+  }
+}
+
+function clearPersonOrderDropMarkers() {
+  document
+    .querySelectorAll("#scheduleBody tr.person-order-drop-before, #scheduleBody tr.person-order-drop-after")
+    .forEach((row) => row.classList.remove("person-order-drop-before", "person-order-drop-after"));
+}
+
+function resetPersonOrderDrag() {
+  document.body.classList.remove("dragging-person-order");
+  document
+    .querySelectorAll("#scheduleBody tr.person-order-dragging")
+    .forEach((row) => row.classList.remove("person-order-dragging"));
+  clearPersonOrderDropMarkers();
+  personOrderDrag.sourceId = null;
+  personOrderDrag.targetId = null;
+  personOrderDrag.position = "after";
+}
+
+function updatePersonOrderDropTarget(cell, event) {
+  const targetId = Number(cell.dataset.personId);
+  if (!Number.isInteger(targetId) || targetId === Number(personOrderDrag.sourceId)) return;
+  const rect = cell.getBoundingClientRect();
+  const position = event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+  clearPersonOrderDropMarkers();
+  cell.parentElement.classList.add(position === "before" ? "person-order-drop-before" : "person-order-drop-after");
+  personOrderDrag.targetId = targetId;
+  personOrderDrag.position = position;
+}
+
+function currentAreaPersonIdsForReorder() {
+  const areaId = Number(state.currentUser?.area_id);
+  return state.persons
+    .filter((person) => Number(person.home_area_id) === areaId && person.is_active !== false)
+    .map((person) => Number(person.id));
+}
+
+function movedPersonOrderIds(sourceId, targetId, position, ids) {
+  if (sourceId === targetId) return ids;
+  const withoutSource = ids.filter((id) => id !== sourceId);
+  let index = withoutSource.indexOf(targetId);
+  if (index < 0) return ids;
+  if (position === "after") index += 1;
+  withoutSource.splice(index, 0, sourceId);
+  return withoutSource;
+}
+
+function applyPersonOrderResponse(updatedPersons) {
+  const byId = new Map((updatedPersons || []).map((person) => [Number(person.id), person]));
+  if (!byId.size) return;
+  state.allPersons = state.allPersons.map((person) => (
+    byId.has(Number(person.id)) ? { ...person, ...byId.get(Number(person.id)) } : person
+  ));
+  state.sortKey = "sort_order";
+  state.sortAsc = true;
+  refreshPersons();
+  buildRows();
+  setupScheduleHorizontalScroll();
+}
+
+async function savePersonOrder(sourceId, targetId, position) {
+  if (!canUsePersonSortOrder()) {
+    showToast("Du saknar behörighet att sortera personer.", "error", 5000);
+    return;
+  }
+  if (state.nameFilter.trim()) {
+    showToast("Rensa personfiltret innan du sorterar personer.", "warn", 5000);
+    return;
+  }
+  const ids = currentAreaPersonIdsForReorder();
+  if (!ids.includes(sourceId) || !ids.includes(targetId)) {
+    showToast("Du kan bara sortera personer med samma hemområde som ditt användarområde.", "warn", 5000);
+    return;
+  }
+  const personIds = movedPersonOrderIds(sourceId, targetId, position, ids);
+  if (personIds.join(",") === ids.join(",")) return;
+  markScheduleActivity();
+  try {
+    const updatedPersons = await api.put("/api/persons/sort-order", { person_ids: personIds });
+    invalidateScheduleAllCache();
+    applyPersonOrderResponse(updatedPersons);
+    showToast("Personsorteringen sparades.", "success", 2500);
+  } catch (error) {
+    showToast(error.message || "Kunde inte spara personsorteringen.", "error", 7000);
+    if (error.status === 409) await loadSchedule();
+  }
+}
+
+function setupPersonOrderDrag() {
+  const body = document.getElementById("scheduleBody");
+  body.addEventListener("dragstart", (event) => {
+    const cell = event.target.closest("td.name[data-person-id]");
+    if (!cell) return;
+    const person = personById(Number(cell.dataset.personId));
+    if (!canReorderPerson(person) || state.nameFilter.trim()) {
+      event.preventDefault();
+      if (state.nameFilter.trim()) showToast("Rensa personfiltret innan du sorterar personer.", "warn", 4000);
+      return;
+    }
+    personOrderDrag.sourceId = Number(cell.dataset.personId);
+    document.body.classList.add("dragging-person-order");
+    cell.parentElement.classList.add("person-order-dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(personOrderDrag.sourceId));
+  });
+
+  body.addEventListener("dragover", (event) => {
+    if (personOrderDrag.sourceId == null) return;
+    const cell = event.target.closest("td.name[data-person-id]");
+    if (!cell) return;
+    const person = personById(Number(cell.dataset.personId));
+    if (!canReorderPerson(person)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    updatePersonOrderDropTarget(cell, event);
+  });
+
+  body.addEventListener("drop", (event) => {
+    if (personOrderDrag.sourceId == null) return;
+    const cell = event.target.closest("td.name[data-person-id]");
+    if (!cell) return;
+    event.preventDefault();
+    const sourceId = Number(personOrderDrag.sourceId);
+    const targetId = Number(personOrderDrag.targetId || cell.dataset.personId);
+    const position = personOrderDrag.position;
+    resetPersonOrderDrag();
+    void savePersonOrder(sourceId, targetId, position);
+  });
+
+  body.addEventListener("dragend", resetPersonOrderDrag);
+  body.addEventListener("dragleave", (event) => {
+    if (!body.contains(event.relatedTarget)) clearPersonOrderDropMarkers();
   });
 }
 
@@ -1001,6 +1163,28 @@ function areaNameByCode(code) {
     || ({ GG: "Granngården", MG: "Mestergruppen", AS: "Autostore", EH: "E-Handel" }[code] || code);
 }
 
+function calcAreaKeys() {
+  const seen = new Set();
+  const keys = [];
+  state.areas
+    .filter((area) => area?.is_active !== false)
+    .sort((a, b) => (Number(a?.sort_order) || 0) - (Number(b?.sort_order) || 0))
+    .forEach((area) => {
+      const code = String(area?.code || "").trim().toUpperCase();
+      if (!code || code === "ANNAT" || seen.has(code)) return;
+      seen.add(code);
+      keys.push(code);
+    });
+  return keys.length ? keys : CALC_AREA_FALLBACK_KEYS;
+}
+
+function ensureCalcInput(areaKey) {
+  if (!state.calcInputs[areaKey]) {
+    state.calcInputs[areaKey] = { rows: "", time: "", goal: "" };
+  }
+  return state.calcInputs[areaKey];
+}
+
 function sanitizeNumericInput(value) {
   const cleaned = String(value || "").replace(/[^\d.,]/g, "");
   const firstSep = cleaned.search(/[.,]/);
@@ -1021,7 +1205,7 @@ function activityHoursByCode(code) {
 }
 
 function calcMetrics(areaKey) {
-  const values = state.calcInputs[areaKey] || { rows: "", time: "", goal: "" };
+  const values = ensureCalcInput(areaKey);
   const rows = parseNumericInput(values.rows);
   const time = parseNumericInput(values.time);
   const goal = parseNumericInput(values.goal);
@@ -1080,9 +1264,13 @@ function renderCalculator() {
     };
   }
 
-  const selectedKeys = state.calcSelection === "ALL" ? CALC_AREA_KEYS : [state.calcSelection];
+  const availableKeys = calcAreaKeys();
+  if (state.calcSelection !== "ALL" && !availableKeys.includes(state.calcSelection)) {
+    state.calcSelection = "ALL";
+  }
+  const selectedKeys = state.calcSelection === "ALL" ? availableKeys : [state.calcSelection];
   container.innerHTML = selectedKeys.map((areaKey) => {
-    const values = state.calcInputs[areaKey];
+    const values = ensureCalcInput(areaKey);
     const metrics = calcMetrics(areaKey);
     return `
       <div class="calc-panel" data-area-key="${areaKey}">
@@ -1143,7 +1331,8 @@ function renderCalculator() {
 function setupCalculator() {
   if (!state.calcSelection) {
     const currentAreaCode = areaCodeById(state.areaId);
-    state.calcSelection = CALC_AREA_KEYS.includes(currentAreaCode) ? currentAreaCode : "ALL";
+    const availableKeys = calcAreaKeys();
+    state.calcSelection = availableKeys.includes(currentAreaCode) ? currentAreaCode : "ALL";
   }
 
   renderCalculator();
@@ -1151,7 +1340,8 @@ function setupCalculator() {
 
 function syncCalculatorWithSelectedArea() {
   const currentAreaCode = areaCodeById(state.areaId);
-  state.calcSelection = CALC_AREA_KEYS.includes(currentAreaCode) ? currentAreaCode : "ALL";
+  const availableKeys = calcAreaKeys();
+  state.calcSelection = availableKeys.includes(currentAreaCode) ? currentAreaCode : "ALL";
   renderCalculator();
 }
 
@@ -1634,6 +1824,7 @@ function buildRows() {
     const name = document.createElement("td");
     name.className = "name";
     name.textContent = person.name;
+    setupPersonOrderNameCell(name, person);
     tr.appendChild(name);
 
     const base = document.createElement("td");
@@ -2610,6 +2801,7 @@ async function loadSchedule() {
   buildHeader();
   await loadSchedule();
   setupDrag();
+  setupPersonOrderDrag();
   setupKeyboard();
   document.addEventListener("pointerdown", markScheduleActivity, { passive: true });
   document.addEventListener("keydown", markScheduleActivity, { passive: true });

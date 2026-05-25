@@ -112,6 +112,15 @@ def test_role_view_access_can_grant_bearbeta_to_lagerkontorist():
     assert not can_use_allocation_process(user, {"warehouse_clerk": {"allocationProcess": "view"}})
 
 
+def test_bearbeta_matrix_has_separate_view_and_edit_permission():
+    user = make_user("warehouse_clerk", roles=["warehouse_clerk"])
+    access = {"warehouse_clerk": {"allocationProcessMatrix": "view"}}
+
+    assert can_access_view(user, access, "allocationProcessMatrix", "view")
+    assert not can_access_view(user, access, "allocationProcessMatrix", "edit")
+    assert can_access_view(make_user("admin"), {}, "allocationProcessMatrix", "edit")
+
+
 def test_role_view_access_levels_match_view_and_edit_contract():
     viewer = make_user("viewer")
 

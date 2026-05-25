@@ -1,7 +1,7 @@
 ---
 title: Personer
 status: aktiv
-updated: 2026-05-22
+updated: 2026-05-25
 tags: [personer, register, ui, import]
 ---
 
@@ -24,6 +24,7 @@ Kort svar: Personer ar registret over alla planerbara personer. Sidan stoder ny 
 | Klick pa Hemomrade | Inline-select | Sparar nytt hemomrade | `PUT /api/persons/{id}` | Omrade styr sort/fokus och standardplacering. |
 | Klick pa Huvudaktivitet | Inline-select | Sparar huvudaktivitet | `PUT /api/persons/{id}` | Visas i schema som personens standardaktivitet. |
 | Klick pa Sortering | Inline-number | Sparar sorteringsnummer | `PUT /api/persons/{id}` | Ctrl+Z kan angra senaste personandring. |
+| Dra personnamn i Bemanning/Oversikt | Drar ett namn upp eller ned i planeringsvyn | Uppdaterar samma sorteringsnummer som visas i Personer | `PUT /api/persons/sort-order` | Kraver Personsortering=Redigera, ratt roll och samma anvandaromrade som personens hemomrade. |
 | Schema | Oppnar veckomallmodal | Hamter/sparar personlig mall | `GET/PUT /api/persons/{id}/schedule` | Tider maste vara 06-24 och start < slut. |
 | Ta bort | Bekraftar borttagning | Inaktiverar person | `DELETE /api/persons/{id}` | Texten sager "permanent", men backend anvander soft delete. |
 | Ctrl+Z | Angrar senaste inline-personandring | Sparar snapshot tillbaka | `PUT /api/persons/{id}` | Galler lokal session. |

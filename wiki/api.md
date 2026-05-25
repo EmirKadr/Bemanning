@@ -41,10 +41,11 @@ Kort svar: `API_ROUTES.md` ar kontraktslistan och testas mot FastAPI-appen via `
 - `GET /api/overview/revision`, `/api/overview/revision/month` - latta revisionsnycklar for tyst bakgrundsrefresh.
 - `POST /api/overview/day` - satt en hel dag.
 - `POST /api/overview/days/bulk` - satt flera dagar via drag.
+- `PUT /api/persons/sort-order` - sparar ny personordning for anvandarens eget omrade nar personnamn dras i Bemanning eller Oversikt.
 
 ## Register och settings
 
-- `GET/POST/PUT/DELETE /api/persons...`, `POST /api/persons/import-rows` - personregister, Excelimport och direktimport fran tabellrader.
+- `GET/POST/PUT/DELETE /api/persons...`, `POST /api/persons/import-rows`, `PUT /api/persons/sort-order` - personregister, Excelimport, direktimport fran tabellrader och begransad sortering fran planeringsvyerna.
 - `GET/PUT /api/persons/{id}/schedule` - veckomall.
 - `GET/POST/PUT/DELETE /api/activities...`, `POST /api/activities/import-rows` - aktivitetsregister, Excelimport och direktimport fran tabellrader.
 - `GET/POST/PUT/DELETE /api/areas...` - omraden. Delete tar bort tomma omraden men inaktiverar omradet om personer, aktiviteter eller anvandare redan pekar pa det.
@@ -64,7 +65,9 @@ eller skapa/importera med explicit verksamhet.
 - `POST /api/audit/client-error` - tyst klientrapportering av API-fel som anvandaren traffar; sparar sanerad path/status/felkod utan request body eller queryvarden.
 - `GET /api/productivity/files`, `GET /api/productivity/targets`, `GET /api/productivity` - produktivitet, kraver `productivity=view`.
 - `POST /api/productivity/files`, `POST /api/productivity/files/raw`, `DELETE /api/productivity/files/{file_type}` - serverhanterade produktivitetsfiler, kraver `productivity=edit`.
-- `GET /api/allokering/health`, `/flows`, `/pool`, `POST /detect`, `POST /flow/{flow_id}`, `POST /open-excel`, `GET /table-column/...`, `GET /download/...` - lagerverktyg.
+- `GET /api/coredata/files` - listar verksamhetens permanenta coredata-karnfiler for lagerverktygen.
+- `POST /api/coredata/files/raw` - laddar upp en coredata-karnfil till anvandarens verksamhet och ersatter aldre fil med samma prefix, kraver `allocationUploads=edit`.
+- `GET /api/allokering/health`, `/flows`, `/pool`, `GET/PUT /process-matrix`, `POST /detect`, `POST /flow/{flow_id}`, `POST /open-excel`, `GET /table-column/...`, `GET /download/...` - lagerverktyg.
 - `GET /api/public/...` - publika text/CSV-summeringar for timmar/personer. Queryparametern `business` defaultar till `STIGAMO`; publika endpoints summerar inte globalt.
 
 ## Agentkommandon
@@ -80,4 +83,5 @@ python -m tools.flow_cli api GET /api/health
 - `../API_ROUTES.md`
 - `../tools/flow_cli.py`
 - `../app/backend/business_scope.py`
+- `../app/backend/routers/coredata.py`
 - `../tests/tools/test_flow_cli.py`

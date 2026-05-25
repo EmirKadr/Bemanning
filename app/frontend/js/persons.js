@@ -2,6 +2,7 @@
 
 let areas = [];
 let activities = [];
+let activitiesActive = [];
 let businesses = [];
 let persons = [];
 let currentUser = null;
@@ -15,11 +16,13 @@ let personUndoBusy = false;
 async function loadInitial() {
   const requests = [
     api.get("/api/areas"),
+    api.get("/api/activities"),
     api.get("/api/activities?include_inactive=true"),
   ];
   if (currentUser?.is_super_user) requests.push(api.get("/api/businesses"));
-  const [a, act, biz] = await Promise.all(requests);
+  const [a, activeAct, act, biz] = await Promise.all(requests);
   areas = a;
+  activitiesActive = activeAct;
   activities = act;
   businesses = biz || [];
 }
@@ -321,7 +324,7 @@ function renderRows() {
     if (canEditPersons) tdAct.addEventListener("click", () =>
       editSelect(
         tdAct, p, "home_activity_id", p.home_activity_id,
-        activities,
+        activitiesActive,
         (a) => a.id,
         (a) => a.label,
       )
@@ -465,7 +468,7 @@ function openBulkPersonsModal() {
       ...businessColumn,
       { key: "name", label: "Namn" },
       { key: "home_area", label: "Hemområde", type: "select", options: areas.map((area) => ({ value: area.name, label: area.name })) },
-      { key: "home_activity", label: "Huvudaktivitet", type: "select", options: activities.map((activity) => ({ value: activity.label, label: activity.label })) },
+      { key: "home_activity", label: "Huvudaktivitet", type: "select", options: activitiesActive.map((activity) => ({ value: activity.label, label: activity.label })) },
       { key: "sort_order", label: "Sortering", type: "number" },
     ],
     onSubmit: async (rows) => {
@@ -533,7 +536,7 @@ function openModal(person) {
       <label>Huvudaktivitet</label>
       <select id="m-activity">
         <option value="">(inget)</option>
-        ${activities.map((a) => `<option value="${a.id}" ${person?.home_activity_id === a.id ? "selected" : ""}>${escapeHtml(a.label)}</option>`).join("")}
+        ${activitiesActive.map((a) => `<option value="${a.id}" ${person?.home_activity_id === a.id ? "selected" : ""}>${escapeHtml(a.label)}</option>`).join("")}
       </select>
       <label>Sortering</label>
       <input id="m-sort" type="number" value="${person?.sort_order ?? 0}" />

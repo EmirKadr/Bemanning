@@ -12,6 +12,7 @@ from .user_access import normalize_role_view_access_ids, normalize_role_view_id
 LOCK_FOREIGN_SCHEDULE_CELLS_KEY = "lock_foreign_schedule_cells"
 SIDEBAR_LAYOUT_KEY = "sidebar_layout"
 ROLE_VIEW_ACCESS_KEY = "role_view_access"
+ALLOCATION_PROCESS_MATRIX_KEY = "allocation_process_matrix"
 
 
 def _bool_text(value: bool) -> str:

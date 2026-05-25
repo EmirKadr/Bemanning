@@ -5,6 +5,59 @@ const ALLOCATION_STORE = "files";
 const ALLOCATION_WORK_STATE_VERSION = 1;
 const ALLOCATION_WORK_STATE_PREFIX = "flow-allocation-work-state-v1:";
 const ALLOCATION_HIDDEN_FLOW_IDS = new Set(["observations-update", "observations-sync", "update-check"]);
+const ALLOCATION_PROCESS_AREA_PARAM = "__process_area_focus";
+const ALLOCATION_PROCESS_AREA_OPTIONS = [
+  { code: "GG", label: "GG" },
+  { code: "MG", label: "MG" },
+  { code: "AS", label: "AS" },
+  { code: "EH", label: "EH" },
+  { code: "R3", label: "R3" },
+  { code: "ALLT", label: "Alla" },
+];
+const ALLOCATION_PROCESS_MATRIX = {
+  GG: {
+    company: "GG",
+    excludeCustomers: ["6005"],
+    filterLabel: "Filter: Bolag GG, exkl. kundnr 6005",
+    visibleFlowIds: null,
+  },
+  MG: {
+    company: "MG",
+    excludeCustomers: ["40002", "90002"],
+    filterLabel: "Filter: Bolag MG, exkl. kundnr 40002 och 90002",
+    visibleFlowIds: null,
+  },
+  AS: {
+    company: "",
+    excludeCustomers: [],
+    filterLabel: "",
+    visibleFlowIds: null,
+  },
+  EH: {
+    company: "",
+    excludeCustomers: [],
+    filterLabel: "",
+    visibleFlowIds: null,
+  },
+  R3: {
+    company: "",
+    excludeCustomers: [],
+    filterLabel: "",
+    visibleFlowIds: null,
+  },
+  ALLT: {
+    company: "",
+    excludeCustomers: [],
+    filterLabel: "",
+    visibleFlowIds: null,
+  },
+  DEFAULT: {
+    company: "",
+    excludeCustomers: [],
+    filterLabel: "",
+    visibleFlowIds: null,
+  },
+};
 const ALLOCATION_KEY_OVERRIDES = { details: "orders", wms_buffert: "buffer" };
 const ALLOCATION_FILE_WORDS = {
   orders: ["v_ask_customer_order_details_all", "customer_order_details_all", "customer_order_details", "detalj kundorder"],
@@ -67,6 +120,46 @@ const ALLOCATION_PRODUCTIVITY_KEYS = {
   wms_trans: "trans",
   productivity_pallet: "pallet",
 };
+const ALLOCATION_COREDATA_UPLOAD_SPECS = [
+  { key: "article_max", prefix: "artikel_max" },
+  { key: "article_max", prefix: "article_max" },
+  { key: "item_attribute", prefix: "item_attribute" },
+  { key: "kpi_target_rule", prefix: "kpi_target_rule" },
+  { key: "item_option", prefix: "item_option" },
+  { key: "pallet_type", prefix: "pallet_type" },
+  { key: "item_alias", prefix: "item_alias" },
+  { key: "dimension", prefix: "dimension" },
+  { key: "custom", prefix: "custom" },
+  { key: "item", prefix: "item" },
+];
+const ALLOCATION_COREDATA_SLOT_TYPES = {
+  max_csv: "article_max",
+  items: "item_option",
+};
+const ALLOCATION_COREDATA_DISPLAY_ORDER = [
+  "article_max",
+  "custom",
+  "dimension",
+  "item",
+  "item_alias",
+  "item_attribute",
+  "item_option",
+  "kpi_target_rule",
+  "pallet_type",
+  "kpi",
+];
+const ALLOCATION_COREDATA_LABELS = {
+  article_max: "artikel_max.csv",
+  custom: "Custom",
+  dimension: "Dimension",
+  item: "Item",
+  item_alias: "Item alias",
+  item_attribute: "Item attribute",
+  item_option: "Item option",
+  kpi_target_rule: "KPI target rule",
+  pallet_type: "Pallet type",
+  kpi: "KPI-Mål",
+};
 const ALLOCATION_CORE_FILES = {
   max_csv: {
     name: "artikel_max.csv",
@@ -87,6 +180,8 @@ const allocationState = {
   flows: [],
   visibleFlows: [],
   files: {},
+  coredata: {},
+  processMatrix: null,
   values: {},
   busyId: "",
   status: "",
@@ -115,8 +210,26 @@ function allocationSlotLabel(key) {
   return ALLOCATION_SLOT_LABELS[allocationLogicalKey(key)] || key;
 }
 
+function allocationCoreDataFile(key) {
+  const fileType = ALLOCATION_COREDATA_SLOT_TYPES[allocationLogicalKey(key)];
+  const entry = fileType ? allocationState.coredata?.files?.[fileType] : null;
+  if (!entry?.uploaded) return null;
+  return {
+    name: entry.name || `${entry.prefix || fileType}.csv`,
+    badge: "KÃ¤rnfil",
+    sizeLabel: "KÃ¤rnfil",
+  };
+}
+
+function allocationCoreDataBackedSlotIsHidden(key) {
+  const logicalKey = allocationLogicalKey(key);
+  if (allocationState.files[logicalKey]) return false;
+  return Boolean(allocationCoreDataFile(logicalKey));
+}
+
 function allocationCoreFile(key) {
-  return ALLOCATION_CORE_FILES[allocationLogicalKey(key)] || null;
+  const logicalKey = allocationLogicalKey(key);
+  return allocationCoreDataFile(logicalKey) || ALLOCATION_CORE_FILES[logicalKey] || null;
 }
 
 function allocationDisplayFile(key) {
@@ -141,7 +254,100 @@ function allocationPageActiveName(page) {
 function allocationWorkStateKey(page = allocationState.page) {
   if (page !== "process" && page !== "split") return "";
   const userKey = allocationState.user?.id ?? allocationState.user?.username ?? "current";
-  return `${ALLOCATION_WORK_STATE_PREFIX}${String(userKey)}:${page}`;
+  const focusKey = page === "process" ? `:${String(window.readAreaFocus?.() || "ALLT")}` : "";
+  return `${ALLOCATION_WORK_STATE_PREFIX}${String(userKey)}:${page}${focusKey}`;
+}
+
+function allocationProcessAreaCode() {
+  return String(window.areaFocusCode?.() || "").trim().toUpperCase();
+}
+
+function appendAllocationAreaFocus(formData) {
+  const focusCode = allocationProcessAreaCode();
+  if (focusCode) formData.append(ALLOCATION_PROCESS_AREA_PARAM, focusCode);
+}
+
+function normalizeAllocationProcessRule(rule = {}) {
+  const company = String(rule.company || "").trim().toUpperCase();
+  const rawExcluded = Array.isArray(rule.excludeCustomers)
+    ? rule.excludeCustomers
+    : Array.isArray(rule.exclude_customers)
+      ? rule.exclude_customers
+      : String(rule.excludeCustomers || rule.exclude_customers || "").split(/[,;\s]+/);
+  const excludeCustomers = [...new Set(rawExcluded.map((value) => String(value || "").trim()).filter(Boolean))];
+  const visibleFlowIds = Array.isArray(rule.visibleFlowIds)
+    ? rule.visibleFlowIds.map((value) => String(value || "").trim()).filter(Boolean)
+    : Array.isArray(rule.visible_flow_ids)
+      ? rule.visible_flow_ids.map((value) => String(value || "").trim()).filter(Boolean)
+      : null;
+  const filterLabel = typeof rule.filterLabel === "string" ? rule.filterLabel : "";
+  return {
+    company,
+    excludeCustomers,
+    filterLabel,
+    visibleFlowIds,
+  };
+}
+
+function allocationProcessFallbackMatrix() {
+  const matrix = {};
+  for (const [code, rule] of Object.entries(ALLOCATION_PROCESS_MATRIX)) {
+    matrix[code] = normalizeAllocationProcessRule(rule);
+  }
+  return {
+    areas: ALLOCATION_PROCESS_AREA_OPTIONS.map((area) => ({ ...area })),
+    flows: [],
+    matrix,
+  };
+}
+
+function normalizeAllocationProcessMatrix(data = null) {
+  const fallback = allocationProcessFallbackMatrix();
+  const matrix = { ...fallback.matrix };
+  const incoming = data?.matrix && typeof data.matrix === "object" ? data.matrix : {};
+  for (const [code, rule] of Object.entries(incoming)) {
+    const areaCode = String(code || "").trim().toUpperCase();
+    if (!areaCode) continue;
+    matrix[areaCode] = normalizeAllocationProcessRule(rule);
+  }
+  const areas = Array.isArray(data?.areas) && data.areas.length
+    ? data.areas.map((area) => ({
+        code: String(area.code || area.value || "").trim().toUpperCase(),
+        label: String(area.label || area.code || area.value || "").trim(),
+      })).filter((area) => area.code)
+    : fallback.areas;
+  const flows = Array.isArray(data?.flows)
+    ? data.flows.map((flow) => ({
+        id: String(flow.id || "").trim(),
+        label: String(flow.label || flow.id || "").trim(),
+        category: String(flow.category || "").trim(),
+      })).filter((flow) => flow.id)
+    : [];
+  return { areas, flows, matrix };
+}
+
+function allocationProcessMatrixData() {
+  return allocationState.processMatrix || allocationProcessFallbackMatrix();
+}
+
+function allocationProcessRule(code = allocationProcessAreaCode()) {
+  const matrix = allocationProcessMatrixData().matrix || {};
+  return matrix[code] || matrix.DEFAULT || normalizeAllocationProcessRule(ALLOCATION_PROCESS_MATRIX.DEFAULT);
+}
+
+function allocationFlowVisibleForCurrentArea(flow) {
+  if (allocationState.page !== "process") return true;
+  const visibleFlowIds = allocationProcessRule().visibleFlowIds;
+  return !Array.isArray(visibleFlowIds) || visibleFlowIds.includes(flow.id);
+}
+
+function allocationFlowsForCurrentView() {
+  return allocationState.visibleFlows.filter((flow) => allocationFlowVisibleForCurrentArea(flow));
+}
+
+function allocationProcessFilterNotice() {
+  if (allocationState.page !== "process") return "";
+  return allocationProcessRule().filterLabel || "";
 }
 
 function serializableAllocationValues(values) {
@@ -291,6 +497,20 @@ function allocationDisplaySizeLabel(entry, coreEntry) {
   return coreEntry?.sizeLabel || "";
 }
 
+function allocationCoreDataItems() {
+  const files = allocationState.coredata?.files || {};
+  return ALLOCATION_COREDATA_DISPLAY_ORDER.map((key) => {
+    const entry = files[key] || {};
+    return {
+      key,
+      label: ALLOCATION_COREDATA_LABELS[key] || entry.label || key,
+      uploaded: Boolean(entry.uploaded),
+      name: entry.name || "",
+      sizeLabel: entry.size_label || "",
+    };
+  });
+}
+
 async function allocationJson(path, options = {}) {
   const response = await fetch(path, { credentials: "include", ...options });
   const ct = response.headers.get("content-type") || "";
@@ -307,10 +527,30 @@ async function allocationPostForm(path, formData) {
   return allocationJson(path, { method: "POST", body: formData });
 }
 
+async function loadAllocationCoreDataStatus() {
+  try {
+    allocationState.coredata = await allocationJson("/api/coredata/files");
+  } catch (error) {
+    console.warn("Kunde inte lÃ¤sa kÃ¤rnfiler.", error);
+    allocationState.coredata = {};
+  }
+}
+
 async function loadAllocationFlows() {
   const data = await allocationJson(`${ALLOCATION_API}/flows`);
   allocationState.flows = data.flows || [];
   allocationState.visibleFlows = allocationState.flows.filter((flow) => !ALLOCATION_HIDDEN_FLOW_IDS.has(flow.id));
+}
+
+async function loadAllocationProcessMatrix() {
+  if (allocationState.page !== "process") return;
+  try {
+    const data = await allocationJson(`${ALLOCATION_API}/process-matrix`);
+    allocationState.processMatrix = normalizeAllocationProcessMatrix(data);
+  } catch (error) {
+    console.warn("Kunde inte lasa Bearbeta-matris.", error);
+    allocationState.processMatrix = allocationProcessFallbackMatrix();
+  }
 }
 
 function deriveAllocationSlots(flows) {
@@ -398,6 +638,30 @@ function productivitySharedUploadCandidates(files) {
   });
 }
 
+function classifyAllocationCoreDataFile(file) {
+  const stem = String(file?.name || "").toLowerCase().replace(/\.[^.]+$/, "");
+  if (!stem) return null;
+  for (const spec of ALLOCATION_COREDATA_UPLOAD_SPECS) {
+    if (
+      stem === spec.prefix
+      || stem.startsWith(`${spec.prefix}-`)
+      || stem.startsWith(`${spec.prefix}_`)
+      || stem.startsWith(`${spec.prefix}.`)
+      || stem.startsWith(`${spec.prefix} `)
+    ) {
+      return spec.key;
+    }
+  }
+  return null;
+}
+
+async function uploadAllocationCoreDataFile(file) {
+  return await api.postFile(
+    `/api/coredata/files/raw?filename=${encodeURIComponent(file.name || "coredata.csv")}`,
+    file,
+  );
+}
+
 async function routeProductivityFilesFromSharedUpload(files) {
   const candidates = productivitySharedUploadCandidates(files);
   if (!candidates.length || !window.productivityUploads?.saveFiles) {
@@ -429,10 +693,21 @@ async function routeAllocationFiles(files, slots, options = {}) {
   allocationState.status = "Identifierar filer...";
   renderAllocationPage();
   const assigned = [];
+  const coredataSaved = [];
   const unknown = [];
   let productivityResult = { saved: [], unknown: [], hiddenSaved: 0, recognized: [] };
   try {
     for (const file of dropped) {
+      if (classifyAllocationCoreDataFile(file)) {
+        try {
+          const result = await uploadAllocationCoreDataFile(file);
+          if (result.status) allocationState.coredata = result.status;
+          coredataSaved.push(file.name || "kÃ¤rnfil");
+        } catch (error) {
+          showToast(error.message || "Kunde inte uppdatera kÃ¤rnfil.", "error", 7000);
+        }
+        continue;
+      }
       let targets = [];
       try {
         const result = await detectAllocationFile(file);
@@ -456,6 +731,7 @@ async function routeAllocationFiles(files, slots, options = {}) {
   } finally {
     const uploadedNames = new Set([
       ...assigned.map((item) => item.file?.name || ""),
+      ...coredataSaved,
       ...(productivityResult.recognized || productivityResult.saved || []),
     ].filter(Boolean));
     window.allocationUploadActivity?.finish(uploadedNames.size);
@@ -464,6 +740,7 @@ async function routeAllocationFiles(files, slots, options = {}) {
   const visibleUnknown = unknown.filter((name) => !productivityNames.has(name));
   const uploadedNames = new Set([
     ...assigned.map((item) => item.file?.name || ""),
+    ...coredataSaved,
     ...(productivityResult.recognized || productivityResult.saved || []),
   ].filter(Boolean));
   if (uploadedNames.size === 1) allocationState.status = "1 fil inlagd.";
@@ -540,15 +817,20 @@ async function triggerAllocationObservationsUpdate(entry) {
 }
 
 function currentAllocationSlots() {
-  return mergeUploadOnlySlots(deriveAllocationSlots(allocationState.visibleFlows));
+  return mergeUploadOnlySlots(deriveAllocationSlots(allocationFlowsForCurrentView()));
+}
+
+function visibleUploadFileSlots(slots) {
+  if (allocationState.page !== "uploads") return slots;
+  return slots.filter((slot) => !allocationCoreDataBackedSlotIsHidden(slot.key));
 }
 
 function flowById(id) {
-  return allocationState.visibleFlows.find((flow) => flow.id === id);
+  return allocationFlowsForCurrentView().find((flow) => flow.id === id);
 }
 
 function combinedAllocationFlows() {
-  return allocationState.visibleFlows.filter((flow) => flow.view === "combined");
+  return allocationFlowsForCurrentView().filter((flow) => flow.view === "combined");
 }
 
 function allocationFileRows(slots) {
@@ -638,7 +920,8 @@ function bindAllocationCommonEvents(root) {
 }
 
 function renderUploadsView() {
-  const slots = currentAllocationSlots();
+  const allSlots = currentAllocationSlots();
+  const slots = visibleUploadFileSlots(allSlots);
   const filled = slots.filter((slot) => allocationDisplayFile(slot.key)).length;
   renderAllocationShell(`
     <section class="allocation-panel" data-allocation-drop>
@@ -655,6 +938,7 @@ function renderUploadsView() {
       ${allocationState.status ? `<p class="allocation-status">${allocationEscape(allocationState.status)}</p>` : ""}
       <div class="allocation-file-grid">${allocationFileRows(slots)}</div>
     </section>
+    ${renderCoreDataFilesView()}
   `);
   document.getElementById("allocation-upload-all")?.addEventListener("change", async (event) => {
     await routeAllocationFiles(event.target.files, slots);
@@ -666,6 +950,35 @@ function renderUploadsView() {
       showToast(error.message || "Kunde inte rensa filerna.", "error", 7000);
     }
   });
+}
+
+function renderCoreDataFilesView() {
+  const items = allocationCoreDataItems();
+  if (!items.length) return "";
+  const uploaded = items.filter((item) => item.uploaded).length;
+  return `
+    <section class="allocation-panel allocation-coredata-panel" data-allocation-drop>
+      <div class="allocation-panel-head">
+        <h2>Kärnfiler</h2>
+        <div><span class="allocation-muted">${uploaded}/${items.length} finns</span></div>
+      </div>
+      <div class="allocation-file-grid compact">
+        ${items.map((item) => `
+          <div class="allocation-file-slot ${item.uploaded ? "filled" : ""}" data-allocation-drop>
+            <div>
+              <h3>${allocationEscape(item.label)}</h3>
+              <p>${item.uploaded
+                ? `${allocationEscape(item.name)} ${item.sizeLabel ? `<span>${allocationEscape(item.sizeLabel)}</span>` : ""}`
+                : "Ingen kärnfil för verksamheten"}</p>
+            </div>
+            <div class="allocation-file-actions">
+              <span class="allocation-file-badge">${item.uploaded ? "Kärnfil" : "Saknas"}</span>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
 }
 
 function slotsForFlow(flow) {
@@ -751,6 +1064,9 @@ async function runAllocationFlow(flow) {
   persistAllocationWorkState({ status: "", result: null });
   renderAllocationPage();
   const fd = new FormData();
+  if (allocationState.page === "process") {
+    appendAllocationAreaFocus(fd);
+  }
   for (const input of flow.inputs || []) {
     if (input.type === "file") {
       const entry = allocationState.files[allocationFileInputKey(input)];
@@ -1013,8 +1329,194 @@ function ensureFlowPopoverDismiss() {
   });
 }
 
+function canViewAllocationProcessMatrix() {
+  return Boolean(window.canViewPage?.(allocationState.user, "allocationProcessMatrix") || allocationState.user?.is_super_user);
+}
+
+function canEditAllocationProcessMatrix() {
+  return Boolean(window.canEditPage?.(allocationState.user, "allocationProcessMatrix") || allocationState.user?.is_super_user);
+}
+
+function allocationProcessMatrixAreas() {
+  return allocationProcessMatrixData().areas || ALLOCATION_PROCESS_AREA_OPTIONS;
+}
+
+function allocationProcessMatrixFlows() {
+  const savedFlows = allocationProcessMatrixData().flows || [];
+  if (savedFlows.length) return savedFlows;
+  return allocationState.visibleFlows
+    .filter((flow) => flow.view === "combined" && !ALLOCATION_HIDDEN_FLOW_IDS.has(flow.id))
+    .map((flow) => ({
+      id: String(flow.id || ""),
+      label: String(flow.label || flow.id || ""),
+      category: String(flow.category || ""),
+    }))
+    .filter((flow) => flow.id);
+}
+
+function cloneAllocationProcessMatrixRules(rules) {
+  const cloned = {};
+  for (const [code, rule] of Object.entries(rules || {})) {
+    cloned[code] = {
+      company: String(rule.company || ""),
+      excludeCustomers: [...(rule.excludeCustomers || [])],
+      filterLabel: String(rule.filterLabel || ""),
+      visibleFlowIds: Array.isArray(rule.visibleFlowIds) ? [...rule.visibleFlowIds] : null,
+    };
+  }
+  return cloned;
+}
+
+function allocationProcessMatrixDraft(defaults = false) {
+  const source = defaults ? allocationProcessFallbackMatrix().matrix : allocationProcessMatrixData().matrix;
+  return cloneAllocationProcessMatrixRules(source);
+}
+
+function allocationProcessMatrixFlowChecks(code, rule, flows) {
+  const allFlows = !Array.isArray(rule.visibleFlowIds);
+  const visible = new Set(rule.visibleFlowIds || []);
+  return `
+    <div class="allocation-process-flow-grid" data-matrix-flow-grid="${allocationEscape(code)}">
+      <label class="modal-checkbox allocation-process-flow-all">
+        <input type="checkbox" data-matrix-all-flows="${allocationEscape(code)}" ${allFlows ? "checked" : ""} />
+        <span>Alla</span>
+      </label>
+      ${flows.map((flow) => `
+        <label class="modal-checkbox allocation-process-flow-check">
+          <input
+            type="checkbox"
+            data-matrix-flow="${allocationEscape(code)}"
+            value="${allocationEscape(flow.id)}"
+            ${allFlows || visible.has(flow.id) ? "checked" : ""}
+            ${allFlows ? "disabled" : ""}
+          />
+          <span>${allocationEscape(flow.label)}</span>
+        </label>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderAllocationProcessMatrixEditor(host, draft, readonly = false) {
+  const areas = allocationProcessMatrixAreas();
+  const flows = allocationProcessMatrixFlows();
+  host.innerHTML = `
+    <div class="modal-table-scroll allocation-process-matrix-scroll">
+      <table class="allocation-process-matrix-table">
+        <thead>
+          <tr>
+            <th>Toggle</th>
+            <th>Bolag</th>
+            <th>Exkl. kundnr</th>
+            <th>Funktioner</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${areas.map((area) => {
+            const code = String(area.code || "").toUpperCase();
+            const rule = draft[code] || normalizeAllocationProcessRule(ALLOCATION_PROCESS_MATRIX.DEFAULT);
+            return `
+              <tr data-matrix-area="${allocationEscape(code)}">
+                <th>${allocationEscape(area.label || code)}</th>
+                <td>
+                  <input type="text" data-matrix-company="${allocationEscape(code)}" value="${allocationEscape(rule.company || "")}" aria-label="Bolag ${allocationEscape(code)}" ${readonly ? "disabled" : ""} />
+                </td>
+                <td>
+                  <input type="text" data-matrix-exclude="${allocationEscape(code)}" value="${allocationEscape((rule.excludeCustomers || []).join(", "))}" aria-label="Exkludera kundnr ${allocationEscape(code)}" ${readonly ? "disabled" : ""} />
+                </td>
+                <td>${allocationProcessMatrixFlowChecks(code, rule, flows)}</td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  if (readonly) {
+    host.querySelectorAll("[data-matrix-all-flows], [data-matrix-flow]").forEach((input) => { input.disabled = true; });
+    return;
+  }
+  host.querySelectorAll("[data-matrix-all-flows]").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const grid = checkbox.closest("[data-matrix-flow-grid]");
+      grid?.querySelectorAll("[data-matrix-flow]").forEach((item) => {
+        item.disabled = checkbox.checked;
+        if (checkbox.checked) item.checked = true;
+      });
+    });
+  });
+}
+
+function collectAllocationProcessMatrixDraft(host) {
+  const matrix = {};
+  host.querySelectorAll("[data-matrix-area]").forEach((row) => {
+    const code = String(row.dataset.matrixArea || "").trim().toUpperCase();
+    if (!code) return;
+    const company = String(row.querySelector("[data-matrix-company]")?.value || "").trim();
+    const excludeCustomers = String(row.querySelector("[data-matrix-exclude]")?.value || "")
+      .split(/[,;\s]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const allFlows = row.querySelector("[data-matrix-all-flows]")?.checked;
+    const visibleFlowIds = allFlows
+      ? null
+      : [...row.querySelectorAll("[data-matrix-flow]:checked")].map((input) => input.value);
+    matrix[code] = { company, excludeCustomers, visibleFlowIds };
+  });
+  return matrix;
+}
+
+async function openAllocationProcessMatrixModal() {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  let draft = allocationProcessMatrixDraft();
+  const canEditMatrix = canEditAllocationProcessMatrix();
+  backdrop.innerHTML = `
+    <div class="modal wide allocation-process-matrix-modal">
+      <h2>Bearbeta-matris</h2>
+      <div id="allocation-process-matrix-editor"></div>
+      <div class="actions">
+        ${canEditMatrix ? `<button type="button" id="allocation-process-matrix-defaults">Standard</button>` : ""}
+        <button type="button" id="allocation-process-matrix-cancel">Avbryt</button>
+        ${canEditMatrix ? `<button type="button" class="primary" id="allocation-process-matrix-save">Spara</button>` : ""}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const editor = backdrop.querySelector("#allocation-process-matrix-editor");
+  renderAllocationProcessMatrixEditor(editor, draft, !canEditMatrix);
+
+  backdrop.querySelector("#allocation-process-matrix-cancel").addEventListener("click", () => backdrop.remove());
+  backdrop.querySelector("#allocation-process-matrix-defaults")?.addEventListener("click", () => {
+    draft = allocationProcessMatrixDraft(true);
+    renderAllocationProcessMatrixEditor(editor, draft);
+  });
+  backdrop.querySelector("#allocation-process-matrix-save")?.addEventListener("click", async () => {
+    const button = backdrop.querySelector("#allocation-process-matrix-save");
+    button.disabled = true;
+    try {
+      const response = await allocationJson(`${ALLOCATION_API}/process-matrix`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matrix: collectAllocationProcessMatrixDraft(editor) }),
+      });
+      allocationState.processMatrix = normalizeAllocationProcessMatrix(response);
+      backdrop.remove();
+      renderAllocationPage();
+      showToast("Bearbeta-matris sparades.", "success", 2500);
+    } catch (error) {
+      button.disabled = false;
+      showToast(error.message || "Kunde inte spara Bearbeta-matris.", "error", 7000);
+    }
+  });
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) backdrop.remove();
+  });
+}
+
 function renderCombinedView() {
   const flows = combinedAllocationFlows();
+  const filterNotice = allocationProcessFilterNotice();
   const groups = [];
   for (const flow of flows) {
     let group = groups.find((item) => item.name === flow.category);
@@ -1026,9 +1528,13 @@ function renderCombinedView() {
   }
   const anyFile = Object.keys(allocationState.files).length > 0;
   const fileActionLabel = anyFile ? "Välj fler filer" : "Välj filer";
+  const matrixButton = canViewAllocationProcessMatrix()
+    ? `<button type="button" id="allocation-process-matrix">Matris</button>`
+    : "";
   renderAllocationShell(`
     <section class="allocation-panel allocation-panel--compact" data-allocation-drop>
       ${!anyFile ? `<p class="allocation-status">Inga filer inlagda. Dra filer hit eller använd Välj filer.</p>` : ""}
+      ${filterNotice ? `<p class="allocation-status">${allocationEscape(filterNotice)}</p>` : ""}
       ${allocationState.status ? `<p class="allocation-status">${allocationEscape(allocationState.status)}</p>` : ""}
       <div class="allocation-board">
         ${groups.map((group) => `
@@ -1041,11 +1547,13 @@ function renderCombinedView() {
     </section>
     ${renderResultPanel(allocationState.result)}
   `, `
+    ${matrixButton}
     <label class="button-like" for="allocation-combined-files">${fileActionLabel}</label>
     <input id="allocation-combined-files" type="file" multiple hidden />
   `);
   const input = document.getElementById("allocation-combined-files");
   if (input) input.addEventListener("change", async (event) => routeAllocationFiles(event.target.files, currentAllocationSlots()));
+  document.getElementById("allocation-process-matrix")?.addEventListener("click", openAllocationProcessMatrixModal);
   bindRunButtons();
 }
 
@@ -1123,6 +1631,16 @@ function renderAllocationUnavailable(message) {
   `);
 }
 
+function handleAllocationAreaFocusChanged() {
+  const root = document.getElementById("allocationRoot");
+  if (!root || !allocationState.user || allocationState.page !== "process" || allocationState.busyId) return;
+  allocationState.values = {};
+  allocationState.status = "";
+  allocationState.result = null;
+  restoreAllocationWorkState();
+  renderAllocationPage();
+}
+
 async function initAllocationPage() {
   const root = document.getElementById("allocationRoot");
   if (!root) return;
@@ -1139,6 +1657,8 @@ async function initAllocationPage() {
   try {
     allocationState.files = await loadStoredAllocationFiles();
     await loadAllocationFlows();
+    await loadAllocationProcessMatrix();
+    await loadAllocationCoreDataStatus();
     if (allocationState.page === "uploads" && window.productivityUploads?.syncAllocationUploads) {
       try {
         await window.productivityUploads.syncAllocationUploads();
@@ -1158,6 +1678,7 @@ window.addEventListener("flow:uploadsCleared", async () => {
   const root = document.getElementById("allocationRoot");
   if (!root || !allocationState.user) return;
   allocationState.files = await loadStoredAllocationFiles();
+  await loadAllocationCoreDataStatus();
   allocationState.status = "Alla filval rensade.";
   allocationState.autoStatus = "";
   allocationState.lastBufferSignature = "";
@@ -1170,5 +1691,7 @@ window.addEventListener("flow:allocationFilesChanged", async () => {
   allocationState.files = await loadStoredAllocationFiles();
   renderAllocationPage();
 });
+
+window.addEventListener("flow:areaFocusChanged", handleAllocationAreaFocusChanged);
 
 document.addEventListener("DOMContentLoaded", initAllocationPage);

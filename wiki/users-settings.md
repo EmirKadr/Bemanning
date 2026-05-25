@@ -59,6 +59,8 @@ Rollmatrisen visar vyer som rader och roller som kolumner. Matrisen ar global, s
 
 `Ingen` -> `Visa` -> `Redigera` -> `Ingen`
 
+Raden `Personsortering` (`personSortOrder`) styr om Bemanningsansvarig/admin kan dra personnamn i Bemanning och Oversikt for att uppdatera sorteringsnumret i Personer. Super User har alltid edit via backendens Super User-regel, men sorteringen kraver fortfarande att anvandaren har ett omrade och att personen har samma hemomrade.
+
 Knappar:
 
 - `Standard`: aterstaller modalens draft till defaultmatris.

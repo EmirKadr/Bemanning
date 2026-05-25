@@ -308,7 +308,9 @@ def test_activity_delete_removes_inactive_legacy_activity_and_clears_references(
     import_db.commit()
 
     labels = [activity.label for activity in list_activities(include_inactive=False, db=import_db)]
-    assert "Gammal aktivitet" in labels
+    all_labels = [activity.label for activity in list_activities(include_inactive=True, db=import_db)]
+    assert "Gammal aktivitet" not in labels
+    assert "Gammal aktivitet" in all_labels
 
     delete_activity(activity_id=legacy.id, db=import_db, admin=staffing)
 

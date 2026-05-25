@@ -67,3 +67,22 @@ def test_persons_view_refetches_with_area_focus_to_prevent_super_user_leaks():
     assert "Number(person?.home_area_id) === Number(areaId)" in matches_body
     assert 'window.addEventListener("flow:areaFocusChanged", () => loadPersons())' in persons_js
     assert 'window.addEventListener("flow:areaFocusChanged", () => renderRows())' not in persons_js
+
+
+def test_planning_views_drag_person_names_to_persist_sort_order():
+    frontend = ROOT / "app" / "frontend"
+    schedule_js = (frontend / "js" / "schedule.js").read_text(encoding="utf-8")
+    overview_js = (frontend / "js" / "overview.js").read_text(encoding="utf-8")
+    styles = (frontend / "css" / "styles.css").read_text(encoding="utf-8")
+
+    for source in (schedule_js, overview_js):
+        assert "setupPersonOrderDrag()" in source
+        assert "setupPersonOrderNameCell" in source
+        assert 'canEditPage(user, "personSortOrder")' in source
+        assert 'api.put("/api/persons/sort-order"' in source
+        assert "Number(person?.home_area_id) === Number(state.currentUser?.area_id)" in source
+        assert "Rensa personfiltret innan du sorterar personer." in source
+
+    assert "person-order-draggable" in styles
+    assert "person-order-drop-before" in styles
+    assert "person-order-drop-after" in styles

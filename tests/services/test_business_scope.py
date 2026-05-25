@@ -295,6 +295,34 @@ def test_delete_area_hard_deletes_empty_and_deactivates_linked_data(business_ses
         data["super_user"],
     )
 
+    linked_activity = Activity(
+        business_id=data["r3"].id,
+        code="R3_WORK",
+        label="R3 Work",
+        area_id=data["r3_user"].area_id,
+        color="#ffffff",
+        category="work",
+        sort_order=2,
+    )
+    session.add(linked_activity)
+    session.flush()
+    data["r3_person"].home_activity_id = linked_activity.id
+    session.add(
+        ScheduleCell(
+            id=20,
+            year=2026,
+            week=21,
+            weekday=1,
+            hour=7,
+            minute_start=0,
+            minute_end=60,
+            person_id=data["r3_person"].id,
+            activity_id=linked_activity.id,
+            updated_by=data["r3_user"].id,
+        )
+    )
+    session.commit()
+
     assert_http_status(404, delete_area, data["r3_user"].area_id, session, data["user"])
     delete_area(empty_area.id, session, data["super_user"])
     assert session.get(Area, empty_area.id) is None
@@ -305,8 +333,20 @@ def test_delete_area_hard_deletes_empty_and_deactivates_linked_data(business_ses
     linked_area = session.get(Area, linked_area_id)
     assert linked_area is not None
     assert linked_area.is_active is False
+    session.refresh(data["r3_user"])
+    session.refresh(data["r3_person"])
+    session.refresh(linked_activity)
+    cell = session.get(ScheduleCell, 20)
+    assert data["r3_user"].area_id is None
+    assert data["r3_person"].home_area_id is None
+    assert data["r3_person"].home_activity_id is None
+    assert linked_activity.area_id is None
+    assert linked_activity.is_active is False
+    assert cell.activity_id is None
+    assert cell.empty_override is True
     assert [area.code for area in list_areas(db=session, user=data["r3_user"])] == []
     assert [area.code for area in list_areas(include_inactive=True, db=session, user=data["r3_user"])] == ["R3"]
+    assert [activity.code for activity in list_activities(db=session, user=data["r3_user"])] == ["R3_LEDIG"]
 
 
 def test_cross_business_area_activity_and_user_updates_are_blocked(business_session):

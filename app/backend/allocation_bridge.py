@@ -44,6 +44,56 @@ UPLOAD_CACHE_DIR = Path(tempfile.gettempdir()) / "flow_allocation_upload_cache"
 UPLOAD_CACHE_TTL_SECONDS = 6 * 60 * 60
 UPLOAD_CACHE_MAX_FILES = 64
 DEFAULT_MAX_CSV_PARAM = "__default_max_csv_path"
+PROCESS_AREA_FOCUS_PARAM = "__process_area_focus"
+PROCESS_MATRIX_AREA_OPTIONS: tuple[dict[str, str], ...] = (
+    {"code": "GG", "label": "GG"},
+    {"code": "MG", "label": "MG"},
+    {"code": "AS", "label": "AS"},
+    {"code": "EH", "label": "EH"},
+    {"code": "R3", "label": "R3"},
+    {"code": "ALLT", "label": "Alla"},
+)
+PROCESS_AREA_RULES: dict[str, dict] = {
+    "GG": {
+        "company": "GG",
+        "exclude_customers": {"6005"},
+        "label": "Bolag=GG, Kundnr!=6005",
+        "visible_flow_ids": None,
+    },
+    "MG": {
+        "company": "MG",
+        "exclude_customers": {"40002", "90002"},
+        "label": "Bolag=MG, Kundnr!=40002/90002",
+        "visible_flow_ids": None,
+    },
+}
+PROCESS_DEFAULT_AREA_RULE: dict[str, object] = {
+    "company": "",
+    "exclude_customers": set(),
+    "label": "",
+    "visible_flow_ids": None,
+}
+PROCESS_COMPANY_COLUMN_KEYS = {
+    "bolag",
+    "bolagnr",
+    "bolagskod",
+    "bol",
+    "company",
+    "companyid",
+    "companynum",
+}
+PROCESS_CUSTOMER_COLUMN_KEYS = {
+    "kund",
+    "kundnr",
+    "kundnummer",
+    "kundnum",
+    "custom",
+    "customnum",
+    "customernr",
+    "customernumber",
+    "customer",
+    "customerid",
+}
 
 
 def _default_warehouse_tools_dir() -> Path:
@@ -161,6 +211,334 @@ def business_allocation_data_paths(business_code: str | None) -> dict[str, str]:
         "observations_path": str(engine_module.business_observations_path(business_code)),
         "article_max_path": str(engine_module.business_artikel_max_path(business_code)),
     }
+
+
+def normalize_process_area_focus(value: object) -> str:
+    return str(value or "").strip().upper()
+
+
+def _process_matrix_flow_ids(flows: list[dict] | None) -> set[str] | None:
+    if flows is None:
+        return None
+    ids: set[str] = set()
+    for flow in flows:
+        flow_id = str(flow.get("id") or "").strip()
+        if flow_id:
+            ids.add(flow_id)
+    return ids
+
+
+def _process_rule_values(raw: dict | None, *keys: str):
+    if not isinstance(raw, dict):
+        return None
+    for key in keys:
+        if key in raw:
+            return raw.get(key)
+    return None
+
+
+def _process_customer_values(value: object) -> set[str]:
+    if value is None:
+        return set()
+    if isinstance(value, str):
+        raw_values = re.split(r"[,;\s]+", value)
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+    return {
+        _process_customer_value(item)
+        for item in raw_values
+        if _process_customer_value(item)
+    }
+
+
+def _process_visible_flow_ids(value: object, allowed_flow_ids: set[str] | None = None) -> set[str] | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        raw_values = re.split(r"[,;\s]+", value)
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+    ids = {str(item or "").strip() for item in raw_values if str(item or "").strip()}
+    if allowed_flow_ids is not None:
+        ids &= allowed_flow_ids
+    return ids
+
+
+def _process_rule_label(rule: dict) -> str:
+    company = str(rule.get("company") or "").strip().upper()
+    excluded = sorted(str(value) for value in (rule.get("exclude_customers") or set()) if str(value))
+    parts: list[str] = []
+    if company:
+        parts.append(f"Bolag={company}")
+    if excluded:
+        parts.append(f"Kundnr!={'/'.join(excluded)}")
+    return ", ".join(parts)
+
+
+def _process_rule_filter_notice(rule: dict) -> str:
+    company = str(rule.get("company") or "").strip().upper()
+    excluded = sorted(str(value) for value in (rule.get("exclude_customers") or set()) if str(value))
+    parts: list[str] = []
+    if company:
+        parts.append(f"Bolag {company}")
+    if excluded:
+        parts.append(f"exkl. kundnr {' och '.join(excluded)}")
+    return f"Filter: {', '.join(parts)}" if parts else ""
+
+
+def _normalize_process_area_rule(raw: dict | None, allowed_flow_ids: set[str] | None = None) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    company = str(_process_rule_values(raw, "company", "bolag") or "").strip().upper()
+    excluded = _process_customer_values(
+        _process_rule_values(raw, "exclude_customers", "excludeCustomers", "excluded_customers", "excludedCustomers")
+    )
+    visible_flow_ids = _process_visible_flow_ids(
+        _process_rule_values(raw, "visible_flow_ids", "visibleFlowIds", "flow_ids", "flowIds"),
+        allowed_flow_ids=allowed_flow_ids,
+    )
+    rule = {
+        "company": company,
+        "exclude_customers": excluded,
+        "visible_flow_ids": visible_flow_ids,
+    }
+    rule["label"] = _process_rule_label(rule)
+    return rule
+
+
+def default_process_matrix(flows: list[dict] | None = None) -> dict[str, dict]:
+    allowed_flow_ids = _process_matrix_flow_ids(flows)
+    matrix: dict[str, dict] = {
+        "DEFAULT": _normalize_process_area_rule(PROCESS_DEFAULT_AREA_RULE, allowed_flow_ids=allowed_flow_ids)
+    }
+    for area in PROCESS_MATRIX_AREA_OPTIONS:
+        code = normalize_process_area_focus(area.get("code"))
+        matrix[code] = _normalize_process_area_rule(PROCESS_AREA_RULES.get(code), allowed_flow_ids=allowed_flow_ids)
+    return matrix
+
+
+def normalize_process_matrix(value: object = None, *, flows: list[dict] | None = None) -> dict[str, dict]:
+    allowed_flow_ids = _process_matrix_flow_ids(flows)
+    matrix = default_process_matrix(flows=flows)
+    raw_matrix = value.get("matrix") if isinstance(value, dict) and isinstance(value.get("matrix"), dict) else value
+    if not isinstance(raw_matrix, dict):
+        return matrix
+
+    known_area_codes = {normalize_process_area_focus(area.get("code")) for area in PROCESS_MATRIX_AREA_OPTIONS}
+    known_area_codes.add("DEFAULT")
+    for raw_code, raw_rule in raw_matrix.items():
+        code = normalize_process_area_focus(raw_code)
+        if not code or not re.fullmatch(r"[A-Z0-9_:-]{1,40}", code):
+            continue
+        if code not in known_area_codes and not isinstance(raw_rule, dict):
+            continue
+        matrix[code] = _normalize_process_area_rule(raw_rule, allowed_flow_ids=allowed_flow_ids)
+    return matrix
+
+
+def process_area_rule(area_focus: object, matrix: dict[str, dict] | None = None) -> dict | None:
+    code = normalize_process_area_focus(area_focus)
+    if not code:
+        return None
+    rules = normalize_process_matrix(matrix) if matrix is not None else default_process_matrix()
+    return rules.get(code) or rules.get("DEFAULT")
+
+
+def process_flow_visible(flow_id: str, area_focus: object, matrix: dict[str, dict] | None = None) -> bool:
+    rule = process_area_rule(area_focus, matrix=matrix)
+    visible_flow_ids = rule.get("visible_flow_ids") if rule else None
+    return visible_flow_ids is None or flow_id in visible_flow_ids
+
+
+def process_rule_has_filters(rule: dict | None) -> bool:
+    return bool(rule and (rule.get("company") or rule.get("exclude_customers")))
+
+
+def process_matrix_storage_payload(matrix: dict[str, dict] | None = None) -> dict[str, dict]:
+    rules = normalize_process_matrix(matrix)
+    payload: dict[str, dict] = {}
+    for code, rule in rules.items():
+        if code == "DEFAULT":
+            continue
+        visible_flow_ids = rule.get("visible_flow_ids")
+        payload[code] = {
+            "company": str(rule.get("company") or ""),
+            "excludeCustomers": sorted(str(value) for value in (rule.get("exclude_customers") or set()) if str(value)),
+            "visibleFlowIds": None if visible_flow_ids is None else sorted(str(value) for value in visible_flow_ids),
+        }
+    return payload
+
+
+def process_matrix_public_payload(
+    matrix: dict[str, dict] | None = None,
+    *,
+    flows: list[dict] | None = None,
+    area_codes: set[str] | None = None,
+) -> dict:
+    rules = normalize_process_matrix(matrix, flows=flows)
+    active_codes = None if area_codes is None else {normalize_process_area_focus(code) for code in area_codes}
+    areas = [
+        area
+        for area in PROCESS_MATRIX_AREA_OPTIONS
+        if active_codes is None
+        or normalize_process_area_focus(area.get("code")) == "ALLT"
+        or normalize_process_area_focus(area.get("code")) in active_codes
+    ]
+    known_codes = {normalize_process_area_focus(area.get("code")) for area in areas}
+    for code in sorted(rules):
+        if code != "DEFAULT" and code not in known_codes and (active_codes is None or code in active_codes):
+            areas.append({"code": code, "label": code})
+            known_codes.add(code)
+
+    public_rules: dict[str, dict] = {}
+    for code, rule in rules.items():
+        visible_flow_ids = rule.get("visible_flow_ids")
+        public_rules[code] = {
+            "company": str(rule.get("company") or ""),
+            "excludeCustomers": sorted(str(value) for value in (rule.get("exclude_customers") or set()) if str(value)),
+            "visibleFlowIds": None if visible_flow_ids is None else sorted(str(value) for value in visible_flow_ids),
+            "label": str(rule.get("label") or ""),
+            "filterLabel": _process_rule_filter_notice(rule),
+        }
+    return {
+        "areas": areas,
+        "flows": flows or [],
+        "matrix": public_rules,
+    }
+
+
+def _process_column_key(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").strip().lower())
+
+
+def _process_filter_column(columns, aliases: set[str]) -> str | None:
+    for column in columns:
+        if _process_column_key(column) in aliases:
+            return column
+    return None
+
+
+def _process_filter_text(value: object) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text.lower() in {"", "nan", "nat", "none"}:
+        return ""
+    return text
+
+
+def _process_company_value(value: object) -> str:
+    return _process_filter_text(value).upper()
+
+
+def _process_customer_value(value: object) -> str:
+    text = re.sub(r"\s+", "", _process_filter_text(value))
+    if re.fullmatch(r"\d+([,.]0+)?", text):
+        return re.split(r"[,.]", text, maxsplit=1)[0]
+    return text.upper()
+
+
+def _read_process_filter_table(path: Path):
+    import pandas as pd  # type: ignore
+
+    suffix = path.suffix.lower()
+    if suffix in {".xlsx", ".xlsm", ".xltx", ".xltm", ".xls"}:
+        return pd.read_excel(path, dtype=str)
+
+    try:
+        df = pd.read_csv(path, dtype=str, sep=None, engine="python", encoding="utf-8-sig")
+        if df.shape[1] == 1 and len(df):
+            first = str(df.iloc[0, 0])
+            if "\t" in first:
+                df = pd.read_csv(path, dtype=str, sep="\t", engine="python", encoding="utf-8-sig")
+    except Exception:
+        df = pd.read_csv(path, dtype=str, sep="\t", engine="python", encoding="utf-8-sig")
+    return df
+
+
+def _write_process_filter_table(df, *, source_key: str, area_focus: str) -> Path:
+    target = tempfile.NamedTemporaryFile(
+        delete=False,
+        prefix=f"flow_{area_focus.lower()}_{_safe_upload_stem(source_key)}_",
+        suffix=".csv",
+    )
+    path = Path(target.name)
+    target.close()
+    df.to_csv(path, index=False, encoding="utf-8-sig")
+    return path
+
+
+def _apply_process_area_rule_to_table(df, rule: dict) -> tuple[object | None, dict | None]:
+    company_column = _process_filter_column(df.columns, PROCESS_COMPANY_COLUMN_KEYS)
+    customer_column = _process_filter_column(df.columns, PROCESS_CUSTOMER_COLUMN_KEYS)
+    company = str(rule.get("company") or "").upper()
+    excluded = {str(value).upper() for value in (rule.get("exclude_customers") or set())}
+    if not company and not excluded:
+        return None, None
+    can_apply_company = bool(company and company_column is not None)
+    can_apply_customer = bool(excluded and customer_column is not None)
+    if not can_apply_company and not can_apply_customer:
+        return None, None
+
+    before = int(len(df))
+    mask = None
+    if can_apply_company:
+        mask = df[company_column].map(_process_company_value).eq(company)
+    if can_apply_customer:
+        customer_mask = ~df[customer_column].map(_process_customer_value).isin(excluded)
+        mask = customer_mask if mask is None else (mask & customer_mask)
+
+    filtered = df.loc[mask].copy() if mask is not None else df.copy()
+    return filtered, {
+        "before": before,
+        "after": int(len(filtered)),
+        "company_column": str(company_column or ""),
+        "customer_column": str(customer_column or ""),
+    }
+
+
+def apply_process_area_filters(
+    files: dict[str, Path],
+    area_focus: object,
+    matrix: dict[str, dict] | None = None,
+) -> tuple[dict[str, Path], list[Path], list[str]]:
+    rule = process_area_rule(area_focus, matrix=matrix)
+    if not process_rule_has_filters(rule):
+        return files, [], []
+
+    code = normalize_process_area_focus(area_focus)
+    filtered_files = dict(files)
+    temp_paths: list[Path] = []
+    stats: list[dict] = []
+
+    for key, raw_path in files.items():
+        path = Path(raw_path)
+        try:
+            df = _read_process_filter_table(path)
+            filtered_df, stat = _apply_process_area_rule_to_table(df, rule)
+        except Exception:
+            continue
+        if filtered_df is None or stat is None:
+            continue
+        filtered_path = _write_process_filter_table(filtered_df, source_key=key, area_focus=code)
+        filtered_files[key] = filtered_path
+        temp_paths.append(filtered_path)
+        stats.append({"key": key, **stat})
+
+    if not stats:
+        return filtered_files, temp_paths, []
+
+    lines = [f"Omradesfilter {code}: {rule['label']}."]
+    for stat in stats:
+        columns = ", ".join(
+            value for value in (stat.get("company_column"), stat.get("customer_column")) if value
+        )
+        suffix = f" ({columns})" if columns else ""
+        lines.append(f"{stat['key']}: {stat['before']} -> {stat['after']} rader{suffix}.")
+    return filtered_files, temp_paths, lines
 
 
 def _cell(value: object) -> str:

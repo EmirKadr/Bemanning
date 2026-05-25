@@ -1759,6 +1759,47 @@ table.matrix th.name, table.matrix td.name {
 }
 table.matrix td.name { background: var(--surface); font-size: 12px; }
 table.matrix tr:hover td.name { background: #fafbfd; }
+table.matrix td.name.person-order-draggable,
+table.overview td.name.person-order-draggable {
+  cursor: grab;
+  user-select: none;
+}
+table.matrix td.name.person-order-draggable:active,
+table.overview td.name.person-order-draggable:active {
+  cursor: grabbing;
+}
+table.matrix td.name.person-order-locked,
+table.overview td.name.person-order-locked {
+  cursor: not-allowed;
+}
+table.matrix tr.person-order-dragging td.name,
+table.overview tr.person-order-dragging td.name {
+  opacity: .56;
+}
+table.matrix tr.person-order-drop-before td.name::before,
+table.matrix tr.person-order-drop-after td.name::after,
+table.overview tr.person-order-drop-before td.name::before,
+table.overview tr.person-order-drop-after td.name::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  pointer-events: none;
+}
+table.matrix tr.person-order-drop-before td.name::before,
+table.overview tr.person-order-drop-before td.name::before {
+  top: 2px;
+}
+table.matrix tr.person-order-drop-after td.name::after,
+table.overview tr.person-order-drop-after td.name::after {
+  bottom: 2px;
+}
+body.dragging-person-order {
+  cursor: grabbing;
+}
 
 table.matrix th.base, table.matrix td.base {
   position: sticky;
@@ -2616,6 +2657,49 @@ tr.filter-row input {
   color: #15803d;
   background: color-mix(in srgb, #16a34a 13%, var(--surface));
   border-color: color-mix(in srgb, #16a34a 32%, var(--border));
+}
+.allocation-process-matrix-modal {
+  width: min(1080px, 94vw);
+  max-height: min(84vh, 760px);
+  display: flex;
+  flex-direction: column;
+}
+.allocation-process-matrix-scroll {
+  max-height: min(62vh, 560px);
+}
+.allocation-process-matrix-table {
+  min-width: 900px;
+}
+.allocation-process-matrix-table th,
+.allocation-process-matrix-table td {
+  vertical-align: top;
+}
+.allocation-process-matrix-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.allocation-process-matrix-table tbody th {
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+}
+.allocation-process-matrix-table input[type="text"] {
+  min-width: 130px;
+}
+.allocation-process-flow-grid {
+  display: grid;
+  gap: 4px 12px;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+}
+.modal label.allocation-process-flow-all,
+.modal label.allocation-process-flow-check {
+  margin: 0;
+  min-height: 26px;
+}
+.allocation-process-flow-check input:disabled + span {
+  color: var(--text-muted);
 }
 .sidebar-editor-modal .note {
   margin-top: -4px;

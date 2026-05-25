@@ -51,8 +51,8 @@ Apphjalpens LLM-prompt far en begransad supportkontext om inloggad anvandare: ro
 Vyer som kan styras:
 
 - `schedule`, `overview`, `productivity`, `dataFetch`
-- `allocationUploads`, `allocationProcess`, `allocationSplit`
-- `persons`, `personImport`
+- `allocationUploads`, `allocationProcess`, `allocationProcessMatrix`, `allocationSplit`
+- `persons`, `personSortOrder`, `personImport`
 - `activities`, `activityImport`, `areas`
 - `analytics`, `users`, `userImport`
 - `appSettings`, `sidebarLayout`, `roleAccess`, `businesses`
@@ -71,9 +71,11 @@ Om anvandaren bara har `view`:
 - Vyn syns inte i sidebar: rollen har `none` for vyn eller sidan filtreras bort.
 - Knappen syns men fungerar inte: anvandaren har `view`, inte `edit`.
 - Importknapp ar dold: importvyn saknar edit-atkomst.
+- Drag-sortering av personnamn i Bemanning/Oversikt fungerar inte: rollen saknar `personSortOrder=edit`, anvandaren saknar omrade eller personen har annat hemomrade. Backend tillater dessutom bara Bemanningsansvarig, admin och Super User.
 - Historik nekas: kraver Super User. Produktivitet nekas: rollen saknar `productivity` i vyatkomst.
 - Hamta data saknas eller nekas: `dataFetch` saknas i vyatkomst. Eftersom vyn kan hamta data fran extern datakalla har inga basroller standardatkomst; Super User kan oppna den.
 - Bearbeta saknas eller nekas: rollen saknar `allocationProcess=edit` i vyatkomst. Lagerroller har som standard Uppladdningar och Dela, men kan fa Bearbeta via Vybehorigheter.
+- Matris-knappen i Bearbeta saknas: rollen saknar `allocationProcessMatrix=view`. Knappen visas lasande med `view` och kan spara forst med `allocationProcessMatrix=edit`; admin har `edit` som standard och Super User har alltid full atkomst.
 
 ## Kallor
 

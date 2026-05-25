@@ -596,7 +596,8 @@ def test_area_focus_toggle_is_wired_to_views():
     assert "comparePersonsForAreaFocus" in common
     assert ".area-focus-toggle" in styles
 
-    assert 'const CALC_AREA_KEYS = ["GG", "MG", "AS", "EH"]' in schedule
+    assert 'const CALC_AREA_FALLBACK_KEYS = ["GG", "MG", "AS", "EH"]' in schedule
+    assert "function calcAreaKeys" in schedule
     assert 'preferredAreaIdFromFocus(state.areas) : null' in schedule
     assert 'preferredAreaIdFromFocus(state.areas) : null' in overview
     assert "compareActivitiesForAreaFocus(a, b, state.areas, state.currentUser?.area_id)" in schedule
@@ -619,6 +620,27 @@ def test_area_focus_toggle_is_wired_to_views():
     assert 'id="productivityGroupFilter"' not in productivity_html
     assert 'id="calcAreaSelect"' not in schedule_html
     assert "productivityGroupFilter" not in productivity
+
+
+def test_bearbeta_area_focus_filter_contract():
+    allocation = (ROOT / "app" / "frontend" / "js" / "allocation_tools.js").read_text(encoding="utf-8")
+
+    assert "ALLOCATION_PROCESS_MATRIX" in allocation
+    assert 'GG: {' in allocation
+    assert "Filter: Bolag GG, exkl. kundnr 6005" in allocation
+    assert "Filter: Bolag MG, exkl. kundnr 40002 och 90002" in allocation
+    assert 'const ALLOCATION_PROCESS_AREA_PARAM = "__process_area_focus"' in allocation
+    assert "formData.append(ALLOCATION_PROCESS_AREA_PARAM, focusCode)" in allocation
+    assert "appendAllocationAreaFocus(fd)" in allocation
+    assert 'allocationJson(`${ALLOCATION_API}/process-matrix`)' in allocation
+    assert 'allocationJson(`${ALLOCATION_API}/process-matrix`, {' in allocation
+    assert 'canViewPage?.(allocationState.user, "allocationProcessMatrix")' in allocation
+    assert 'canEditPage?.(allocationState.user, "allocationProcessMatrix")' in allocation
+    assert 'id="allocation-process-matrix">Matris</button>' in allocation
+    assert "openAllocationProcessMatrixModal" in allocation
+    assert "allocation-process-matrix-table" in allocation
+    assert "function allocationFlowsForCurrentView" in allocation
+    assert 'window.addEventListener("flow:areaFocusChanged", handleAllocationAreaFocusChanged)' in allocation
 
 
 def test_planning_views_cache_all_scope_and_have_top_scrollbars():
@@ -873,6 +895,8 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert "window.allocationUploadActivity?.finish(uploadedNames.size)" in allocation
     assert "observationsUpdateStatusText" in allocation
     assert "observationsUpdateLogText" in allocation
+    assert "function appendAllocationAreaFocus(formData)" in allocation
+    assert "appendAllocationAreaFocus(fd);" in allocation
     assert "github_sent_rows" in allocation
     assert "article_max_changed_rows" in allocation
     assert "allocationState.files = await loadStoredAllocationFiles()" in allocation

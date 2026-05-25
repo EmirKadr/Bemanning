@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from ..audit import log as audit_log
 from ..business_scope import filter_query_for_business, resolve_write_business_id, scoped_get
 from ..deps import get_current_user, get_db, require_view_access
-from ..models import Activity, Area, Person, User
+from ..models import Activity, Area, Person, ScheduleCell, User
 from ..schemas import AreaCreate, AreaOut, AreaUpdate
 
 router = APIRouter(prefix="/api/areas", tags=["areas"])
@@ -30,6 +30,43 @@ def _area_has_linked_data(db: Session, area_id: int) -> bool:
             db.query(User.id).filter(User.area_id == area_id),
         )
     )
+
+
+def _detach_area_references(db: Session, area_id: int) -> dict[str, int]:
+    activity_ids = [
+        activity_id
+        for (activity_id,) in db.query(Activity.id).filter(Activity.area_id == area_id).all()
+    ]
+    detached: dict[str, int] = {
+        "persons": db.query(Person)
+        .filter(Person.home_area_id == area_id)
+        .update({Person.home_area_id: None}, synchronize_session=False),
+        "users": db.query(User)
+        .filter(User.area_id == area_id)
+        .update({User.area_id: None}, synchronize_session=False),
+        "activities": 0,
+        "home_activities": 0,
+        "summary_activities": 0,
+        "schedule_cells": 0,
+    }
+    if activity_ids:
+        detached["home_activities"] = db.query(Person).filter(Person.home_activity_id.in_(activity_ids)).update(
+            {Person.home_activity_id: None},
+            synchronize_session=False,
+        )
+        detached["summary_activities"] = db.query(Activity).filter(Activity.summary_activity_id.in_(activity_ids)).update(
+            {Activity.summary_activity_id: None},
+            synchronize_session=False,
+        )
+        detached["schedule_cells"] = db.query(ScheduleCell).filter(ScheduleCell.activity_id.in_(activity_ids)).update(
+            {ScheduleCell.activity_id: None, ScheduleCell.empty_override: True},
+            synchronize_session=False,
+        )
+        detached["activities"] = db.query(Activity).filter(Activity.id.in_(activity_ids)).update(
+            {Activity.area_id: None, Activity.is_active: False},
+            synchronize_session=False,
+        )
+    return detached
 
 
 @router.get("", response_model=list[AreaOut])
@@ -121,6 +158,7 @@ def delete_area(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
     before = _area_snapshot(area)
     if _area_has_linked_data(db, area_id):
+        detached = _detach_area_references(db, area_id)
         area.is_active = False
         audit_log(
             db,
@@ -128,7 +166,7 @@ def delete_area(
             entity_id=area.id,
             action="update",
             old_value=before,
-            new_value=_area_snapshot(area),
+            new_value={**_area_snapshot(area), "detached": detached},
             user_id=admin.id,
             business_id=area.business_id,
         )

@@ -5,6 +5,7 @@ let productivityTargetsSignature = "";
 let productivityDataset = null;
 let productivityDatasetSignature = "";
 let productivityDatasetPromise = null;
+let productivityActiveAreaCodes = null;
 
 const productivityReportCache = new Map();
 const productivityReportRequests = new Map();
@@ -54,6 +55,12 @@ const PRODUCTIVITY_GROUPS = [
   { id: "mg", title: "Mestergruppen" },
 ];
 const PRODUCTIVITY_GROUP_TITLES = Object.fromEntries(PRODUCTIVITY_GROUPS.map((group) => [group.id, group.title]));
+const PRODUCTIVITY_GROUP_AREA_CODES = {
+  gg: "GG",
+  as: "AS",
+  eh: "EH",
+  mg: "MG",
+};
 const EXCLUDED_GG_USERS = new Set(["FILI10", "SEBA80"]);
 const EXCLUDED_MG_USERS = new Set(["ANTO87", "HUGO49"]);
 
@@ -336,8 +343,9 @@ function clearProductivityReportCache() {
 }
 
 function preferredProductivityGroupFilter() {
-  const focus = typeof readAreaFocus === "function" ? readAreaFocus() : "ALLT";
-  return ({ GG: "gg", MG: "mg", AS: "as", EH: "eh" }[focus] || "all");
+  const focus = typeof areaFocusCode === "function" ? areaFocusCode() : null;
+  const groupId = ({ GG: "gg", MG: "mg", AS: "as", EH: "eh" }[focus] || "all");
+  return groupId === "all" || productivityGroupIsActive(groupId) ? groupId : "all";
 }
 
 function resetLocalProductivityDataset() {
@@ -349,6 +357,27 @@ function resetLocalProductivityDataset() {
 
 function activeGroupFilter() {
   return preferredProductivityGroupFilter();
+}
+
+function productivityGroupIsActive(groupId) {
+  if (!(productivityActiveAreaCodes instanceof Set)) return true;
+  const code = PRODUCTIVITY_GROUP_AREA_CODES[groupId];
+  return !code || productivityActiveAreaCodes.has(code);
+}
+
+async function loadProductivityAreas(user) {
+  try {
+    const areas = await api.get("/api/areas");
+    productivityActiveAreaCodes = new Set(
+      (areas || [])
+        .filter((area) => area?.is_active !== false)
+        .map((area) => String(area?.code || "").trim().toUpperCase())
+        .filter(Boolean)
+    );
+    if (typeof setAreaFocusAreas === "function") setAreaFocusAreas(areas, user);
+  } catch (error) {
+    productivityActiveAreaCodes = null;
+  }
 }
 
 function activeSearch() {
@@ -793,11 +822,13 @@ function buildProductivityReportFromLocalDataset(dataset, targets, requestedDate
     });
   }
 
-  const groups = PRODUCTIVITY_GROUPS.map((group) => ({
-    id: group.id,
-    title: PRODUCTIVITY_GROUP_TITLES[group.id],
-    sections: sectionsByGroup[group.id] || [],
-  }));
+  const groups = PRODUCTIVITY_GROUPS
+    .filter((group) => productivityGroupIsActive(group.id))
+    .map((group) => ({
+      id: group.id,
+      title: PRODUCTIVITY_GROUP_TITLES[group.id],
+      sections: sectionsByGroup[group.id] || [],
+    }));
   const users = new Set(groups.flatMap((group) =>
     group.sections.flatMap((section) => section.rows.map((row) => row.user))
   ));
@@ -1147,6 +1178,7 @@ function renderContent() {
   const hours = productivityReport.hours || [];
 
   const groups = (productivityReport.groups || [])
+    .filter((group) => productivityGroupIsActive(group.id))
     .filter((group) => groupFilter === "all" || group.id === groupFilter)
     .map((group) => ({
       ...group,
@@ -1214,6 +1246,7 @@ async function handleProductivityUploadsCleared() {
 (async () => {
   const user = await initPage("productivity");
   if (!user) return;
+  await loadProductivityAreas(user);
 
   document.getElementById("productivityDate").addEventListener("change", () => {
     updateProductivityDateDisplay();

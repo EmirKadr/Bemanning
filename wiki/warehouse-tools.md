@@ -28,11 +28,29 @@ Kort svar: Lagerverktygen ar tre vyer ovanpa `warehouse_tools`: Uppladdningar fo
 | Rensa alla | Rensar alla lokala uppladdningar | Rensar både allokerings- och produktivitetsstores | `clearAllUploadedFiles` | Bekraftelse visas om anropas via gemensam funktion. |
 | Uppladdningsbadge | Visar antal nya filer | Lagrar notice i sessionStorage | `allocationUploadActivity` | Badge rensas nar Uppladdningar oppnas. |
 
+## Karnfiler i coredata
+
+Uppladdningar visar en separat lista for permanenta karnfiler. `artikel_max.csv` visas ihop med coredata-filerna och uppdaterar samma verksamhetsfil som Ordersaldo, LYX och Pafyllnadsprio anvander. Coredata-prefixen `custom`, `dimension`, `item`, `item_alias`, `item_attribute`, `item_option`, `kpi_target_rule` och `pallet_type` sparas server-side under `data/coredata/<verksamhetskod>/`. Om en anvandare laddar upp en ny fil med samma prefix for sin verksamhet tas den gamla filen med samma prefix bort och den nya blir sanningen. Andra verksamheters filer rors inte.
+
+Allokering anvander verksamhetens `item_option`-karnfil nar anvandaren inte laddat upp en egen Item option-fil. En uppladdad lokal fil i sloten vinner for den korningen, men den permanenta karnfilen ligger kvar som verksamhetens fallback.
+
+Nar en slot redan har en verksamhetens karnfil, till exempel `item_option` eller `artikel_max.csv`, visas den i Karnfiler i stallet for att dubbelvisas i Filer. Om anvandaren laddar upp en lokal override i sessionen visas sloten i Filer igen.
+
 ## Bearbeta-floden
 
 Bearbeta ar en egen sidebar-vy (`bearbeta.html`). Den ska inte beskrivas som en flik inne i Dela. Om anvandaren inte ser Bearbeta i menyn, eller ser vyn men inte kan kora floden, beror det normalt pa att rollen saknar `allocationProcess=edit` i vyatkomst. Vanliga lagerroller ser som standard Uppladdningar och Dela, men kan fa Bearbeta via Vybehorigheter.
 
 Att andra `allocationProcess` eller `Vybehorigheter` kraver admin-/Super User-atkomst till Anvandare/installningar. En vanlig anvandare ska kontakta admin eller Super User, inte sjalv ga till Vybehorigheter.
+
+Bearbeta lyssnar pa sidebarens omradestoggle nar floden kors. Rollen maste ha `allocationProcessMatrix=view` for att se knappen `Matris` i Bearbeta och `allocationProcessMatrix=edit` for att spara andringar. Super User har alltid full atkomst, och admin har `Redigera` som standard. Matrisen oppnar en global Bearbeta-matris dar varje toggle kan fa bolagsfilter, exkluderade kundnummer och en lista over vilka Bearbeta-funktioner som ska synas for togglen. Valet `Alla` betyder att togglen ser alla funktioner.
+
+Matrisen sparas i appsettings som `allocation_process_matrix` via `GET/PUT /api/allokering/process-matrix` och galler for bade webb och desktop eftersom desktop servar samma frontend och API. Standardmatrisen ar:
+
+- GG filtrerar tabellfiler som har Bolag-/Kundnr-kolumner till `Bolag = GG` och exkluderar `Kundnr = 6005`.
+- MG filtrerar tabellfiler som har Bolag-/Kundnr-kolumner till `Bolag = MG` och exkluderar `Kundnr = 40002` och `90002`.
+- Ovriga toggles, inklusive AS, EH, R3 och `∞`, skickar inte nagot radfilter och ser hela underlaget.
+
+Reglerna normaliseras server-side i `allocation_bridge.normalize_process_matrix` sa de galler alla Bearbeta-floden oavsett vilken filslot som anvands. Frontendens `ALLOCATION_PROCESS_MATRIX` ar bara fallback/standard om API:t inte kan lasa matrisen. Radfiltrering sker pa temporara kopior per korning; originaluppladdningen i cache/IndexedDB andras inte.
 
 | Flode | Kraver | Resultat |
 | --- | --- | --- |
@@ -47,6 +65,8 @@ Att andra `allocationProcess` eller `Vybehorigheter` kraver admin-/Super User-at
 | Prognosrapport | Prognos eller kampanj, samt Saldo; valfritt Buffert | Prognos vs Autoplock |
 
 Dolda/tekniska floden finns for observations-update, observations-sync och update-check. Observations kan aven triggas automatiskt nar ny buffertfil laggs in. Observations och den framraknade karnfilen `artikel_max.csv` ar verksamhetsseparerade: Stigamo anvander legacy-filerna i `lowfreqdata/buffertpall/`, medan R3 anvander egna filer under `lowfreqdata/buffertpall/r3/`. En R3-uppladdning ska darfor inte andra Stigamos observations- eller artikel_max-underlag, och tvartom.
+
+For Super User foljer lagerverktygens verksamhet sidebarens omradestoggle. R3-toggle skriver/laser R3:s observations, `artikel_max.csv` och coredata; Stigamo-omraden som GG/MG/AS/EH skriver/laser Stigamo. `∞` faller tillbaka till Super User-kontots egen verksamhet.
 
 Allokering anvander bara orderrader med status 33 eller lagre. Orderrader med status over 33 ignoreras innan pallar matchas. Buffertpallar filtreras separat till status 29, 30 och 32 for allokering, och refill anvander status 29 och 30.
 
@@ -63,7 +83,7 @@ API: `POST /api/allokering/flow/split-values`.
 
 Korda lagerverktygsfloden auditloggas i Historik som `allocation_flow`. Loggen sparar flodes-id, vilka filslotar/parameternamn som anvandes och hur manga resultattabeller som skapades, men inte filnamn eller inskickade listvarden. Om uppladdningen inte kan sparas, multipart-formularet inte kan lasas eller filen inte kan bearbetas loggas `upload_failed` med steg och feltyp. Om automatisk filidentifiering kraschar loggas `detect_failed`.
 
-Bearbeta-uppladdningar sparas content-addressed i serverns temporara cachekatalog utan originalfilnamn. Nar samma fil skickas igen far den samma sokvag, och `warehouse_tools.flows` ateranvander inlast DataFrame sa lange filens storlek och modifieringstid ar oforandrade. Cachelagret rensas opportunistiskt, behaller bara ett begransat antal filer och ska bara paverka hastighet, inte resultat eller verksamhetsscope. Om samma anvandare laddar upp samma slot/filnamn med nytt innehall ersatts den tidigare cacheposten direkt.
+Bearbeta-uppladdningar sparas content-addressed i serverns temporara cachekatalog utan originalfilnamn. Nar samma fil skickas igen far den samma sokvag, och `warehouse_tools.flows` ateranvander inlast DataFrame sa lange filens storlek och modifieringstid ar oforandrade. Cachelagret rensas opportunistiskt, behaller bara ett begransat antal filer och ska bara paverka hastighet, inte resultat eller verksamhetsscope. Om samma anvandare laddar upp samma slot/filnamn med nytt innehall ersatts den tidigare cacheposten direkt. GG/MG-radfilter skrivs till temporara filtrerade kopior per korning; originaluppladdningen i cache/IndexedDB andras inte.
 
 Bearbeta-resultat lagras som temporara serversessioner. Sessionen binds till anvandaren som korde flodet, sa `Oppna i Excel`, `Ladda ner CSV` och kolumnkopiering inte kan hamta en annan anvandares resultat aven om ett session-id skulle delas.
 
@@ -113,13 +133,16 @@ python -m tools.compare_warehouse_results --left .\Resultat.csv --right .\tmp6jj
 | "Varfor hamnar filen i fel ruta?" | Automatisk detektion bygger pa filnamn/header. Anvand Välj pa exakt slot for att styra. |
 | "Varfor ser jag inte Bearbeta i menyn?" | Rollen saknar normalt `allocationProcess=edit`. Be admin/Super User kontrollera Vybehorigheter. |
 | "Varfor oppnas inte Excel?" | Funktionen kraver lokal desktop/OS-stod och servern maste ha kvar resultat-sessionen. Om servern startade om med `--reload`, kor flodet igen. Om Windows/Excel inte kan oppna filen automatiskt visas feltoast; testa Ladda ner CSV. |
-| "Vad betyder artikel_max karnfil?" | `artikel_max.csv` kan finnas som intern karnfil aven om anvandaren inte laddat upp den. |
+| "Vad betyder karnfil?" | En karnfil ar permanent serverdata for anvandarens verksamhet. `artikel_max.csv` och coredata-filer som `item_option` kan anvandas aven om anvandaren inte laddat upp en lokal fil i sessionen. |
+| "Vad hander om jag laddar upp ny item_option?" | Den gamla `item_option`-filen for din verksamhet tas bort och den nya blir sanningen. R3, Stigamo och framtida verksamheter paverkar inte varandra. |
 
 ## Kallor
 
 - `../app/frontend/js/allocation_tools.js`
 - `../app/backend/routers/allocation.py`
 - `../app/backend/allocation_bridge.py`
+- `../app/backend/coredata_service.py`
+- `../app/backend/routers/coredata.py`
 - `../warehouse_tools/catalog.py`
 - `../warehouse_tools/cli.py`
 - `../warehouse_tools/flows.py`
