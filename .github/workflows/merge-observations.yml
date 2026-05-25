@@ -6,6 +6,7 @@ on:
       - data/community-observations
     paths:
       - 'warehouse_tools/vendor/lowfreqdata/buffertpall/observations_*.csv.gz'
+      - 'warehouse_tools/vendor/lowfreqdata/buffertpall/*/observations_*.csv.gz'
   workflow_dispatch:
 
 permissions:
@@ -43,7 +44,8 @@ jobs:
           import numpy as np
           import pandas as pd
 
-          data_dir = Path('warehouse_tools/vendor/lowfreqdata/buffertpall')
+          root_data_dir = Path('warehouse_tools/vendor/lowfreqdata/buffertpall')
+          data_dir = root_data_dir
           observations_path = data_dir / 'observations.csv.gz'
           artikel_max_path = data_dir / 'artikel_max.csv'
           cols = ['artikelnummer', 'pallid', 'antal']
@@ -56,6 +58,81 @@ jobs:
                           df[col] = ''
                   return df[cols]
               return pd.DataFrame(columns=cols)
+
+          def read_artikel_max(path: Path) -> pd.DataFrame:
+              artikel_cols = ['artikelnummer', 'max', 'pallid']
+              if path.exists() and path.stat().st_size > 0:
+                  try:
+                      df = pd.read_csv(path, dtype=str, encoding='utf-8-sig')
+                  except Exception:
+                      return pd.DataFrame(columns=artikel_cols)
+                  for col in artikel_cols:
+                      if col not in df.columns:
+                          df[col] = ''
+                  return df[artikel_cols]
+              return pd.DataFrame(columns=artikel_cols)
+
+          def normalize_artikel_max(df: pd.DataFrame) -> pd.DataFrame:
+              artikel_cols = ['artikelnummer', 'max', 'pallid']
+              if df is None or df.empty:
+                  return pd.DataFrame(columns=artikel_cols).set_index('artikelnummer')
+              out = df.copy()
+              for col in artikel_cols:
+                  if col not in out.columns:
+                      out[col] = ''
+              out = out[artikel_cols]
+              out['artikelnummer'] = out['artikelnummer'].astype(str).str.strip()
+              out['pallid'] = out['pallid'].astype(str).str.strip()
+              out['max'] = pd.to_numeric(out['max'], errors='coerce')
+              out = out[out['artikelnummer'] != '']
+              return out.drop_duplicates(subset='artikelnummer', keep='first').set_index('artikelnummer')
+
+          def same_max_value(before, after) -> bool:
+              if pd.isna(before) and pd.isna(after):
+                  return True
+              if pd.isna(before) or pd.isna(after):
+                  return False
+              return float(before) == float(after)
+
+          def fmt_max(value) -> str:
+              if pd.isna(value):
+                  return ''
+              value = float(value)
+              return str(int(value)) if value.is_integer() else str(value)
+
+          def artikel_max_summary(before: pd.DataFrame, after: pd.DataFrame) -> dict:
+              before_norm = normalize_artikel_max(before)
+              after_norm = normalize_artikel_max(after)
+              before_articles = set(before_norm.index)
+              after_articles = set(after_norm.index)
+              changed = []
+              increased = 0
+              decreased = 0
+              for article in sorted(before_articles & after_articles):
+                  before_value = before_norm.at[article, 'max']
+                  after_value = after_norm.at[article, 'max']
+                  if same_max_value(before_value, after_value):
+                      continue
+                  if not pd.isna(before_value) and not pd.isna(after_value):
+                      if float(after_value) > float(before_value):
+                          increased += 1
+                      elif float(after_value) < float(before_value):
+                          decreased += 1
+                  changed.append({
+                      'artikelnummer': str(article),
+                      'before_max': fmt_max(before_value),
+                      'after_max': fmt_max(after_value),
+                      'before_pallid': str(before_norm.at[article, 'pallid']),
+                      'after_pallid': str(after_norm.at[article, 'pallid']),
+                  })
+              return {
+                  'changed_rows': len(changed),
+                  'increased_rows': increased,
+                  'decreased_rows': decreased,
+                  'new_article_rows': len(after_articles - before_articles),
+                  'removed_article_rows': len(before_articles - after_articles),
+                  'examples': changed[:5],
+              }
 
           def max_utan_outlier(group: pd.DataFrame) -> tuple[float, str]:
               if len(group) > 2:
@@ -93,30 +170,132 @@ jobs:
               return len(rows)
 
           data_dir.mkdir(parents=True, exist_ok=True)
-          frames = [read_observations(observations_path)]
+          existing_observations = read_observations(observations_path)
+          existing_ids = set(existing_observations['pallid'].astype(str))
+          article_max_before = read_artikel_max(artikel_max_path)
+          frames = [existing_observations]
+          user_frames = []
 
           user_files = sorted(glob.glob(str(data_dir / 'observations_*.csv.gz')))
           for filename in user_files:
               try:
                   df = pd.read_csv(filename, compression='gzip', dtype=str)
                   if all(col in df.columns for col in cols):
-                      frames.append(df[cols])
+                      session_rows = df[cols]
+                      frames.append(session_rows)
+                      user_frames.append(session_rows)
                   else:
                       print(f'Skipping {filename}: missing expected columns')
               except Exception as exc:
                   print(f'Skipping {filename}: {exc}')
 
+          user_rows = pd.concat(user_frames, ignore_index=True) if user_frames else pd.DataFrame(columns=cols)
+          new_user_rows = user_rows[~user_rows['pallid'].astype(str).isin(existing_ids)].drop_duplicates(subset='pallid')
           merged = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=cols)
           before = len(merged)
           merged = merged.drop_duplicates(subset='pallid', keep='first')
           after = len(merged)
           merged.to_csv(observations_path, index=False, compression='gzip')
           article_count = rebuild_artikel_max(merged, artikel_max_path)
+          article_max_after = read_artikel_max(artikel_max_path)
+          max_changes = artikel_max_summary(article_max_before, article_max_after)
+
           print(f'Merged {len(user_files)} user files. Rows: {before} -> {after}. Artikel-max rows: {article_count}.')
+          print(f'Nya pallid från sessionsfiler: {len(new_user_rows)}.')
+          print(
+              'Artikel-max ändrade maxvärden: '
+              f"{max_changes['changed_rows']} "
+              f"(upp: {max_changes['increased_rows']}, ned: {max_changes['decreased_rows']}, "
+              f"nya artiklar: {max_changes['new_article_rows']}, borttagna artiklar: {max_changes['removed_article_rows']})."
+          )
+          for example in max_changes['examples']:
+              print(
+                  'Ändrat max: '
+                  f"{example['artikelnummer']} {example['before_max']} -> {example['after_max']} "
+                  f"(pallid {example['before_pallid']} -> {example['after_pallid']})"
+              )
+
+          summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary_path:
+              with open(summary_path, 'a', encoding='utf-8') as fh:
+                  fh.write('## Observations merge\n\n')
+                  fh.write(f"- Sessionsfiler: {len(user_files)}\n")
+                  fh.write(f"- Nya pallid från sessionsfiler: {len(new_user_rows)}\n")
+                  fh.write(f"- Observationer efter merge: {after}\n")
+                  fh.write(f"- Artikel-max-rader: {article_count}\n")
+                  fh.write(f"- Ändrade maxvärden: {max_changes['changed_rows']}\n")
+                  fh.write(f"- Max upp/ned: {max_changes['increased_rows']} / {max_changes['decreased_rows']}\n")
+                  fh.write(f"- Nya artiklar i artikel_max: {max_changes['new_article_rows']}\n")
+                  if max_changes['examples']:
+                      fh.write('\n### Exempel på ändrade maxvärden\n')
+                      for example in max_changes['examples']:
+                          fh.write(
+                              f"- {example['artikelnummer']}: {example['before_max']} -> {example['after_max']} "
+                              f"({example['before_pallid']} -> {example['after_pallid']})\n"
+                          )
 
           for filename in user_files:
               os.remove(filename)
               print(f'Removed {filename}')
+
+          for business_dir in sorted(path for path in root_data_dir.iterdir() if path.is_dir()):
+              business_label = business_dir.name.upper()
+              observations_path = business_dir / 'observations.csv.gz'
+              artikel_max_path = business_dir / 'artikel_max.csv'
+              existing_observations = read_observations(observations_path)
+              existing_ids = set(existing_observations['pallid'].astype(str))
+              article_max_before = read_artikel_max(artikel_max_path)
+              frames = [existing_observations]
+              user_frames = []
+
+              user_files = sorted(glob.glob(str(business_dir / 'observations_*.csv.gz')))
+              for filename in user_files:
+                  try:
+                      df = pd.read_csv(filename, compression='gzip', dtype=str)
+                      if all(col in df.columns for col in cols):
+                          session_rows = df[cols]
+                          frames.append(session_rows)
+                          user_frames.append(session_rows)
+                      else:
+                          print(f'[{business_label}] Skipping {filename}: missing expected columns')
+                  except Exception as exc:
+                      print(f'[{business_label}] Skipping {filename}: {exc}')
+
+              user_rows = pd.concat(user_frames, ignore_index=True) if user_frames else pd.DataFrame(columns=cols)
+              new_user_rows = user_rows[~user_rows['pallid'].astype(str).isin(existing_ids)].drop_duplicates(subset='pallid')
+              merged = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=cols)
+              before = len(merged)
+              merged = merged.drop_duplicates(subset='pallid', keep='first')
+              after = len(merged)
+              merged.to_csv(observations_path, index=False, compression='gzip')
+              article_count = rebuild_artikel_max(merged, artikel_max_path)
+              article_max_after = read_artikel_max(artikel_max_path)
+              max_changes = artikel_max_summary(article_max_before, article_max_after)
+
+              print(f'[{business_label}] Merged {len(user_files)} user files. Rows: {before} -> {after}. Artikel-max rows: {article_count}.')
+              print(f'[{business_label}] Nya pallid fran sessionsfiler: {len(new_user_rows)}.')
+              print(
+                  f'[{business_label}] Artikel-max andrade maxvarden: '
+                  f"{max_changes['changed_rows']} "
+                  f"(upp: {max_changes['increased_rows']}, ned: {max_changes['decreased_rows']}, "
+                  f"nya artiklar: {max_changes['new_article_rows']}, borttagna artiklar: {max_changes['removed_article_rows']})."
+              )
+
+              summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
+              if summary_path:
+                  with open(summary_path, 'a', encoding='utf-8') as fh:
+                      fh.write(f'\n## Observations merge {business_label}\n\n')
+                      fh.write(f"- Sessionsfiler: {len(user_files)}\n")
+                      fh.write(f"- Nya pallid fran sessionsfiler: {len(new_user_rows)}\n")
+                      fh.write(f"- Observationer efter merge: {after}\n")
+                      fh.write(f"- Artikel-max-rader: {article_count}\n")
+                      fh.write(f"- Andrade maxvarden: {max_changes['changed_rows']}\n")
+                      fh.write(f"- Max upp/ned: {max_changes['increased_rows']} / {max_changes['decreased_rows']}\n")
+                      fh.write(f"- Nya artiklar i artikel_max: {max_changes['new_article_rows']}\n")
+
+              for filename in user_files:
+                  os.remove(filename)
+                  print(f'[{business_label}] Removed {filename}')
           PY
 
       - name: Commit merged data
