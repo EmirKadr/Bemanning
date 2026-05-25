@@ -59,6 +59,7 @@ Funktioner:
 ## Importregler
 
 - Direktimporten `Flera nya personer` har samma falt som Excelmallen: verksamhet vid behov, namn, hemomrade, huvudaktivitet och sortering.
+- Varje kolumn i direkttabellen visar om faltet ar `Obligatoriskt` eller `Frivilligt` i rubriken.
 - Excelimport matchar svenska och alternativa rubriker.
 - Vanliga anvandare importerar alltid till egen verksamhet. Super User kan ange verksamhet med kod, namn eller id, eller lata omrade/aktivitet harleda den.
 - Import skapar aktiva personer.

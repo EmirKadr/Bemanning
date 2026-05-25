@@ -74,6 +74,7 @@ Knappar:
 ## Importregler
 
 - Direktimporten `Flera nya anvandare` har samma falt som Excelmallen: anvandarnamn, visningsnamn, roller, omrade och vid behov verksamhet.
+- Varje kolumn i direkttabellen visar om faltet ar `Obligatoriskt` eller `Frivilligt` i rubriken.
 - Rollfaltet accepterar samma svenska rollnamn som Excelimporten. Flera roller kan separeras med komma.
 - Importerade anvandare skapas aktiva utan losenord och far `must_change_password=true`.
 - Dubbletter i fil, i direkttabellen eller mot befintliga anvandare stoppas och visas i resultatmodalen. Anvandarnamn ar globalt unika aven over verksamheter.

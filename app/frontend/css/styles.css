@@ -330,7 +330,15 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
 .brand-name { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; color: var(--text); }
 .brand-sub  { font-size: 11px; color: var(--text-soft); margin-top: 1px; }
 
-.sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
 .sidebar-heading {
   margin: 10px 8px 4px;
   color: var(--text-soft);
@@ -393,6 +401,7 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 0 0 auto;
 }
 .sidebar-area-focus {
   display: flex;
@@ -2576,6 +2585,35 @@ tr.filter-row input {
 .bulk-import-table td {
   padding: 7px 8px;
   vertical-align: middle;
+}
+.bulk-import-table th {
+  line-height: 1.2;
+  white-space: normal;
+}
+.bulk-import-head-label,
+.bulk-import-head-requirement {
+  display: block;
+}
+.bulk-import-head-requirement {
+  width: fit-content;
+  margin-top: 5px;
+  padding: 2px 6px;
+  border: 1px solid var(--border-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-transform: none;
+}
+.bulk-import-head-requirement.is-required {
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--border-2));
+  color: var(--danger);
+}
+.bulk-import-head-requirement.is-optional {
+  color: var(--text-soft);
 }
 .bulk-import-table th:first-child,
 .bulk-import-table td.bulk-import-row-number {

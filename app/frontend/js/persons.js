@@ -458,7 +458,7 @@ async function importPersonFile(file) {
 
 function openBulkPersonsModal() {
   const businessColumn = currentUser?.is_super_user
-    ? [{ key: "business", label: "Verksamhet", type: "select", options: businesses.map((business) => ({ value: business.code, label: business.name })) }]
+    ? [{ key: "business", label: "Verksamhet", required: false, type: "select", options: businesses.map((business) => ({ value: business.code, label: business.name })) }]
     : [];
   openBulkImportGrid({
     title: "Flera nya personer",
@@ -466,10 +466,10 @@ function openBulkPersonsModal() {
     initialRows: 10,
     columns: [
       ...businessColumn,
-      { key: "name", label: "Namn" },
-      { key: "home_area", label: "Hemområde", type: "select", options: areas.map((area) => ({ value: area.name, label: area.name })) },
-      { key: "home_activity", label: "Huvudaktivitet", type: "select", options: activitiesActive.map((activity) => ({ value: activity.label, label: activity.label })) },
-      { key: "sort_order", label: "Sortering", type: "number" },
+      { key: "name", label: "Namn", required: true },
+      { key: "home_area", label: "Hemområde", required: false, type: "select", options: areas.map((area) => ({ value: area.name, label: area.name })) },
+      { key: "home_activity", label: "Huvudaktivitet", required: false, type: "select", options: activitiesActive.map((activity) => ({ value: activity.label, label: activity.label })) },
+      { key: "sort_order", label: "Sortering", required: false, type: "number" },
     ],
     onSubmit: async (rows) => {
       const result = await api.post("/api/persons/import-rows", { rows });

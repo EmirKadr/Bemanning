@@ -767,6 +767,11 @@ def test_import_views_have_templates_and_help_buttons():
 
     assert "setupImportHelpButton" in common
     assert "openBulkImportGrid" in common
+    assert "bulkImportRequirementMeta" in common
+    assert "bulkImportRequirementLabel" in common
+    assert 'label: required ? "Obligatoriskt" : "Frivilligt"' in common
+    assert "bulk-import-head-requirement" in common
+    assert 'aria-required="true"' in common
     assert "Importen kan göras via Excel-mallen eller direkt i vyn" in common
     assert "async function download" in api_js
     assert "URL.createObjectURL(blob)" in api_js
@@ -776,6 +781,8 @@ def test_import_views_have_templates_and_help_buttons():
     assert 'id="person-import-help"' in persons_html
     assert "/api/persons/import-rows" in persons_js
     assert "openBulkPersonsModal" in persons_js
+    assert re.search(r'key:\s*"name",\s*label:\s*"Namn",\s*required:\s*true', persons_js)
+    assert 'key: "home_area", label: "Hemområde", required: false' in persons_js
     assert 'setupImportHelpButton("person-import-help", "Importera personer")' in persons_js
     assert 'api.download("/api/persons/import-template", "personer-importmall.xlsx")' in persons_js
     assert 'window.location.href = "/api/persons/import-template"' not in persons_js
@@ -787,6 +794,9 @@ def test_import_views_have_templates_and_help_buttons():
     assert 'id="user-import-help"' in users_html
     assert "/api/users/import-rows" in users_js
     assert "openBulkUsersModal" in users_js
+    assert '{ key: "username", label: "Användarnamn", required: true }' in users_js
+    assert '{ key: "roles", label: "Roller", required: true }' in users_js
+    assert '{ key: "display_name", label: "Visningsnamn", required: false }' in users_js
     assert 'setupImportHelpButton("user-import-help", "Importera användare")' in users_js
     assert 'api.download("/api/users/import-template", "anvandare-importmall.xlsx")' in users_js
     assert 'window.location.href = "/api/users/import-template"' not in users_js
@@ -804,6 +814,8 @@ def test_import_views_have_templates_and_help_buttons():
     assert "/api/activities/import-template" in activities_js
     assert "/api/activities/import-rows" in activities_js
     assert "openBulkActivitiesModal" in activities_js
+    assert '{ key: "label", label: "Etikett", required: true }' in activities_js
+    assert 'key: "area", label: "Område", required: false' in activities_js
     assert 'api.download("/api/activities/import-template", "aktiviteter-importmall.xlsx")' in activities_js
     assert 'window.location.href = "/api/activities/import-template"' not in activities_js
     assert "/api/activities/import" in activities_js

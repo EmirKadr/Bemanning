@@ -253,3 +253,7 @@ Fixade Personer-vyn så Super User inte längre ser global personlista när omr�
 ## [2026-05-25] change | GG/MG-filter i Bearbeta
 
 Bearbeta skickar nu aktuell omradestoggle till `/api/allokering/flow/*`. Backend filtrerar tabellfiler per korning for GG (`Bolag=GG`, exkl. kundnr `6005`) och MG (`Bolag=MG`, exkl. kundnr `40002` och `90002`) nar filen har Bolag-/Kundnr-kolumner. Ovriga toggles ser hela underlaget. Frontenden har en processmatris for framtida flodessynlighet per toggle.
+
+## [2026-05-25] polish | Markerar krav i Flera nya-dialoger
+
+Direktimporttabellerna for Personer, Aktiviteter och Anvandare visar nu `Obligatoriskt` eller `Frivilligt` i varje kolumnrubrik. Den gemensamma bulkimportkomponenten markerar omarkta kolumner som frivilliga som fallback, sa framtida `Flera nya ...`-dialoger inte blir utan faltstatus.

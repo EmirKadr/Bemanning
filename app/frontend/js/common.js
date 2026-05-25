@@ -2311,19 +2311,45 @@ function bulkImportOptionHtml(option) {
 
 function bulkImportControlHtml(column) {
   const key = escapeHtml(column.key);
-  const label = escapeHtml(column.label || column.key);
+  const requirement = bulkImportRequirementMeta(column);
+  const label = escapeHtml(`${column.label || column.key} (${requirement.label.toLowerCase()})`);
+  const requiredAttrs = requirement.required ? ' required aria-required="true"' : ' aria-required="false"';
   if (column.type === "select") {
     return `
-      <select data-bulk-key="${key}" aria-label="${label}">
+      <select data-bulk-key="${key}" aria-label="${label}"${requiredAttrs}>
         <option value=""></option>
         ${(column.options || []).map(bulkImportOptionHtml).join("")}
       </select>
     `;
   }
   if (column.type === "number") {
-    return `<input data-bulk-key="${key}" type="number" step="${escapeHtml(column.step || 1)}" aria-label="${label}" />`;
+    return `<input data-bulk-key="${key}" type="number" step="${escapeHtml(column.step || 1)}" aria-label="${label}"${requiredAttrs} />`;
   }
-  return `<input data-bulk-key="${key}" type="text" autocomplete="off" aria-label="${label}" />`;
+  return `<input data-bulk-key="${key}" type="text" autocomplete="off" aria-label="${label}"${requiredAttrs} />`;
+}
+
+function bulkImportRequirementMeta(column) {
+  const required = column.required === true;
+  return {
+    label: required ? "Obligatoriskt" : "Frivilligt",
+    className: required ? "is-required" : "is-optional",
+    required,
+  };
+}
+
+function bulkImportRequirementLabel(column) {
+  return bulkImportRequirementMeta(column).label;
+}
+
+function bulkImportHeaderHtml(column) {
+  const label = escapeHtml(column.label || column.key);
+  const requirement = bulkImportRequirementMeta(column);
+  return `
+    <th>
+      <span class="bulk-import-head-label">${label}</span>
+      <span class="bulk-import-head-requirement ${requirement.className}">${requirement.label}</span>
+    </th>
+  `;
 }
 
 function collectBulkImportRows(tbody, columns) {
@@ -2361,7 +2387,7 @@ function openBulkImportGrid({ title, columns, submitLabel = "Skapa", initialRows
           <thead>
             <tr>
               <th class="bulk-import-row-number">#</th>
-              ${safeColumns.map((column) => `<th>${escapeHtml(column.label || column.key)}</th>`).join("")}
+              ${safeColumns.map(bulkImportHeaderHtml).join("")}
               <th class="bulk-import-actions"></th>
             </tr>
           </thead>

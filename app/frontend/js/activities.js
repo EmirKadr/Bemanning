@@ -249,7 +249,7 @@ async function importActivityFile(file) {
 
 function openBulkActivitiesModal() {
   const businessColumn = currentUser?.is_super_user
-    ? [{ key: "business", label: "Verksamhet", type: "select", options: businesses.map((business) => ({ value: business.code, label: business.name })) }]
+    ? [{ key: "business", label: "Verksamhet", required: false, type: "select", options: businesses.map((business) => ({ value: business.code, label: business.name })) }]
     : [];
   openBulkImportGrid({
     title: "Flera nya aktiviteter",
@@ -257,10 +257,10 @@ function openBulkActivitiesModal() {
     initialRows: 10,
     columns: [
       ...businessColumn,
-      { key: "label", label: "Etikett" },
-      { key: "area", label: "Område", type: "select", options: areas.map((area) => ({ value: area.name, label: area.name })) },
-      { key: "summary_activity", label: "Summeras som", type: "select", options: activities.map((activity) => ({ value: activity.label, label: activity.label })) },
-      { key: "sort_order", label: "Sortering", type: "number" },
+      { key: "label", label: "Etikett", required: true },
+      { key: "area", label: "Område", required: false, type: "select", options: areas.map((area) => ({ value: area.name, label: area.name })) },
+      { key: "summary_activity", label: "Summeras som", required: false, type: "select", options: activities.map((activity) => ({ value: activity.label, label: activity.label })) },
+      { key: "sort_order", label: "Sortering", required: false, type: "number" },
     ],
     onSubmit: async (rows) => {
       const result = await api.post("/api/activities/import-rows", { rows });

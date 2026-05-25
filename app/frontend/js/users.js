@@ -512,7 +512,7 @@ async function openBulkUsersModal() {
     return;
   }
   const businessColumn = currentUser?.is_super_user
-    ? [{ key: "business", label: "Verksamhet", type: "select", options: businesses.map((business) => ({ value: business.code, label: business.name })) }]
+    ? [{ key: "business", label: "Verksamhet", required: false, type: "select", options: businesses.map((business) => ({ value: business.code, label: business.name })) }]
     : [];
   openBulkImportGrid({
     title: "Flera nya användare",
@@ -520,10 +520,10 @@ async function openBulkUsersModal() {
     initialRows: 10,
     columns: [
       ...businessColumn,
-      { key: "username", label: "Användarnamn" },
-      { key: "display_name", label: "Visningsnamn" },
-      { key: "roles", label: "Roller" },
-      { key: "area", label: "Område", type: "select", options: areas.map((area) => ({ value: area.name, label: area.name })) },
+      { key: "username", label: "Användarnamn", required: true },
+      { key: "display_name", label: "Visningsnamn", required: false },
+      { key: "roles", label: "Roller", required: true },
+      { key: "area", label: "Område", required: false, type: "select", options: areas.map((area) => ({ value: area.name, label: area.name })) },
     ],
     onSubmit: async (rows) => {
       const result = await api.post("/api/users/import-rows", { rows });

@@ -1,7 +1,7 @@
 ---
 title: Aktiviteter och omraden
 status: aktiv
-updated: 2026-05-22
+updated: 2026-05-25
 tags: [aktiviteter, omraden, ui, import]
 ---
 
@@ -54,6 +54,7 @@ Omradesfokus i sidebar filtrerar aktivitetslistan per omrade. `∞` visar alla a
 ## Importregler
 
 - Direktimporten `Flera nya aktiviteter` har samma falt som Excelmallen: verksamhet vid behov, etikett, omrade, summeras som och sortering.
+- Varje kolumn i direkttabellen visar om faltet ar `Obligatoriskt` eller `Frivilligt` i rubriken.
 - Vanliga anvandare importerar alltid till egen verksamhet. Super User kan ange verksamhet med kod, namn eller id, eller lata omrade/summeringsaktivitet harleda den.
 - Importerade aktiviteter far vit standardfarg, kategori `work` och aktiv status.
 - Dubbletter i fil, i direkttabellen eller mot befintliga aktiviteter stoppas och visas i resultatmodalen.
