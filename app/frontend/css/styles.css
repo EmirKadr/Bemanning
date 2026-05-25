@@ -2431,50 +2431,6 @@ body.dragging-ov select { pointer-events: none; }
 
 
 /* ============================================================
-   Tips FAB (floating action button)
-   ============================================================ */
-
-.tips-fab {
-  position: fixed;
-  bottom: 22px;
-  right: 22px;
-  z-index: 20;
-}
-.tips-fab summary {
-  width: 40px; height: 40px;
-  display: flex; align-items: center; justify-content: center;
-  list-style: none;
-  border-radius: 999px;
-  border: 0;
-  background: var(--accent);
-  color: #fff;
-  font-size: 20px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 8px 24px -6px rgba(79, 70, 229, .5);
-  transition: transform .12s, box-shadow .12s;
-}
-.tips-fab summary:hover { transform: scale(1.05); box-shadow: 0 12px 28px -6px rgba(79, 70, 229, .6); }
-.tips-fab summary::-webkit-details-marker { display: none; }
-.tips-fab[open] summary { background: var(--accent-hover); }
-
-.tips-popover {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 12px);
-  width: min(340px, calc(100vw - 40px));
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 16px 18px;
-  box-shadow: var(--shadow-3);
-  animation: pop .16s ease-out;
-}
-.tips-popover h3 { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
-.tips-popover .note { color: var(--text-muted); font-size: 13px; line-height: 1.55; }
-
-
-/* ============================================================
    Sort/filter rows (personer, aktiviteter)
    ============================================================ */
 

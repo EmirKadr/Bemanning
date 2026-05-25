@@ -42,7 +42,6 @@ Kort svar: Bemanning ar huvudmatrisen. Anvandaren valjer ar/vecka/dag och styr o
 | Ctrl+C | Kopierar fokuserad cell/halva | Lagrar aktivitet i lokal clipboard | `copyFocused(false)` | Kraver fokuserad cell. |
 | Ctrl+X | Klipper fokuserad cell/halva | Kopierar och tommer kallsegment | `copyFocused(true)`, `PUT /api/schedule/cell` | Kan fa konflikt om cellen andrats. |
 | Ctrl+V | Klistrar in | Satter fokuserad cell/halva | `pasteFocused`, `PUT /api/schedule/cell` | Fungerar inte utan kopierat varde och fokus. |
-| Tips-knapp | Oppnar hjalp-popover | Visar split och autospar-info | `details.tips-fab` | Ingen API-koppling. |
 | Bemanningskalkyl | Fyller rader/tid/mal | Raknar behov, timmar och diff klient-side for valt omradesfokus; `∞` visar alla paneler | `calcMetrics` | Decimaler normaliseras enligt svensk input. |
 
 ## Kopiera dag-modal

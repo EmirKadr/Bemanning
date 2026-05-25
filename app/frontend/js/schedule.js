@@ -352,8 +352,6 @@ function applyScheduleReadOnlyMode() {
     button.hidden = readOnly;
     button.disabled = readOnly;
   });
-  const tips = document.querySelector(".tips-fab");
-  if (tips) tips.hidden = readOnly;
   updateUndoRedoButtons();
 }
 

@@ -1898,7 +1898,7 @@ function renderSidebar(user, activePage) {
     const main = document.createElement("main");
     main.className = "main";
     Array.from(body.children).forEach((el) => {
-      if (el.tagName === "SCRIPT" || el.classList.contains("tips-fab")) return;
+      if (el.tagName === "SCRIPT") return;
       main.appendChild(el);
     });
 
