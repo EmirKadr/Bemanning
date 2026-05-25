@@ -7,6 +7,10 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-25] change | Super User och demo kan personsortera alla synliga personer
+
+Personsorteringen i Bemanning/Oversikt behaller kravet `personSortOrder=edit`, men Super User och demo ar inte langre lasta till eget anvandaromrade. De kan dra och spara sortering for alla synliga aktiva personer; vanliga admin/bemanningsansvariga ar fortsatt begransade till eget hemomrade.
+
 ## [2026-05-25] change | Veckonummer i Oversikt
 
 Oversiktens daghuvuden visar nu datum pa forsta raden och `Vecka XX` pa en mindre rad under. Det galler bade veckovy och manadsvy, sa man ser veckonummer per dagkolumn.

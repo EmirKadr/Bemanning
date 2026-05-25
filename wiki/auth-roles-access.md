@@ -73,7 +73,7 @@ Om anvandaren bara har `view`:
 - Vyn syns inte i sidebar: rollen har `none` for vyn eller sidan filtreras bort.
 - Knappen syns men fungerar inte: anvandaren har `view`, inte `edit`.
 - Importknapp ar dold: importvyn saknar edit-atkomst.
-- Drag-sortering av personnamn i Bemanning/Oversikt fungerar inte: rollen saknar `personSortOrder=edit`, anvandaren saknar omrade eller personen har annat hemomrade. Backend tillater dessutom bara Bemanningsansvarig, admin och Super User.
+- Drag-sortering av personnamn i Bemanning/Oversikt fungerar inte: rollen saknar `personSortOrder=edit`, personfiltret ar aktivt, eller listan har andrats. Bemanningsansvarig/admin ar begransade till eget omrade; Super User och demo kan sortera alla synliga personer.
 - Historik nekas: kraver Super User. Produktivitet nekas: rollen saknar `productivity` i vyatkomst.
 - Hamta data saknas eller nekas: `dataFetch` saknas i vyatkomst. Eftersom vyn kan hamta data fran extern datakalla har inga basroller standardatkomst; Super User kan oppna den.
 - Bearbeta saknas eller nekas: rollen saknar `allocationProcess=edit` i vyatkomst. Lagerroller har som standard Uppladdningar och Dela, men kan fa Bearbeta via Vybehorigheter.

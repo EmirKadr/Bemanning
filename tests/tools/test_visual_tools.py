@@ -675,6 +675,8 @@ def test_planning_views_cache_all_scope_and_have_top_scrollbars():
         assert f"render{prefix}FromAllCache" in source
         assert f"invalidate{prefix}AllCache" in source
         assert f"revalidate{prefix}" in source
+        assert "function canSortPersonsAcrossAreas" in source
+        assert "user.is_super_user || user.is_demo" in source
         assert "setupSyncedHorizontalScroll(document.getElementById" in source
         assert "user.business_id ?? \"global\"" in source
         assert "user.is_super_user ? \"super\" : \"scoped\"" in source

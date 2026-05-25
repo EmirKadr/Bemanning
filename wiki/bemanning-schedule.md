@@ -34,7 +34,7 @@ Kort svar: Bemanning ar huvudmatrisen. Anvandaren valjer ar/vecka/dag och styr o
 | Redo | Gor om senaste angring | Restore av efter-snapshot | `PUT /api/schedule/hours/restore` | Knappen ar disabled nar redo-stack ar tom. |
 | Personfilter | Skriver i Person-huvud | Filtrerar synliga rader klient-side | `refreshPersons` | Shift-klick pa header sorterar i stallet. |
 | Sortera Person/Hemomrade | Klick pa header | Sorterar rader | `th[data-sort]` | Personheadern har filterinput; klick i input sorterar inte. |
-| Dra personnamn | Drar ett namn upp eller ned | Sparar ny personsortering direkt pa personernas `sort_order` | `PUT /api/persons/sort-order` | Kraver `personSortOrder=edit`, roll Bemanningsansvarig/admin/Super User och att personens hemomrade matchar anvandarens omrade. Rensa personfilter innan sortering. |
+| Dra personnamn | Drar ett namn upp eller ned | Sparar ny personsortering direkt pa personernas `sort_order` | `PUT /api/persons/sort-order` | Kraver `personSortOrder=edit`. Bemanningsansvarig/admin ar begransade till eget omrade; Super User och demo kan sortera alla synliga personer. Rensa personfilter innan sortering. |
 | Cell-dropdown | Valjer aktivitet/tomt | Sparar segment direkt | `PUT /api/schedule/cell` | 409 betyder att nagon annan hann andra cellen. |
 | Hogerklick cell | Delar hel timme eller slar ihop | Kallar split-endpoint | `PUT /api/schedule/cell/split` | Konflikt om segmentsignatur inte matchar servern. |
 | Dubbelklick cell | Alternativ split/merge | Samma som hogerklick | `toggleHourSplit` | I read-only visas varning. |
@@ -65,7 +65,7 @@ Falt:
 - Bemanning cachar bara API-svar som redan ar synliga for inloggad anvandare och aktuell verksamhet. Cachen ogiltigforklaras vid cellandring, split/merge, drag, undo/redo, rensa och kopiera dag sa omradestoggle inte visar gamla data.
 - Nar en period finns i cache kontrollerar klienten `/api/schedule/revision` tyst i bakgrunden. Aktiv vy kontrollerar ungefär var 10:e sekund, idle-vy ungefär var 30:e sekund, och dold browserflik pausar. Vid ny revision hamtas all-data och bara andrade synliga timmar patchas om anvandaren inte haller pa i just den cellen.
 - `fill-from-left` finns som API (`POST /api/schedule/fill-from-left`) men har ingen synlig knapp i nuvarande `index.html`/`schedule.js`.
-- Personnamn kan dras for att andra personernas sorteringsnummer. Klienten skickar hela ordningen for anvandarens eget omrade till `/api/persons/sort-order`; backend nekar andra roller, saknat anvandaromrade, filtrerade/forandrade personlistor och personer med annat hemomrade.
+- Personnamn kan dras for att andra personernas sorteringsnummer. Klienten skickar hela synliga ordningen till `/api/persons/sort-order`; backend nekar andra roller, filtrerade/forandrade personlistor och, for vanliga admin/bemanningsansvariga, personer med annat hemomrade. Super User och demo far sortera over omradesgranser nar de har `Personsortering=Redigera`.
 
 ## Felsokningssvar for framtida chat
 
@@ -77,7 +77,7 @@ Falt:
 | "Varfor fungerar inte Ctrl+C/V?" | En schemacell eller halva maste vara fokuserad forst. |
 | "Hur delar jag en timme?" | Hogerklicka eller dubbelklicka pa timcellen. Välj aktivitet for varje halvtimme. |
 | "Var ar Fyll fran vanster?" | Backend-endpointen finns, men nuvarande UI visar ingen knapp for den funktionen. |
-| "Varfor kan jag inte dra namnet for att sortera?" | Anvandaren maste vara Bemanningsansvarig, admin eller Super User, ha `Personsortering=Redigera` i Vybehorigheter och ha samma omrade som personens hemomrade. Rensa personfiltret om det ar aktivt. |
+| "Varfor kan jag inte dra namnet for att sortera?" | Anvandaren maste ha `Personsortering=Redigera`. Bemanningsansvarig/admin maste ha samma omrade som personens hemomrade; Super User och demo kan sortera alla synliga personer. Rensa personfiltret om det ar aktivt. |
 
 ## Kallor
 

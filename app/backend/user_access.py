@@ -204,7 +204,7 @@ def can_admin(user: User) -> bool:
 
 
 def can_sort_person_order(user: User) -> bool:
-    return is_super_user(user) or bool(set(user_roles(user)) & PERSON_SORT_ORDER_ROLES)
+    return is_super_user(user) or is_demo_user(user) or bool(set(user_roles(user)) & PERSON_SORT_ORDER_ROLES)
 
 
 def role_view_access_level(user: User, access: dict | None, view_id: str) -> str:

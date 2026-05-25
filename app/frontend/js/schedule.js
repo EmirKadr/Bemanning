@@ -510,14 +510,20 @@ function refreshPersons() {
 function canUsePersonSortOrder() {
   const user = state.currentUser || {};
   const roles = typeof userRoles === "function" ? userRoles(user) : [user.role];
-  const hasAllowedRole = Boolean(user.is_super_user) || roles.includes("admin") || roles.includes("staffing_manager");
-  const hasArea = user.area_id != null && Number.isFinite(Number(user.area_id));
+  const canCrossAreas = canSortPersonsAcrossAreas();
+  const hasAllowedRole = canCrossAreas || roles.includes("admin") || roles.includes("staffing_manager");
+  const hasArea = canCrossAreas || (user.area_id != null && Number.isFinite(Number(user.area_id)));
   return hasAllowedRole && hasArea && typeof canEditPage === "function" && canEditPage(user, "personSortOrder");
+}
+
+function canSortPersonsAcrossAreas() {
+  const user = state.currentUser || {};
+  return Boolean(user.is_super_user || user.is_demo);
 }
 
 function canReorderPerson(person) {
   return canUsePersonSortOrder()
-    && Number(person?.home_area_id) === Number(state.currentUser?.area_id);
+    && (canSortPersonsAcrossAreas() || Number(person?.home_area_id) === Number(state.currentUser?.area_id));
 }
 
 function setupPersonOrderNameCell(cell, person) {
@@ -561,6 +567,11 @@ function updatePersonOrderDropTarget(cell, event) {
 }
 
 function currentAreaPersonIdsForReorder() {
+  if (canSortPersonsAcrossAreas()) {
+    return state.persons
+      .filter((person) => person.is_active !== false)
+      .map((person) => Number(person.id));
+  }
   const areaId = Number(state.currentUser?.area_id);
   return state.persons
     .filter((person) => Number(person.home_area_id) === areaId && person.is_active !== false)
@@ -601,7 +612,10 @@ async function savePersonOrder(sourceId, targetId, position) {
   }
   const ids = currentAreaPersonIdsForReorder();
   if (!ids.includes(sourceId) || !ids.includes(targetId)) {
-    showToast("Du kan bara sortera personer med samma hemområde som ditt användarområde.", "warn", 5000);
+    const message = canSortPersonsAcrossAreas()
+      ? "Personlistan har ändrats. Läs om vyn och försök igen."
+      : "Du kan bara sortera personer med samma hemområde som ditt användarområde.";
+    showToast(message, "warn", 5000);
     return;
   }
   const personIds = movedPersonOrderIds(sourceId, targetId, position, ids);

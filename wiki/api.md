@@ -41,7 +41,7 @@ Kort svar: `API_ROUTES.md` ar kontraktslistan och testas mot FastAPI-appen via `
 - `GET /api/overview/revision`, `/api/overview/revision/month` - latta revisionsnycklar for tyst bakgrundsrefresh.
 - `POST /api/overview/day` - satt en hel dag.
 - `POST /api/overview/days/bulk` - satt flera dagar via drag.
-- `PUT /api/persons/sort-order` - sparar ny personordning for anvandarens eget omrade nar personnamn dras i Bemanning eller Oversikt.
+- `PUT /api/persons/sort-order` - sparar ny personordning nar personnamn dras i Bemanning eller Oversikt. Vanliga admin/bemanningsansvariga sorterar eget omrade; Super User och demo kan sortera alla synliga personer med `personSortOrder=edit`.
 
 ## Register och settings
 

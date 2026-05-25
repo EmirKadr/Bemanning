@@ -31,7 +31,7 @@ from ..schemas import (
     PersonSortOrderUpdate,
     PersonUpdate,
 )
-from ..user_access import can_sort_person_order
+from ..user_access import can_sort_person_order, is_demo_user, is_super_user
 
 router = APIRouter(prefix="/api/persons", tags=["persons"])
 
@@ -447,6 +447,31 @@ def _normalized_sort_slots(persons: list[Person]) -> list[int]:
     return normalized
 
 
+def _can_sort_person_order_across_areas(user: User) -> bool:
+    return is_super_user(user) or is_demo_user(user)
+
+
+def _person_sort_scope_query(db: Session, user: User, requested_people: list[Person]):
+    query = db.query(Person).filter(Person.is_active.is_(True))
+    if _can_sort_person_order_across_areas(user):
+        business_id = visible_business_id(db, user)
+        if business_id is not None:
+            query = query.filter(Person.business_id == business_id)
+        requested_area_ids = {person.home_area_id for person in requested_people}
+        if len(requested_area_ids) == 1:
+            area_id = next(iter(requested_area_ids))
+            query = query.filter(Person.home_area_id.is_(None) if area_id is None else Person.home_area_id == area_id)
+        return query
+
+    if user.area_id is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Användaren saknar område för personsortering")
+
+    home_area = scoped_get(db, Area, user.area_id, user, detail="Område hittades inte")
+    if home_area.is_active is not True:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
+    return query.filter(Person.home_area_id == home_area.id)
+
+
 @router.put("/sort-order", response_model=list[PersonOut])
 def reorder_person_sort_order(
     payload: PersonSortOrderUpdate,
@@ -456,14 +481,8 @@ def reorder_person_sort_order(
     if not can_sort_person_order(user):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            detail="Personsortering kräver bemanningsansvarig, admin eller Super User",
+            detail="Personsortering kräver bemanningsansvarig, admin, Super User eller demo",
         )
-    if user.area_id is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Användaren saknar område för personsortering")
-
-    home_area = scoped_get(db, Area, user.area_id, user, detail="Område hittades inte")
-    if home_area.is_active is not True:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Område hittades inte")
     ordered_ids = [int(person_id) for person_id in payload.person_ids]
     if len(ordered_ids) != len(set(ordered_ids)):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Personlistan innehåller dubbletter")
@@ -474,18 +493,18 @@ def reorder_person_sort_order(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Person hittades inte")
     for person in requested_people:
         assert_scoped_object(db, user, person, detail="Person hittades inte")
-        if person.is_active is not True or person.home_area_id != home_area.id:
+        if person.is_active is not True:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="Du kan bara sortera aktiva personer",
+            )
+        if not _can_sort_person_order_across_areas(user) and person.home_area_id != user.area_id:
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
                 detail="Du kan bara sortera personer med samma hemområde som ditt användarområde",
             )
 
-    area_people_query = db.query(Person).filter(
-        Person.is_active.is_(True),
-        Person.home_area_id == home_area.id,
-    )
-    if home_area.business_id is not None:
-        area_people_query = area_people_query.filter(Person.business_id == home_area.business_id)
+    area_people_query = _person_sort_scope_query(db, user, requested_people)
     area_people = area_people_query.order_by(Person.sort_order, Person.name, Person.id).all()
     area_ids = {person.id for person in area_people}
     if set(ordered_ids) != area_ids:

@@ -48,14 +48,17 @@ def test_person_sort_order_defaults_only_allow_staffing_admin_and_super_user():
     admin = User(username="admin", role="admin", roles=["admin"], is_active=True)
     leader = User(username="leader", role="leader", roles=["leader"], is_active=True)
     super_user = User(username="super", role="super_user", roles=["super_user"], is_active=True)
+    demo = User(username="demo", role="viewer", roles=["viewer"], is_active=True)
 
     assert can_access_view(staffing, {}, "personSortOrder", "edit")
     assert can_access_view(admin, {}, "personSortOrder", "edit")
     assert can_access_view(super_user, {}, "personSortOrder", "edit")
+    assert can_access_view(demo, {}, "personSortOrder", "edit")
     assert not can_access_view(leader, {}, "personSortOrder", "edit")
     assert can_sort_person_order(staffing)
     assert can_sort_person_order(admin)
     assert can_sort_person_order(super_user)
+    assert can_sort_person_order(demo)
     assert not can_sort_person_order(leader)
 
 
@@ -117,6 +120,57 @@ def test_reorder_person_sort_order_rejects_person_from_other_area(person_sort_db
 
     assert exc.value.status_code == 403
     assert "hemomrade" in exc.value.detail.lower() or "hemområde" in exc.value.detail.lower()
+
+
+def test_reorder_person_sort_order_super_user_can_sort_across_areas_without_user_area(person_sort_db):
+    business, mg, gg = add_scope(person_sort_db)
+    user = make_user("super_user", business_id=None, area_id=None, roles=["super_user"])
+    first = Person(business_id=business.id, name="Anna", home_area_id=mg.id, competencies=[], sort_order=10)
+    other_area = Person(business_id=business.id, name="Goran", home_area_id=gg.id, competencies=[], sort_order=20)
+    second = Person(business_id=business.id, name="Bo", home_area_id=mg.id, competencies=[], sort_order=30)
+    person_sort_db.add_all([user, first, other_area, second])
+    person_sort_db.flush()
+
+    result = reorder_person_sort_order(
+        PersonSortOrderUpdate(person_ids=[other_area.id, first.id, second.id]),
+        db=person_sort_db,
+        user=user,
+    )
+
+    assert [person.id for person in result] == [other_area.id, first.id, second.id]
+    assert other_area.sort_order == 10
+    assert first.sort_order == 20
+    assert second.sort_order == 30
+
+
+def test_reorder_person_sort_order_demo_can_sort_all_people_in_own_business_without_user_area(person_sort_db):
+    business, mg, gg = add_scope(person_sort_db)
+    r3 = Business(code="R3", name="R3", sort_order=2)
+    r3_area = Area(business=r3, code="R3", name="R3", sort_order=1)
+    user = User(
+        username="demo",
+        role="viewer",
+        roles=["viewer"],
+        business_id=business.id,
+        area_id=None,
+        is_active=True,
+    )
+    first = Person(business_id=business.id, name="Anna", home_area_id=mg.id, competencies=[], sort_order=10)
+    other_area = Person(business_id=business.id, name="Goran", home_area_id=gg.id, competencies=[], sort_order=20)
+    outside_business = Person(business=r3, name="R3 Person", home_area=r3_area, competencies=[], sort_order=5)
+    person_sort_db.add_all([r3, r3_area, user, first, other_area, outside_business])
+    person_sort_db.flush()
+
+    result = reorder_person_sort_order(
+        PersonSortOrderUpdate(person_ids=[other_area.id, first.id]),
+        db=person_sort_db,
+        user=user,
+    )
+
+    assert [person.id for person in result] == [other_area.id, first.id]
+    assert other_area.sort_order == 10
+    assert first.sort_order == 20
+    assert outside_business.sort_order == 5
 
 
 def test_reorder_person_sort_order_requires_user_area(person_sort_db):
