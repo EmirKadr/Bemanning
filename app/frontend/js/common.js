@@ -2017,17 +2017,74 @@ const DEMO_TOUR_HANDLED_KEY = "flow-demo-tour-handled";
 const DEMO_TOUR_STATE_KEY = "flow-demo-tour-state";
 
 const DEMO_TOUR_DESCRIPTIONS = {
-  schedule: "Här planeras vem som gör vad timme för timme. Klicka eller dra i cellerna för att fylla i aktiviteter, kopiera dagar, eller använd Ångra/Gör om längst upp.",
-  overview: "Översikten visar bemanningen per dag och vecka i ett kondenserat format. Bra för att se helbilden eller dra heldagsbemanning.",
-  productivity: "Produktivitetsvyn räknar ut KPI per process och bolag baserat på pick/trans/pallet-loggar samt KPI-mål.",
-  dataFetch: "Hämta data låter dig ladda ner valfri vy från det externa lagersystemet, filtrera kolumner och exportera till Excel.",
-  allocationProcess: "Bearbeta hjälper dig planera artikelplacering: matris för zon-fördelning, ordersaldo och påfyllnadsprio.",
-  allocationSplit: "Dela är verktyget för att fördela artiklar mellan zoner när orderbelastningen ändras.",
-  persons: "Här registrerar du personer, hemområde, kompetenser och veckomallar. Personerna används sedan i Bemanning och Översikt.",
-  activities: "Aktiviteter definierar vad personer kan tilldelas: plock, lots, VAS osv — med färg, summering och kategori.",
-  analytics: "Historiken visar audit-logg och statistik över ändringar.",
-  users: "Användarvyn är där admin skapar konton, sätter roller och vybehörigheter.",
-  businesses: "Verksamheter är Super Users översikt över Stigamo, R3 och deras områden.",
+  schedule:
+    "Bemanning är hjärtat i flow — här planerar du vem som gör vad timme för timme.<br><br>"
+    + "<strong>Vänsterklick</strong> på en cell fokuserar den så du kan välja aktivitet i listan som dyker upp.<br>"
+    + "<strong>Högerklick</strong> öppnar samma aktivitetsval direkt i en kontextmeny.<br>"
+    + "<strong>Dubbelklick</strong> delar timmen i två halvor om du behöver två aktiviteter inom samma timme.<br>"
+    + "<strong>Dra</strong> över flera celler för att fylla dem med samma aktivitet på en gång.<br>"
+    + "Knapparna högst upp: <strong>Föregående/Nästa dag</strong>, <strong>Kopiera dag</strong> (klona en dag till en annan), <strong>Rensa dag</strong> samt <strong>Ångra</strong> och <strong>Gör om</strong> för dina senaste ändringar.<br>"
+    + "Drag i personnamnen till vänster för att ändra sorteringsordningen (om rollen tillåter det).",
+  overview:
+    "Översikt visar bemanningen i ett kondenserat format — bra för att se helbilden över veckan eller månaden.<br><br>"
+    + "Växla mellan <strong>vecka</strong> och <strong>månad</strong> högst upp.<br>"
+    + "<strong>Vänsterklick</strong> på en dag öppnar aktivitetsval för heldagen.<br>"
+    + "<strong>Dra</strong> över flera dagar för att sätta samma heldagsaktivitet snabbt.<br>"
+    + "<strong>Ångra/Gör om</strong> fungerar som i Bemanning.",
+  productivity:
+    "Produktivitet räknar ut KPI per process och bolag baserat på pick/trans/pallet-loggar plus KPI-mål.<br><br>"
+    + "Välj <strong>period</strong> och <strong>verksamhet</strong> i topbaren.<br>"
+    + "Klicka på rubriker för att <strong>sortera</strong> tabellen.<br>"
+    + "Klicka på en rad för att <strong>borra ner</strong> i detaljer per timme.<br>"
+    + "Färgerna i cellerna visar om KPI-målet nås (grönt över, rött under).",
+  dataFetch:
+    "Hämta data låter dig ladda ner valfri vy från det externa lagersystemet, filtrera och exportera till Excel.<br><br>"
+    + "Välj <strong>vy</strong> i listan till vänster — sökrutan hjälper dig hitta rätt.<br>"
+    + "Kryssa i de <strong>kolumner</strong> du vill ha med.<br>"
+    + "Lägg in <strong>filter</strong> per kolumn för att begränsa raderna.<br>"
+    + "Klicka <strong>Hämta</strong> för att förhandsgranska och <strong>Exportera till Excel</strong> för att ladda ner.",
+  allocationProcess:
+    "Bearbeta hjälper dig planera artikelplacering och köra de stora flödena i lagret.<br><br>"
+    + "<strong>Matris</strong>-knappen styr per zon vilka filter (bolag, kundnummer) och flöden som visas.<br>"
+    + "Knapparna under varje rubrik kör delflödena — Ordersaldo, LYX, Påfyllnadsprio, Allokering osv.<br>"
+    + "<strong>Vänsterklick</strong> kör flödet med dina valda filer.<br>"
+    + "Resultat visas i en tabell — klicka på cellerna för att <strong>kopiera</strong> värden, och använd <strong>Exportera Excel</strong> för att spara resultatet.",
+  allocationSplit:
+    "Dela är verktyget för när du har en <strong>lång lista värden</strong> i en kolumn och behöver dela upp dem i flera mindre delar.<br><br>"
+    + "Vanligt exempel: ASK klagar att du klistrat in för många värden samtidigt. Då tar du värdena, klistrar in dem här och Dela ger dig dem uppdelade så att du kan klistra in en bit i taget.<br><br>"
+    + "<strong>Klistra in</strong> värdena i textrutan (ett per rad) eller ladda upp en textfil.<br>"
+    + "Sätt <strong>Antal per kolumn</strong> (standard 2000).<br>"
+    + "Klicka <strong>Dela värden</strong> för att få resultatet uppdelat i kolumner som du kan kopiera en åt gången.",
+  persons:
+    "Personer är registret över alla som ska kunna bemannas.<br><br>"
+    + "<strong>Ny person</strong> öppnar modal för att lägga till en person.<br>"
+    + "<strong>Flera nya personer</strong> öppnar tabellmodal för bulk-skapande.<br>"
+    + "<strong>Importera Excel</strong> låter dig ladda upp en mall.<br>"
+    + "<strong>Vänsterklick</strong> i en cell för att redigera namn, hemområde eller huvudaktivitet inline.<br>"
+    + "<strong>Schema</strong>-knappen öppnar veckomallen (vilka timmar personen jobbar).<br>"
+    + "<strong>Ta bort</strong> raderar personen permanent (kräver bekräftelse).",
+  activities:
+    "Aktiviteter definierar vad personer kan tilldelas: plock, lots, VAS osv — med färg, kategori och summering.<br><br>"
+    + "<strong>Ny aktivitet</strong> skapar en aktivitet med kod, etikett, område, färg och sortering.<br>"
+    + "<strong>Vänsterklick</strong> på en rad för att redigera inline.<br>"
+    + "<strong>Summeras som</strong> låter dig gruppera flera koder under en huvudaktivitet i rapporter.<br>"
+    + "Färgen syns sedan direkt i Bemanningens celler.",
+  analytics:
+    "Historik visar audit-loggen och statistik över alla ändringar.<br><br>"
+    + "Tre lägen i toppen: <strong>Användarhistorik</strong> (vem ändrade vad), <strong>Analys</strong> (sammanställningar) och <strong>Felkoder</strong> (API-fel).<br>"
+    + "<strong>Filter</strong>-fält per kolumn för att hitta specifika händelser.<br>"
+    + "Klicka på en rad för att <strong>se gamla och nya värden</strong> sida vid sida.",
+  users:
+    "Användarvyn är där admin skapar konton, sätter roller och vybehörigheter.<br><br>"
+    + "<strong>Ny användare</strong> öppnar modal för konto + roll + område.<br>"
+    + "<strong>Flera nya användare</strong> för bulk-skapande.<br>"
+    + "<strong>Vybehörigheter</strong>-knappen öppnar rollmatrisen där du sätter per roll vilka vyer som är Ingen/Visa/Redigera.<br>"
+    + "<strong>Redigera</strong> ändrar enskilt konto. <strong>Ta bort</strong> raderar det.<br>"
+    + "Checkboxen <strong>Lås bemanningsceller</strong> styr om arbetsledare kan ändra varandras celler.",
+  businesses:
+    "Verksamheter är Super Users översikt över Stigamo, R3 och deras områden.<br><br>"
+    + "<strong>Ny verksamhet</strong> + <strong>Redigera</strong> för att hantera verksamhetskoder/namn.<br>"
+    + "Under varje verksamhet listas dess områden med egna <strong>Nytt område</strong>, <strong>Redigera</strong> och <strong>Ta bort</strong>-knappar.",
 };
 
 function ensureDemoBanner() {
@@ -2095,7 +2152,7 @@ function _renderDemoTourCard(state) {
       <span class="demo-tour-counter">${state.currentIndex + 1} / ${state.steps.length}</span>
       <strong>${escapeForDemo(step.label)}</strong>
     </div>
-    <p>${escapeForDemo(step.body)}</p>
+    <div class="demo-tour-body">${step.body}</div>
     <div class="demo-tour-actions">
       <button class="demo-tour-skip" type="button">Avsluta rundtur</button>
       <button class="demo-tour-next primary" type="button">${state.currentIndex + 1 < state.steps.length ? "Nästa" : "Klar"}</button>
@@ -2136,10 +2193,18 @@ function _showDemoTourPrompt(user, activePage) {
     const backdrop = document.createElement("div");
     backdrop.className = "modal-backdrop";
     backdrop.innerHTML = `
-      <div class="modal">
+      <div class="modal demo-tour-welcome">
         <h2>Välkommen till demo-läget av flow</h2>
         <p>Du ser samma data som finns i produktion just nu. Du kan ändra, skapa, ta bort — <strong>inget sparas till den riktiga databasen</strong> och allt nollställs när du loggar ut.</p>
-        <p>Vill du se en kort rundtur av vyerna först?</p>
+        <p class="demo-tour-hints"><strong>Grundläggande interaktion:</strong></p>
+        <ul class="demo-tour-hints-list">
+          <li><strong>Vänsterklick</strong> väljer eller fokuserar — på en cell öppnar det listan med aktiviteter, på en rad markeras den.</li>
+          <li><strong>Högerklick</strong> öppnar samma val direkt i en kontextmeny på de flesta ställen.</li>
+          <li><strong>Dubbelklick</strong> i Bemanning delar en timme i två halvor.</li>
+          <li><strong>Dra</strong> över flera celler för att fylla dem med samma värde.</li>
+          <li>Många tabeller har <strong>inline-redigering</strong> — klicka i en cell, skriv och tryck Enter.</li>
+        </ul>
+        <p>Vill du se en kort rundtur av vyerna först, med konkreta tips per vy?</p>
         <div class="actions">
           <button id="demo-tour-no" type="button">Nej tack, jag klickar runt själv</button>
           <button id="demo-tour-yes" class="primary" type="button">Ja, visa rundtur</button>
