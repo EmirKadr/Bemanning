@@ -307,8 +307,10 @@ function renderUsers() {
   users.filter(matchesAreaFocus).forEach((user) => {
     const tr = document.createElement("tr");
     const selfLabel = user.id === currentUser.id ? " (du)" : "";
+    const demoLabel = user.is_demo ? ' <span class="demo-user-pill">DEMO</span>' : "";
+    const canDelete = user.id !== currentUser.id && !user.is_demo;
     tr.innerHTML = `
-      <td>${escapeHtml(user.username)}${escapeHtml(selfLabel)}</td>
+      <td>${escapeHtml(user.username)}${escapeHtml(selfLabel)}${demoLabel}</td>
       <td>${escapeHtml(user.display_name || "-")}</td>
       <td>${escapeHtml(roleLabel(user))}</td>
       <td>${escapeHtml(areaName(user.area_id))}</td>
@@ -317,7 +319,7 @@ function renderUsers() {
       <td>
         ${canEditUsers ? `
         <button data-edit="${user.id}">Redigera</button>
-        ${user.id === currentUser.id ? "" : `<button data-delete="${user.id}" class="danger">Ta bort</button>`}
+        ${canDelete ? `<button data-delete="${user.id}" class="danger">Ta bort</button>` : ""}
         ` : ""}
       </td>`;
     tbody.appendChild(tr);
@@ -344,6 +346,7 @@ function renderUsers() {
 
 function openModal(user) {
   const isEdit = !!user;
+  const isDemoTarget = !!user?.is_demo;
   const selectedRoles = rolesForUser(user);
   const roleOptions = editableRoleOptions();
   const selectedAreaId = user?.area_id ?? focusedAreaId();
@@ -353,8 +356,9 @@ function openModal(user) {
   backdrop.innerHTML = `
     <div class="modal">
       <h2>${isEdit ? "Redigera användare" : "Ny användare"}</h2>
+      ${isDemoTarget ? '<p class="note">Demo-användaren är låst: namn, roll och aktiv-status kan inte ändras. Lösenord, visningsnamn och område får roteras.</p>' : ""}
       <label>Användarnamn</label>
-      <input id="m-username" autocomplete="username" value="${escapeHtml(user?.username || "")}" />
+      <input id="m-username" autocomplete="username" value="${escapeHtml(user?.username || "")}" ${isDemoTarget ? "disabled" : ""} />
       <label>Visningsnamn</label>
       <input id="m-display-name" value="${escapeHtml(user?.display_name || "")}" />
       ${businessOptions(selectedBusinessId)}
@@ -362,7 +366,7 @@ function openModal(user) {
       <div class="role-checks" id="m-roles">
         ${roleOptions.map((option) => `
           <label class="role-check">
-            <input type="checkbox" name="m-role" value="${option.value}" ${selectedRoles.includes(option.value) ? "checked" : ""} />
+            <input type="checkbox" name="m-role" value="${option.value}" ${selectedRoles.includes(option.value) ? "checked" : ""} ${isDemoTarget ? "disabled" : ""} />
             <span>${escapeHtml(option.label)}</span>
           </label>
         `).join("")}

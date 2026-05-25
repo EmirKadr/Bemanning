@@ -1965,6 +1965,10 @@ function renderSidebar(user, activePage) {
       await api.post("/api/auth/logout");
       clearAssistantLocalSession();
       clearCachedSidebarUser();
+      try {
+        sessionStorage.removeItem("flow-demo-tour-handled");
+        sessionStorage.removeItem("flow-demo-tour-state");
+      } catch (err) {}
       window.location.href = "/login.html";
     });
   }
@@ -2005,6 +2009,178 @@ function renderSidebar(user, activePage) {
 // Bakåtkompatibilitet
 function renderTopbar(user, activePage) {
   renderSidebar(user, activePage);
+}
+
+// === Demo-läge: banner + valbar guidad rundtur ===
+
+const DEMO_TOUR_HANDLED_KEY = "flow-demo-tour-handled";
+const DEMO_TOUR_STATE_KEY = "flow-demo-tour-state";
+
+const DEMO_TOUR_DESCRIPTIONS = {
+  schedule: "Här planeras vem som gör vad timme för timme. Klicka eller dra i cellerna för att fylla i aktiviteter, kopiera dagar, eller använd Ångra/Gör om längst upp.",
+  overview: "Översikten visar bemanningen per dag och vecka i ett kondenserat format. Bra för att se helbilden eller dra heldagsbemanning.",
+  productivity: "Produktivitetsvyn räknar ut KPI per process och bolag baserat på pick/trans/pallet-loggar samt KPI-mål.",
+  dataFetch: "Hämta data låter dig ladda ner valfri vy från det externa lagersystemet, filtrera kolumner och exportera till Excel.",
+  allocationProcess: "Bearbeta hjälper dig planera artikelplacering: matris för zon-fördelning, ordersaldo och påfyllnadsprio.",
+  allocationSplit: "Dela är verktyget för att fördela artiklar mellan zoner när orderbelastningen ändras.",
+  persons: "Här registrerar du personer, hemområde, kompetenser och veckomallar. Personerna används sedan i Bemanning och Översikt.",
+  activities: "Aktiviteter definierar vad personer kan tilldelas: plock, lots, VAS osv — med färg, summering och kategori.",
+  analytics: "Historiken visar audit-logg och statistik över ändringar.",
+  users: "Användarvyn är där admin skapar konton, sätter roller och vybehörigheter.",
+  businesses: "Verksamheter är Super Users översikt över Stigamo, R3 och deras områden.",
+};
+
+function ensureDemoBanner() {
+  if (document.getElementById("demo-mode-banner")) return;
+  const banner = document.createElement("div");
+  banner.id = "demo-mode-banner";
+  banner.className = "demo-banner";
+  banner.innerHTML = `
+    <span class="demo-banner-dot"></span>
+    <strong>DEMO-läge</strong>
+    <span>Ändringar sparas inte. Allt nollställs när du loggar ut.</span>
+  `;
+  const body = document.body;
+  if (body.firstChild) body.insertBefore(banner, body.firstChild);
+  else body.appendChild(banner);
+}
+
+function _demoTourSteps(user, activePage) {
+  return sidebarPageDefinitions(user, activePage)
+    .filter((page) => page.visible)
+    .map((page) => ({
+      view_id: page.id,
+      label: page.label,
+      href: page.href,
+      body: DEMO_TOUR_DESCRIPTIONS[page.id] || "Använd vyn fritt — alla ändringar sparas bara i demo-sandlådan.",
+    }));
+}
+
+function _readDemoTourState() {
+  try {
+    const raw = sessionStorage.getItem(DEMO_TOUR_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.steps)) return null;
+    return parsed;
+  } catch (err) {
+    return null;
+  }
+}
+
+function _writeDemoTourState(state) {
+  try {
+    if (state === null) {
+      sessionStorage.removeItem(DEMO_TOUR_STATE_KEY);
+    } else {
+      sessionStorage.setItem(DEMO_TOUR_STATE_KEY, JSON.stringify(state));
+    }
+  } catch (err) {}
+}
+
+function _markDemoTourHandled() {
+  try { sessionStorage.setItem(DEMO_TOUR_HANDLED_KEY, "1"); } catch (err) {}
+}
+
+function _renderDemoTourCard(state) {
+  const existing = document.getElementById("demo-tour-card");
+  if (existing) existing.remove();
+  const step = state.steps[state.currentIndex];
+  if (!step) return;
+  const card = document.createElement("div");
+  card.id = "demo-tour-card";
+  card.className = "demo-tour-card";
+  card.innerHTML = `
+    <div class="demo-tour-header">
+      <span class="demo-tour-counter">${state.currentIndex + 1} / ${state.steps.length}</span>
+      <strong>${escapeForDemo(step.label)}</strong>
+    </div>
+    <p>${escapeForDemo(step.body)}</p>
+    <div class="demo-tour-actions">
+      <button class="demo-tour-skip" type="button">Avsluta rundtur</button>
+      <button class="demo-tour-next primary" type="button">${state.currentIndex + 1 < state.steps.length ? "Nästa" : "Klar"}</button>
+    </div>
+  `;
+  document.body.appendChild(card);
+  card.querySelector(".demo-tour-skip").addEventListener("click", () => {
+    _writeDemoTourState(null);
+    card.remove();
+  });
+  card.querySelector(".demo-tour-next").addEventListener("click", () => {
+    const next = state.currentIndex + 1;
+    if (next >= state.steps.length) {
+      _writeDemoTourState(null);
+      card.remove();
+      showToast("Rundtur klar. Utforska gärna vyerna fritt.", "success", 4000);
+      return;
+    }
+    const nextStep = state.steps[next];
+    _writeDemoTourState({ steps: state.steps, currentIndex: next });
+    card.remove();
+    if (nextStep.href && window.location.pathname !== nextStep.href) {
+      window.location.href = nextStep.href;
+    } else {
+      _renderDemoTourCard({ steps: state.steps, currentIndex: next });
+    }
+  });
+}
+
+function escapeForDemo(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]
+  );
+}
+
+function _showDemoTourPrompt(user, activePage) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h2>Välkommen till demo-läget av flow</h2>
+        <p>Du ser samma data som finns i produktion just nu. Du kan ändra, skapa, ta bort — <strong>inget sparas till den riktiga databasen</strong> och allt nollställs när du loggar ut.</p>
+        <p>Vill du se en kort rundtur av vyerna först?</p>
+        <div class="actions">
+          <button id="demo-tour-no" type="button">Nej tack, jag klickar runt själv</button>
+          <button id="demo-tour-yes" class="primary" type="button">Ja, visa rundtur</button>
+        </div>
+      </div>`;
+    document.body.appendChild(backdrop);
+    const finish = (start) => {
+      _markDemoTourHandled();
+      backdrop.remove();
+      if (start) {
+        const steps = _demoTourSteps(user, activePage);
+        if (steps.length > 0) {
+          const startIndex = Math.max(0, steps.findIndex((step) => step.view_id === activePage));
+          _writeDemoTourState({ steps, currentIndex: startIndex });
+          _renderDemoTourCard({ steps, currentIndex: startIndex });
+        }
+      }
+      resolve();
+    };
+    backdrop.querySelector("#demo-tour-yes").addEventListener("click", () => finish(true));
+    backdrop.querySelector("#demo-tour-no").addEventListener("click", () => finish(false));
+  });
+}
+
+async function maybeShowDemoTourPrompt(user, activePage) {
+  if (!user?.is_demo) return;
+  let state = _readDemoTourState();
+  if (state) {
+    // Pågående rundtur — visa kort för aktiv sida om den matchar, annars för rätt steg
+    const matchIndex = state.steps.findIndex((step) => step.view_id === activePage);
+    if (matchIndex >= 0 && matchIndex !== state.currentIndex) {
+      state = { steps: state.steps, currentIndex: matchIndex };
+      _writeDemoTourState(state);
+    }
+    _renderDemoTourCard(state);
+    return;
+  }
+  let handled = false;
+  try { handled = sessionStorage.getItem(DEMO_TOUR_HANDLED_KEY) === "1"; } catch (err) {}
+  if (handled) return;
+  await _showDemoTourPrompt(user, activePage);
 }
 
 async function initPage(activePage, options = {}) {
@@ -2064,6 +2240,13 @@ async function initPage(activePage, options = {}) {
   void refreshSidebarLayout(user, activePage);
   if (activePage === "allocationUploads") clearAllocationUploadNotice();
   flushQueuedToast();
+  if (user.is_demo) {
+    document.body.classList.add("demo-mode");
+    if (typeof ensureDemoBanner === "function") ensureDemoBanner();
+    if (typeof maybeShowDemoTourPrompt === "function") {
+      void maybeShowDemoTourPrompt(user, activePage);
+    }
+  }
   return user;
 }
 
