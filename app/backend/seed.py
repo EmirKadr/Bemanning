@@ -9,7 +9,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .business_scope import DEFAULT_BUSINESS_CODE, R3_BUSINESS_CODE, ensure_seed_businesses
+from .config import settings
 from .database import SessionLocal
+from .demo_session import DEMO_USERNAME
 from .models import Activity, AppSetting, Area, AuditLog, Business, Person, PersonScheduleTemplate, ScheduleCell, User
 from .security import hash_password
 
@@ -164,6 +166,41 @@ def seed_admin(db: Session, business: Business) -> None:
         admin.business_id = business.id
 
 
+def seed_demo_user(db: Session, business: Business) -> None:
+    """Skapa eller uppdatera demo-användaren som används för försäljningsdemos."""
+    demo = db.query(User).filter_by(username=DEMO_USERNAME).one_or_none()
+    password_hash = hash_password(settings.DEMO_USER_PASSWORD)
+    if demo is None:
+        db.add(
+            User(
+                username=DEMO_USERNAME,
+                password_hash=password_hash,
+                display_name="Demo (presentationsläge)",
+                role="admin",
+                roles=["admin"],
+                business_id=business.id,
+                must_change_password=False,
+                is_active=True,
+            )
+        )
+        return
+    # Säkerställ att kontot är aktivt och har rätt grundinställningar — men
+    # rör inte super_user-rollen om en super_user har gett det.
+    demo.business_id = business.id
+    demo.is_active = True
+    demo.must_change_password = False
+    if demo.password_hash is None:
+        demo.password_hash = password_hash
+    if not demo.display_name:
+        demo.display_name = "Demo (presentationsläge)"
+    roles = list(demo.roles or [])
+    if "admin" not in roles:
+        roles.append("admin")
+        demo.roles = roles
+    if demo.role not in roles:
+        demo.role = "admin"
+
+
 def remove_duplicate_persons(db: Session) -> None:
     keep_by_name: dict[tuple[int | None, str], int] = {}
     duplicate_ids: list[int] = []
@@ -249,6 +286,7 @@ def run() -> None:
         seed_activities(db, stigamo, stigamo_areas, ACTIVITIES)
         seed_activities(db, r3, r3_areas, [spec for spec in ACTIVITIES if spec.get("category") == "absence"])
         seed_admin(db, stigamo)
+        seed_demo_user(db, stigamo)
         remove_duplicate_persons(db)
         seed_persons(db, stigamo, stigamo_areas)
         backfill_home_activities(db)

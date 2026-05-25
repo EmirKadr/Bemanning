@@ -222,6 +222,13 @@ def can_use_allocation_process(user: User, access: dict | None = None) -> bool:
     return can_access_view(user, access, "allocationProcess", "edit")
 
 
+def is_demo_user(user: User) -> bool:
+    from .demo_session import DEMO_USERNAME
+
+    username = str(getattr(user, "username", "") or "").strip().lower()
+    return username == DEMO_USERNAME
+
+
 def user_out(user: User) -> UserOut:
     business = getattr(user, "business", None)
     return UserOut(
@@ -236,6 +243,7 @@ def user_out(user: User) -> UserOut:
         area_id=user.area_id,
         must_change_password=user_needs_password_setup(user),
         is_super_user=is_super_user(user),
+        is_demo=is_demo_user(user),
     )
 
 
@@ -255,4 +263,5 @@ def user_admin_out(user: User) -> UserAdminOut:
         must_change_password=user_needs_password_setup(user),
         created_at=user.created_at,
         is_super_user=is_super_user(user),
+        is_demo=is_demo_user(user),
     )

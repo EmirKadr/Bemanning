@@ -368,6 +368,7 @@ class UserOut(BaseModel):
     area_id: int | None = None
     must_change_password: bool = False
     is_super_user: bool = False
+    is_demo: bool = False
 
 
 class UserAdminOut(BaseModel):
@@ -385,6 +386,7 @@ class UserAdminOut(BaseModel):
     must_change_password: bool = False
     created_at: datetime
     is_super_user: bool = False
+    is_demo: bool = False
 
 
 class UserCreate(BaseModel):

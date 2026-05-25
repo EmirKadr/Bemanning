@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     DATA_SOURCE_MAX_ROWS: int = 1000
     DATA_SOURCE_CATALOG_PATH: str = ""
     DATA_SOURCE_CATALOG_JSON: str = ""
+    DEMO_USER_PASSWORD: str = "demo1234"
+    DEMO_SESSION_MAX_AGE_HOURS: float = 6.0
 
     @property
     def is_production(self) -> bool:

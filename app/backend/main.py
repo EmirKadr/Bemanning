@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import allocation_bridge
+from . import allocation_bridge, demo_session
 from .business_scope import DEFAULT_BUSINESS_CODE, R3_BUSINESS_CODE
 from .config import settings
 from .routers import (
@@ -80,6 +80,14 @@ def sync_allocation_observations_on_startup() -> None:
         name="AllocationObservationsSync",
         daemon=True,
     ).start()
+
+
+@app.on_event("startup")
+def cleanup_stale_demo_sessions_on_startup() -> None:
+    try:
+        demo_session.cleanup_stale_demo_sessions(settings.DEMO_SESSION_MAX_AGE_HOURS)
+    except Exception:
+        pass
 
 
 app.include_router(auth.router)

@@ -3,6 +3,7 @@ from collections.abc import Generator
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from . import demo_session
 from .database import SessionLocal
 from .models import User
 from .settings_service import get_role_view_access
@@ -13,6 +14,7 @@ from .user_access import (
     can_use_allocation_process,
     can_use_allocation_tools,
     can_view_planning,
+    is_demo_user,
     is_super_user,
     user_needs_password_setup,
 )
@@ -25,8 +27,13 @@ PASSWORD_SETUP_ALLOWED_PATHS = {
 }
 
 
-def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
+def get_db(request: Request) -> Generator[Session, None, None]:
+    demo_session_id = request.session.get("demo_session_id")
+    if demo_session_id and demo_session.session_exists(demo_session_id):
+        SessionFactory = demo_session.get_demo_session_local(demo_session_id)
+    else:
+        SessionFactory = SessionLocal
+    db = SessionFactory()
     try:
         yield db
     finally:
@@ -40,6 +47,10 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive")
+    if is_demo_user(user) and not demo_session.session_exists(request.session.get("demo_session_id")):
+        # Demo-sessionen är borta (utgången eller städad) — tvinga ny inloggning.
+        request.session.clear()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="demo_session_expired")
     if user_needs_password_setup(user) and request.url.path not in PASSWORD_SETUP_ALLOWED_PATHS:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="password_setup_required")
     return user

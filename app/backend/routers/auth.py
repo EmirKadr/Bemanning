@@ -1,12 +1,17 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from .. import demo_session
 from ..audit import log as audit_log
 from ..deps import get_current_user, get_db
 from ..models import User
 from ..schemas import LoginRequest, PasswordSetRequest, UserOut
 from ..security import hash_password, verify_password
-from ..user_access import user_needs_password_setup, user_out
+from ..user_access import is_demo_user, user_needs_password_setup, user_out
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -25,11 +30,22 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     elif not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Felaktigt användarnamn eller lösenord")
     request.session["user_id"] = user.id
+    if is_demo_user(user):
+        try:
+            demo_session.start_demo_session(request, user)
+        except Exception:
+            logger.exception("Kunde inte starta demo-session")
+            request.session.clear()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Demo-läget kunde inte starta just nu. Försök igen om en stund.",
+            )
     return user_out(user)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(request: Request) -> None:
+    demo_session.end_demo_session(request)
     request.session.clear()
 
 
