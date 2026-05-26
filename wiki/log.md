@@ -7,6 +7,11 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-26] fix | Narvarande ligger fore Undo/Redo
+
+Knappen `Narvarande` ligger nu till vanster om Undo/Redo i bade Bemanning och
+Oversikt, sa utskriftsflodet hamnar fore historikknapparna i verktygsraden.
+
 ## [2026-05-26] feature | Narvarande-lista for utskrift
 
 Bemanning och Oversikt har nu knappen `Narvarande`. Den hamtar en serverraknad

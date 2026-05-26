@@ -817,6 +817,8 @@ def test_presence_print_is_wired_to_both_planning_views():
 
     assert '<button id="presenceBtn" type="button">Närvarande</button>' in schedule_html
     assert '<button id="presenceBtn" type="button">Närvarande</button>' in overview_html
+    assert schedule_html.index('id="presenceBtn"') < schedule_html.index('id="undoBtn"')
+    assert overview_html.index('id="presenceBtn"') < overview_html.index('id="undoBtn"')
     assert '<script src="/js/presence_print.js"></script>' in schedule_html
     assert '<script src="/js/presence_print.js"></script>' in overview_html
     assert "setupPresencePrintButton(\"presenceBtn\"" in schedule
