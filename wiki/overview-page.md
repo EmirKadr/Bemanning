@@ -1,7 +1,7 @@
 ---
 title: Oversikt
 status: aktiv
-updated: 2026-05-25
+updated: 2026-05-26
 tags: [oversikt, ui, knappar]
 ---
 
@@ -19,7 +19,7 @@ Daghuvudena visar bade datum och ISO-vecka, till exempel `Vecka 21`, sa man ser 
 | Ar | Valjer ar | Laddar aktuell vecka/manad i nytt ar | `GET /api/overview` eller `/month` | ISO-vecka kan ligga over arsskifte. |
 | Vecka | Valjer vecka | Laddar veckoversikt | `/api/overview` | Visas bara i veckovy. |
 | Manad | Valjer manad | Laddar manadsoversikt | `/api/overview/month` | Visas bara i manadsvy. |
-| Omradesfokus i sidebar | Valjer MG/GG/AS/EH eller Alla | Visar cachat all-data filtrerat klient-side nar det finns; annars hamtas vald vy och all-data forhamtas | `flow:areaFocusChanged`, `filterOverviewDataForArea`, `prefetchAllOverview` | `∞` betyder alla synliga omraden; for Super User kan det vara globalt enligt verksamhetsscope. |
+| Omradesfokus i sidebar | Valjer MG/GG/AS/EH eller Alla | Visar cachat all-data eller exakt omradescache nar det finns; annars hamtas vald vy och all-data forhamtas | `flow:areaFocusChanged`, `filterOverviewDataForArea`, `prefetchAllOverview` | `∞` betyder alla synliga omraden; for Super User kan det vara globalt enligt verksamhetsscope. |
 | Ovre horisontell scrollbar | Drar tabellen i sidled ovanfor oversikten | Synkar med tabellens vanliga scroll nederst | `setupSyncedHorizontalScroll` | Visas bara nar tabellen ar bredare an ytan. |
 | Undo/Redo | Angra/gor om dagandringar | Restore av snapshots via schema-API | `/api/schedule/hours/restore` | Disabled om stacken ar tom eller read-only. |
 | Personfilter | Skriver soktext | Filtrerar personer klient-side | `refreshPersons` | Shift-klick pa header sorterar. |
@@ -42,7 +42,7 @@ Daghuvudena visar bade datum och ISO-vecka, till exempel `Vecka 21`, sa man ser 
 - Vid blandad dag fragar klienten innan den skriver over med ett enda varde.
 - Drag skapar manga heldagsandringar och pushar undo-snapshot for de lyckade.
 - Drag pa personnamn andrar inte bemanningsceller utan personernas sorteringsnummer i registret. Samma backendregel som Bemanning anvands: Bemanningsansvarig/admin sorterar eget omrade, medan Super User och demo sorterar alla synliga personer med `Personsortering=Redigera`.
-- Oversikt cachar bara API-svar som redan ar synliga for inloggad anvandare och aktuell verksamhet. Cachen ar separat for veckovy och manadsvy och ogiltigforklaras vid dagandring, drag och undo/redo.
+- Oversikt cachar bara API-svar som redan ar synliga for inloggad anvandare och aktuell verksamhet. Cachen ar separat for veckovy och manadsvy och har bade all-cache och kortlivad exakt omradescache, sa aterbesokta omraden kan visas utan nytt API-anrop aven innan all-cache hunnit forvarmas. Cachen ogiltigforklaras vid dagandring, drag och undo/redo.
 - Nar en period finns i cache kontrollerar klienten `/api/overview/revision` eller `/api/overview/revision/month` tyst i bakgrunden. Aktiv vy kontrollerar ungefär var 10:e sekund, idle-vy ungefär var 30:e sekund, och dold browserflik pausar. Vid ny revision hamtas all-data och bara andrade synliga dagceller patchas om anvandaren inte haller pa i just den cellen.
 
 ## Felsokningssvar for framtida chat

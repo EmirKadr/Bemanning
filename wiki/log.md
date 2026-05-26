@@ -7,6 +7,10 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-26] fix | Snabbare omradestoggle i planeringsvyer
+
+Bemanning och Oversikt anvander nu en exakt kortlivad cache per omrade/period utöver all-cache. Om anvandaren vaxlar tillbaka till ett omrade som redan hamtats ritas vyn direkt utan nytt API-anrop, medan all-data fortsatter forvarmas och revisionskontrolleras i bakgrunden. Aborts fran egna snabba omladdningar rapporteras inte langre som `network_error | HTTP 0`, och riktiga natverksfel dedupliceras per path en kort stund for att inte fylla Historik.
+
 ## [2026-05-26] polish | Mindre brus i dokumentloggen
 
 Sidoppningar skrivs inte langre i dokumentloggen och gamla `Oppnade vy`-rader filtreras bort fran sessionloggen. Samma handelse rapporteras i stallet tyst till Historik som `view/open` via `/api/audit/client-event`. Bemanningens summeringsvarning visar nu orsak och kontext, till exempel HTTP-/natverksfel, vecka, dag och omrade, sa anvandaren far mer felsokningsbar information utan att loggen fylls av vanliga sidbyten.
