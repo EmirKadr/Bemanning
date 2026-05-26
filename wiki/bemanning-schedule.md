@@ -26,7 +26,7 @@ Kort svar: Bemanning ar huvudmatrisen. Anvandaren valjer ar/vecka/dag och styr o
 | Dag | Valjer mandag-sondag | Uppdaterar veckodag och datum | `onControlChange` | Dag ar ISO-veckodag, inte datum. |
 | Datumfalt | Valjer exakt datum | Raknar om ar/vecka/dag och laddar schema | `onDateChange` | Om datum hoppar beror det pa ISO-vecka. |
 | Foregaende/nasta dag | Klick pa pilar | Flyttar datum en dag | `stepDay(-1/1)` | Sparar valt datum i `sessionStorage`. |
-| Omradesfokus i sidebar | Valjer MG/GG/AS/EH eller Alla | Visar cachat all-data eller exakt omradescache nar det finns; annars hamtas vald vy och all-data forhamtas | `flow:areaFocusChanged`, `filterScheduleDataForArea`, `prefetchAllSchedule` | `∞` betyder alla synliga omraden; for Super User kan det vara globalt enligt verksamhetsscope. |
+| Omradesfokus i sidebar | Valjer MG/GG/AS/EH eller Alla | Friskar upp tillgangliga omraden fran sidans `/api/areas`-svar, faller tillbaka till Alla om sparat omrade inte langre finns, och visar cachat all-data eller exakt omradescache nar det finns | `setAreaFocusAreas`, `flow:areaFocusChanged`, `filterScheduleDataForArea`, `prefetchAllSchedule` | `∞` betyder alla synliga omraden; for Super User kan det vara globalt enligt verksamhetsscope. |
 | Ovre horisontell scrollbar | Drar tabellen i sidled ovanfor matrisen | Synkar med tabellens vanliga scroll nederst | `setupSyncedHorizontalScroll` | Visas bara nar tabellen ar bredare an ytan. |
 | Kopiera dag | Oppnar modal | Kopierar schema fran dag till dag | `POST /api/schedule/copy` | Overskrivning sker bara om checkboxen i modalen ar vald. |
 | Rensa dag | Bekraftar med `confirm` | Rensar valt schema/omrade | `POST /api/schedule/clear` | Read-only kan inte rensa. |
@@ -63,6 +63,7 @@ Falt:
 - Om anvandaren tommer en malltimme skapas explicit tom override.
 - `lock_foreign_schedule_cells` kan hindra ledare fran att andra celler skapade av annan anvandare.
 - Bemanning cachar bara API-svar som redan ar synliga for inloggad anvandare och aktuell verksamhet. Nar cache saknas prioriterar klienten all-data for hela dagen/verksamheten, filtrerar vald area lokalt och fyller bade all-cache och exakt omradescache innan anvandaren togglar vidare. Cachen ogiltigforklaras vid cellandring, split/merge, drag, undo/redo, rensa och kopiera dag sa omradestoggle inte visar gamla data.
+- Om ett sparat omradesfokus pekar pa ett omrade som har tagits bort, till exempel ett gammalt `AREA:<id>` i browsern, normaliseras fokus till Alla innan Bemanning skickar API-anrop. Det skyddar mot 404 `Omrade hittades inte` och mot att vyn ser tom ut efter registerandringar.
 - Nar en period finns i cache kontrollerar klienten `/api/schedule/revision` tyst i bakgrunden. Aktiv vy kontrollerar ungefär var 10:e sekund, idle-vy ungefär var 30:e sekund, och dold browserflik pausar. Vid ny revision hamtas all-data och bara andrade synliga timmar patchas om anvandaren inte haller pa i just den cellen.
 - `fill-from-left` finns som API (`POST /api/schedule/fill-from-left`) men har ingen synlig knapp i nuvarande `index.html`/`schedule.js`.
 - Personnamn kan dras for att andra personernas sorteringsnummer. Klienten skickar hela synliga ordningen till `/api/persons/sort-order`; backend nekar andra roller, filtrerade/forandrade personlistor och, for vanliga admin/bemanningsansvariga, personer med annat hemomrade. Super User och demo far sortera over omradesgranser nar de har `Personsortering=Redigera`.
@@ -78,6 +79,7 @@ Falt:
 | "Hur delar jag en timme?" | Hogerklicka eller dubbelklicka pa timcellen. Välj aktivitet for varje halvtimme. |
 | "Var ar Fyll fran vanster?" | Backend-endpointen finns, men nuvarande UI visar ingen knapp for den funktionen. |
 | "Varfor kan jag inte dra namnet for att sortera?" | Anvandaren maste ha `Personsortering=Redigera`. Bemanningsansvarig/admin maste ha samma omrade som personens hemomrade; Super User och demo kan sortera alla synliga personer. Rensa personfiltret om det ar aktivt. |
+| "Varfor sag Bemanning tom ut efter att ett omrade togs bort?" | Browsern kan ha haft ett gammalt omradesfokus sparat. Nu faller sidan tillbaka till Alla nar det sparade omradet inte langre finns. Kontrollera Historik efter 404 `Omrade hittades inte` om felet hande innan fixen. |
 
 ## Kallor
 

@@ -675,6 +675,8 @@ def test_area_focus_toggle_is_wired_to_views():
     assert 'toggle.addEventListener("click", () => writeAreaFocus(nextAreaFocus()))' in common
     assert "preferredAreaIdFromFocus" in common
     assert "function areaFocusValueForArea" in common
+    assert 'writeAreaFocus("ALLT")' in common
+    assert "visibleAreas.some((area) => Number(area?.id) === areaId)" in common
     assert "buildAreaFocusOptions" in common
     assert 'business_code || "").toUpperCase() === "STIGAMO"' in common
     assert 'code || "").trim().toUpperCase() !== "ANNAT"' in common
@@ -691,6 +693,8 @@ def test_area_focus_toggle_is_wired_to_views():
     assert "function calcAreaKeys" in schedule
     assert 'preferredAreaIdFromFocus(state.areas) : null' in schedule
     assert 'preferredAreaIdFromFocus(state.areas) : null' in overview
+    assert "setAreaFocusAreas(areas, state.currentUser)" in schedule
+    assert "setAreaFocusAreas(areas, state.currentUser)" in overview
     assert "compareActivitiesForAreaFocus(a, b, state.areas, state.currentUser?.area_id)" in schedule
     assert "compareActivitiesForAreaFocus(a, b, state.areas, state.currentUser?.area_id)" in overview
     assert "const scheduleAreaCache = new Map();" in schedule

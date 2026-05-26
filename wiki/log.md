@@ -358,3 +358,7 @@ Dokumentloggen i sidebaren sparas nu i browsersessionen, foljer med mellan vyer 
 ## [2026-05-26] polish | Vectorikoner for webb och desktop
 
 Webben anvander nu SVG for favicon och brandlogga, med PNG/ICO kvar som fallback for plattformar som kraver raster. Desktop-fonstret foredrar `flow_icon.svg`, medan `.ico` fortfarande finns kvar for exe-/genvagsikon och fallback i Windows-bygget.
+
+## [2026-05-26] fix | Ogiltigt omradesfokus faller tillbaka
+
+Bemanning och Oversikt friskar nu upp den gemensamma omradestogglen fran sidans egna `/api/areas`-svar och validerar sparade `AREA:<id>` mot aktuella aktiva omraden. Om ett omrade raderats medan en browserflik hade det valt faller fokus tillbaka till Alla i stallet for att skicka dod `area_id` och visa 404/tom vy.

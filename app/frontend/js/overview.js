@@ -1369,6 +1369,9 @@ async function loadInitial() {
   state.activitiesActive = activities;
   state.activities = activitiesAll;
 
+  if (typeof setAreaFocusAreas === "function") {
+    setAreaFocusAreas(areas, state.currentUser);
+  }
   state.areaId = preferredAreaIdForCurrentUser();
 }
 

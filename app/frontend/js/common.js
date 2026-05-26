@@ -403,12 +403,31 @@ function findAreaByCode(areas, code) {
 function preferredAreaIdFromFocus(areas) {
   const focus = readAreaFocus();
   if (focus === "ALLT") return null;
+  const visibleAreas = Array.isArray(areas)
+    ? areas.filter((area) => area?.is_active !== false)
+    : null;
   const option = areaFocusOption(focus);
-  if (option?.areaId != null) return Number(option.areaId);
+  if (option?.areaId != null) {
+    const areaId = Number(option.areaId);
+    if (!visibleAreas || visibleAreas.some((area) => Number(area?.id) === areaId)) {
+      return areaId;
+    }
+    writeAreaFocus("ALLT");
+    return null;
+  }
   const areaIdMatch = String(focus || "").match(/^AREA:(\d+)$/i);
-  if (areaIdMatch) return Number(areaIdMatch[1]);
-  const area = findAreaByCode(areas, option?.code || focus);
-  return area ? Number(area.id) : null;
+  if (areaIdMatch) {
+    const areaId = Number(areaIdMatch[1]);
+    if (!visibleAreas || visibleAreas.some((area) => Number(area?.id) === areaId)) {
+      return areaId;
+    }
+    writeAreaFocus("ALLT");
+    return null;
+  }
+  const area = findAreaByCode(visibleAreas || areas, option?.code || focus);
+  if (area) return Number(area.id);
+  if (visibleAreas) writeAreaFocus("ALLT");
+  return null;
 }
 
 function areaFocusAreaId(areas) {
