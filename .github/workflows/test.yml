@@ -60,7 +60,6 @@ jobs:
           ENVIRONMENT: production
         run: |
           alembic upgrade head
-          python -m backend.seed
           python -c "from backend.main import app; print(app.title)"
 
       - name: Run pytest

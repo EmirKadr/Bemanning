@@ -7,6 +7,13 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-26] fix | Coredata följer med deploy
+
+`data/coredata/` är inte längre ignorerad av git, så verksamhetens kärnfiler kan
+versionshanteras och följa med deploy när de läggs till i en commit. CI:s
+Render-simulering kör nu samma produktionssteg som `render.yaml`: migrations och
+app-start utan `backend.seed`.
+
 ## [2026-05-26] process | Halsa som driftregel
 
 Halsa och Vantetider ar nu dokumenterat som permanent agentarbetsregel i

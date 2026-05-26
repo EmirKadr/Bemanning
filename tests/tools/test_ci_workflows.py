@@ -11,7 +11,7 @@ def test_push_ci_runs_core_test_gates_against_postgres_render_simulation():
     assert "flow_test" in workflow
     assert "postgresql+psycopg://postgres:postgres@localhost:5432/flow_test" in workflow
     assert "alembic upgrade head" in workflow
-    assert "python -m backend.seed" in workflow
+    assert "python -m backend.seed" not in workflow
     assert "python -m pytest" in workflow
     assert "python -m playwright install --with-deps chromium" in workflow
     assert "node --check" in workflow
