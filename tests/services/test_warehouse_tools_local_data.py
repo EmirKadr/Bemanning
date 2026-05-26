@@ -24,6 +24,7 @@ REGISTRY_FLOW_IDS = (
     "hib-koppling",
     "overview-check",
     "dispatch-check",
+    "goods-declaration",
     "vecka27-check",
     "prognos-report",
     "observations-update",
@@ -35,7 +36,7 @@ REGISTRY_FLOW_IDS = (
 LOCAL_DATA_FLOW_IDS = tuple(
     flow_id
     for flow_id in REGISTRY_FLOW_IDS
-    if flow_id not in {"forecast", "ytgenerering", "observations-sync", "update-check"}
+    if flow_id not in {"forecast", "ytgenerering", "goods-declaration", "observations-sync", "update-check"}
 )
 
 EXPECTED_SUMMARIES = {
@@ -217,6 +218,77 @@ def test_allocate_flow_ignores_order_rows_above_status_33(tmp_path):
     assert any("Status > 33" in line for line in result["log"])
 
 
+def test_goods_declaration_uses_order_overview_alt_address_for_lq_gotland(tmp_path):
+    orders_path = tmp_path / "orders.csv"
+    overview_path = tmp_path / "overview.csv"
+    custom_adr_path = tmp_path / "custom_adr.csv"
+    security_path = tmp_path / "item_security_info.csv"
+
+    pd.DataFrame(
+        [
+            {"Order nr": "O-DG", "Rad": "1", "Kund": "10", "Kund.1": "DG kund", "Artikel": "A-DG", "Artikel.1": "DG vara", "Bolag": "GG", "Kund Adr": "99"},
+            {"Order nr": "O-LQ-GOT", "Rad": "1", "Kund": "20", "Kund.1": "Gotland kund", "Artikel": "A-LQ", "Artikel.1": "LQ vara", "Bolag": "GG", "Kund Adr": "99"},
+            {"Order nr": "O-LQ-NOT", "Rad": "1", "Kund": "30", "Kund.1": "Fastland kund", "Artikel": "A-LQ", "Artikel.1": "LQ vara", "Bolag": "GG", "Kund Adr": "99"},
+            {"Order nr": "O-LQ-ZERO", "Rad": "1", "Kund": "40", "Kund.1": "Saknar alt", "Artikel": "A-LQ", "Artikel.1": "LQ vara", "Bolag": "GG", "Kund Adr": "99"},
+            {"Order nr": "O-OK", "Rad": "1", "Kund": "50", "Kund.1": "Vanlig kund", "Artikel": "A-OK", "Artikel.1": "Vanlig vara", "Bolag": "GG", "Kund Adr": "5"},
+        ]
+    ).to_csv(orders_path, sep="\t", index=False, encoding="utf-8-sig")
+    pd.DataFrame(
+        [
+            {"Ordernr": "O-DG", "Kund nr": "10", "Alt adress": "1"},
+            {"Ordernr": "O-LQ-GOT", "Kund nr": "20", "Alt adress": "5"},
+            {"Ordernr": "O-LQ-NOT", "Kund nr": "30", "Alt adress": "7"},
+            {"Ordernr": "O-LQ-ZERO", "Kund nr": "40", "Alt adress": "0"},
+            {"Ordernr": "O-OK", "Kund nr": "50", "Alt adress": "5"},
+        ]
+    ).to_csv(overview_path, sep="\t", index=False, encoding="utf-8-sig")
+    pd.DataFrame(
+        [
+            {"Kund": "10", "Adr num": "1", "Post nr": "111 11", "Adress 1": "DG-gatan"},
+            {"Kund": "20", "Adr num": "5", "Post nr": "620 12", "Adress 1": "Gotlandsgatan"},
+            {"Kund": "30", "Adr num": "7", "Post nr": "111 22", "Adress 1": "Fastlandsgatan"},
+            {"Kund": "20", "Adr num": "99", "Post nr": "111 33", "Adress 1": "Fel detaljadress"},
+        ]
+    ).to_csv(custom_adr_path, sep="\t", index=False, encoding="utf-8-sig")
+    pd.DataFrame(
+        [
+            {"Artikel": "A-DG", "Bolag": "GG", "Farligt gods niv\u00e5": "DG"},
+            {"Artikel": "A-LQ", "Bolag": "GG", "Farligt gods niv\u00e5": "LQ"},
+            {"Artikel": "A-OK", "Bolag": "GG", "Farligt gods niv\u00e5": ""},
+        ]
+    ).to_csv(security_path, sep="\t", index=False, encoding="utf-8-sig")
+
+    result = flows.FLOW_BY_ID["goods-declaration"]["handler"](
+        {
+            "orders": orders_path,
+            "overview": overview_path,
+            "custom_adr": custom_adr_path,
+            "item_security_info": security_path,
+        },
+        {},
+    )
+    tables = {key: table for key, _label, table in result["tables"]}
+
+    assert result["summary"] == {
+        "DG-rader": 1,
+        "LQ-rader": 3,
+        "LQ sj\u00f6/hav": 1,
+        "Klara ordernummer": 2,
+        "Ej klara LQ": 2,
+    }
+    assert tables["clear_orders"]["Ordernr"].tolist() == ["O-DG", "O-LQ-GOT"]
+    assert tables["clear_lines"]["Ordernr"].tolist() == ["O-DG", "O-LQ-GOT"]
+    assert tables["clear_lines"].loc[tables["clear_lines"]["Ordernr"].eq("O-LQ-GOT"), "Post nr"].iloc[0] == "620 12"
+    assert tables["review_lq"]["Ordernr"].tolist() == ["O-LQ-NOT", "O-LQ-ZERO"]
+    assert tables["gotland_postcodes"]["Postnummer"].tolist() == [
+        "620 00-620 99",
+        "621 00-621 99",
+        "622 00-622 99",
+        "623 00-623 99",
+        "624 00-624 99",
+    ]
+
+
 def test_allocate_flow_reuses_cached_outputs_for_same_file_versions(monkeypatch, tmp_path):
     flows.clear_allocation_cache()
     orders_path = tmp_path / "orders.csv"
@@ -373,7 +445,7 @@ def test_warehouse_tool_testdata_is_local_to_flow():
 
 def test_warehouse_registry_is_loaded_from_flow_package():
     assert tuple(flows.FLOW_BY_ID) == REGISTRY_FLOW_IDS
-    assert len(flows.public_pool()) == 10
+    assert len(flows.public_pool()) == 11
     public_registry = flows.public_registry()
     assert [flow["id"] for flow in public_registry] == list(REGISTRY_FLOW_IDS)
     assert all("handler" not in flow for flow in public_registry)
@@ -391,6 +463,11 @@ def test_warehouse_registry_is_loaded_from_flow_package():
     assert ytgenerering["coredata"] == [{"key": "location", "label": "Lagerplatser", "required": True}]
     ordersaldo = next(flow for flow in public_registry if flow["id"] == "ordersaldo")
     assert any(input_def["key"] == "max_csv" for input_def in ordersaldo["inputs"])
+    goods_declaration = next(flow for flow in public_registry if flow["id"] == "goods-declaration")
+    assert [input_def["key"] for input_def in goods_declaration["inputs"]] == ["orders", "overview", "custom_adr"]
+    assert goods_declaration["coredata"] == [
+        {"key": "item_security_info", "label": "Artikel s\u00e4kerhetsinformation", "required": True}
+    ]
 
 
 def test_ytgenerering_places_shipments_separately_and_sorts_by_carrier():

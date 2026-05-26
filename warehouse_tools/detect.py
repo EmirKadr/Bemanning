@@ -10,6 +10,7 @@ NAME_HINTS = {
     "v_ask_item_summary_stock_automation": "automation",
     "v_ask_order_overview": "overview",
     "v_ask_dispatch_pallet": "dispatch",
+    "v_ask_custom_adr": "custom_adr",
     "v_ask_booking_putaway": "wms_booking",
     "v_ask_article_buffertpallet": "buffer",
     "v_ask_article_bufferpallet": "buffer",
@@ -126,6 +127,13 @@ def detect_file_type(path: str | os.PathLike[str]) -> str | None:
     has_rad = _has_any(cols, ("radnr", "rad nr", "line id", "rad", "struktur", "radsnr"))
     if has_art and has_qty and (has_ord or has_rad):
         return "orders"
+
+    has_custom_adr_num = _has_any(cols, ("adr num", "custom adr num", "custom_adr_num"))
+    has_post_num = _has_any(cols, ("post nr", "post_num", "post no", "post_no"))
+    has_custom_num = _has_any(cols, ("kund", "kundnr", "custom num", "custom_num"))
+    has_address = _has_any(cols, ("adress 1", "adress1", "address 1", "address1")) or _has_part(cols, "adress")
+    if has_custom_adr_num and has_post_num and has_custom_num and has_address:
+        return "custom_adr"
 
     has_lagerplats = _has_part(cols, "lagerplats") or _has_any(cols, ("plats", "location", "bin"))
     has_pallid = _has_any(cols, ("pallid", "pall id", "id", "sscc", "etikett", "batch"))

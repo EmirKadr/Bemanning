@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import gzip
 import os
 import re
 import shutil
@@ -60,12 +61,98 @@ SOURCE_SPECS = (
 SOURCE_SPEC_BY_KEY = {spec.key: spec for spec in SOURCE_SPECS}
 VISIBLE_SOURCE_SPECS = tuple(spec for spec in SOURCE_SPECS if spec.visible)
 
+
+@dataclass(frozen=True)
+class CompiledProductivityLogSpec:
+    key: str
+    source_key: str
+    label: str
+    filename: str
+    merge_strategy: str
+
+
+COMPILED_PRODUCTIVITY_LOG_SPECS = (
+    CompiledProductivityLogSpec(
+        "productivity_pick_observations",
+        "pick",
+        "Plocklogg sammanstalld data",
+        "v_ask_pick_log_full_observations.csv.gz",
+        "rowid",
+    ),
+    CompiledProductivityLogSpec(
+        "productivity_trans_observations",
+        "trans",
+        "Translogg sammanstalld data",
+        "v_ask_trans_log_observations.csv.gz",
+        "rowid",
+    ),
+    CompiledProductivityLogSpec(
+        "productivity_pallet_observations",
+        "pallet",
+        "Palllastningslogg sammanstalld data",
+        "v_ask_palletloading_log_observations.csv.gz",
+        "timestamp",
+    ),
+)
+COMPILED_PRODUCTIVITY_LOG_BY_SOURCE = {
+    spec.source_key: spec for spec in COMPILED_PRODUCTIVITY_LOG_SPECS
+}
+
 HEADER_HINTS = {
     "pick": {"Zon", "Plockat", "Användare", "Ändrad", "Bolag"},
     "trans": {"Pallid", "Från", "Till", "Antal", "Timestamp"},
     "pallet": {"Plockpallsnr.", "Palltyp", "Pallplacering", "Transnr.", "Vikt"},
     "kpi": {"Flödesnamn", "Processnamn", "Beskrivning", "Rader", "Kollin"},
 }
+
+
+def _compiled_status_payload(spec: CompiledProductivityLogSpec, path: Path | None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "key": spec.key,
+        "label": spec.label,
+        "prefix": Path(spec.filename).name.removesuffix(".csv.gz"),
+        "kind": "compiled_data",
+        "uploaded": path is not None and path.is_file(),
+        "name": None,
+        "modified_at": None,
+        "size": None,
+        "size_label": None,
+    }
+    if path is None or not path.is_file():
+        return payload
+    stat = path.stat()
+    modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).astimezone()
+    payload.update(
+        {
+            "name": path.name,
+            "modified_at": modified.isoformat(timespec="seconds"),
+            "size": stat.st_size,
+            "size_label": _format_size(stat.st_size),
+        }
+    )
+    return payload
+
+
+def productivity_compiled_log_path(
+    file_type: str,
+    reference_dir: Path | str | None = None,
+    business_code: str | None = None,
+) -> Path:
+    spec = COMPILED_PRODUCTIVITY_LOG_BY_SOURCE.get(file_type)
+    if spec is None:
+        raise ProductivitySourceError("Okand produktivitetslogg")
+    return business_coredata_dir(reference_dir, business_code) / spec.filename
+
+
+def build_productivity_compiled_data_status(
+    reference_dir: Path | str | None = None,
+    business_code: str | None = None,
+) -> dict[str, dict[str, Any]]:
+    files: dict[str, dict[str, Any]] = {}
+    for spec in COMPILED_PRODUCTIVITY_LOG_SPECS:
+        path = business_coredata_dir(reference_dir, business_code) / spec.filename
+        files[spec.key] = _compiled_status_payload(spec, path)
+    return files
 
 GROUPS = (
     {"id": "gg", "title": "Granngården"},
@@ -206,6 +293,160 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
         handle.seek(0)
         dialect = _detect_dialect(sample)
         return list(csv.DictReader(handle, dialect=dialect))
+
+
+def _clean_csv_header(value: Any) -> str:
+    return str(value or "").strip().lstrip("\ufeff")
+
+
+def _normalized_csv_header(value: Any) -> str:
+    return _clean_csv_header(value).lower()
+
+
+def _read_csv_rows_with_headers(path: Path, *, compressed: bool = False) -> tuple[list[str], list[dict[str, str]]]:
+    opener = gzip.open if compressed else open
+    with opener(path, "rt", encoding="utf-8-sig", newline="") as handle:
+        sample = handle.read(4096)
+        handle.seek(0)
+        dialect = _detect_dialect(sample)
+        reader = csv.DictReader(handle, dialect=dialect)
+        headers = [_clean_csv_header(header) for header in (reader.fieldnames or []) if header is not None]
+        rows: list[dict[str, str]] = []
+        for row in reader:
+            cleaned = {
+                _clean_csv_header(header): "" if value is None else str(value)
+                for header, value in row.items()
+                if header is not None
+            }
+            if any(str(value).strip() for value in cleaned.values()):
+                rows.append(cleaned)
+        return headers, rows
+
+
+def _write_compiled_csv(path: Path, headers: list[str], rows: list[dict[str, str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    with gzip.open(tmp_path, "wt", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=headers, extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            normalized_values = {_normalized_csv_header(header): value for header, value in row.items()}
+            writer.writerow(
+                {
+                    header: row.get(header, normalized_values.get(_normalized_csv_header(header), ""))
+                    for header in headers
+                }
+            )
+    tmp_path.replace(path)
+
+
+def _union_headers(*header_sets: list[str]) -> list[str]:
+    headers: list[str] = []
+    seen: set[str] = set()
+    for header_set in header_sets:
+        for header in header_set:
+            normalized = _normalized_csv_header(header)
+            if not normalized or normalized in seen:
+                continue
+            headers.append(header)
+            seen.add(normalized)
+    return headers
+
+
+def _row_value(row: dict[str, str], *aliases: str) -> str:
+    normalized_aliases = {_normalized_csv_header(alias) for alias in aliases}
+    for header, value in row.items():
+        if _normalized_csv_header(header) in normalized_aliases:
+            return str(value or "").strip()
+    return ""
+
+
+def _rowid_value(row: dict[str, str]) -> str:
+    for header, value in row.items():
+        normalized = re.sub(r"[^a-z0-9]+", "", _normalized_csv_header(header))
+        if normalized in {"rowid", "radid"}:
+            return str(value or "").strip()
+    return ""
+
+
+def _row_timestamp(row: dict[str, str]) -> datetime | None:
+    return _timestamp(_row_value(row, "Timestamp", "Ändrad", "Andrad"))
+
+
+def _compiled_merge_rowid(
+    existing_rows: list[dict[str, str]],
+    new_rows: list[dict[str, str]],
+) -> tuple[list[dict[str, str]], str | None]:
+    existing_ids = {_rowid_value(row) for row in existing_rows if _rowid_value(row)}
+    if not any(_rowid_value(row) for row in new_rows):
+        return [], "saknar rowid/radid"
+
+    rows_to_add: list[dict[str, str]] = []
+    seen = set(existing_ids)
+    for row in new_rows:
+        rowid = _rowid_value(row)
+        if not rowid or rowid in seen:
+            continue
+        seen.add(rowid)
+        rows_to_add.append(row)
+    return rows_to_add, None
+
+
+def _compiled_merge_timestamp(
+    existing_rows: list[dict[str, str]],
+    new_rows: list[dict[str, str]],
+) -> tuple[list[dict[str, str]], str | None]:
+    existing_timestamps = [
+        timestamp for row in existing_rows if (timestamp := _row_timestamp(row)) is not None
+    ]
+    max_timestamp = max(existing_timestamps) if existing_timestamps else None
+    rows_to_add = [
+        row for row in new_rows
+        if (timestamp := _row_timestamp(row)) is not None
+        and (max_timestamp is None or timestamp > max_timestamp)
+    ]
+    if not rows_to_add and not any(_row_timestamp(row) for row in new_rows):
+        return [], "saknar timestamp"
+    return rows_to_add, None
+
+
+def update_productivity_compiled_log(
+    source_path: Path,
+    file_type: str,
+    reference_dir: Path | str | None = None,
+    business_code: str | None = None,
+) -> dict[str, Any] | None:
+    spec = COMPILED_PRODUCTIVITY_LOG_BY_SOURCE.get(file_type)
+    if spec is None:
+        return None
+
+    new_headers, new_rows = _read_csv_rows_with_headers(source_path)
+    target_path = productivity_compiled_log_path(file_type, reference_dir, business_code)
+    existing_headers: list[str] = []
+    existing_rows: list[dict[str, str]] = []
+    if target_path.is_file():
+        existing_headers, existing_rows = _read_csv_rows_with_headers(target_path, compressed=True)
+
+    if spec.merge_strategy == "rowid":
+        rows_to_add, skipped_reason = _compiled_merge_rowid(existing_rows, new_rows)
+    else:
+        rows_to_add, skipped_reason = _compiled_merge_timestamp(existing_rows, new_rows)
+
+    headers = _union_headers(existing_headers, new_headers)
+    combined_rows = existing_rows + rows_to_add
+    if rows_to_add:
+        _write_compiled_csv(target_path, headers, combined_rows)
+    payload = _compiled_status_payload(spec, target_path)
+    payload.update(
+        {
+            "source_key": file_type,
+            "new_rows": len(rows_to_add),
+            "total_rows": len(combined_rows),
+        }
+    )
+    if skipped_reason:
+        payload["skipped_reason"] = skipped_reason
+    return payload
 
 
 def _iter_csv_values(path: Path):

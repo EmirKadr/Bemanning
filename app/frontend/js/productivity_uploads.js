@@ -222,7 +222,7 @@
     });
   }
 
-  async function uploadPermanentKpiFile(file) {
+  async function uploadProductivityRawFile(file) {
     return await api.postFile(
       `/api/productivity/files/raw?filename=${encodeURIComponent(file.name)}`,
       file,
@@ -389,6 +389,8 @@
     const saved = [];
     const unknown = [];
     const recognized = [];
+    const compiledUpdated = [];
+    const compiledFailed = [];
     let allocationResult = { saved: [], unknown: [], hiddenSaved: 0, recognized: [] };
     let hiddenSaved = 0;
     let activityCount = 0;
@@ -404,12 +406,21 @@
       recognized.push(file.name || fileType);
       if (fileType === "kpi") {
         if (statusElement) statusElement.textContent = `Uppdaterar KPI-mål: ${file.name}`;
-        const result = await uploadPermanentKpiFile(file);
+        const result = await uploadProductivityRawFile(file);
         hiddenSaved += (result.saved || []).length;
         if (reportUnknown) unknown.push(...(result.unknown || []));
         continue;
       }
       await saveFile(fileType, file);
+      try {
+        const result = await uploadProductivityRawFile(file);
+        for (const item of result.saved || []) {
+          if (item.compiled_data) compiledUpdated.push(item.compiled_data);
+        }
+      } catch (error) {
+        console.warn("Kunde inte uppdatera sammanställd produktivitetsdata.", error);
+        compiledFailed.push(file.name || fileType);
+      }
       saved.push(file.name);
     }
 
@@ -426,14 +437,20 @@
     activityCount = activityNames.size;
     const parts = [];
     if (saved.length) parts.push(`${saved.length} fil(er) valda`);
+    const newCompiledRows = compiledUpdated.reduce((sum, item) => sum + Number(item.new_rows || 0), 0);
+    if (compiledUpdated.length) parts.push(`Sammanställd data uppdaterad (${newCompiledRows} nya rader)`);
     if (allocationResult.saved?.length) parts.push(`${allocationResult.saved.length} fil(er) synkade till Uppladdningar`);
     if (hiddenSaved) parts.push("KPI-mål uppdaterat i bakgrunden");
+    if (compiledFailed.length) parts.push(`Sammanställd data kunde inte uppdateras: ${compiledFailed.join(", ")}`);
     if (reportUnknown && unknown.length) parts.push(`Okänd filtyp: ${unknown.join(", ")}`);
     const message = parts.join(". ") || "Ingen fil uppdaterades.";
     if (statusElement) statusElement.textContent = message;
-    if (showResultToast && (saved.length || hiddenSaved || allocationResult.saved?.length)) showToast(message, "success", 3500);
+    const hasWarning = compiledFailed.length || (reportUnknown && unknown.length);
+    if (showResultToast && (saved.length || hiddenSaved || allocationResult.saved?.length || compiledUpdated.length || compiledFailed.length)) {
+      showToast(message, hasWarning ? "warn" : "success", hasWarning ? 7000 : 3500);
+    }
     else if (showResultToast && reportUnknown && unknown.length) showToast(message, "warn", 7000);
-    return { saved, unknown, hiddenSaved, recognized, message, allocationSaved: allocationResult.saved || [] };
+    return { saved, unknown, hiddenSaved, recognized, message, allocationSaved: allocationResult.saved || [], compiledUpdated, compiledFailed };
     } finally {
       if (trackUploadActivity) window.allocationUploadActivity?.finish(activityCount);
     }

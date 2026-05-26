@@ -225,7 +225,7 @@ def test_clear_all_uploads_keeps_core_file_entries(local_allocation_server, chro
 
         assert upload_store_keys(page, "flow-allokering-files") == ["item_option", "max_csv"]
         assert upload_store_keys(page, "flow-productivity-files") == ["kpi"]
-        expect(page.locator(".toast.success").last).to_contain_text("Kärnfiler ligger kvar")
+        expect(page.locator(".toast.success").last).to_contain_text("Kärnfiler och sammanställd data ligger kvar")
     finally:
         context.close()
 

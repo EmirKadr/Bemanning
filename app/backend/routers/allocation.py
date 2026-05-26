@@ -30,6 +30,7 @@ SELF_SERVICE_FLOW_IDS = {"split-values"}
 BUSINESS_ARTICLE_MAX_FLOW_IDS = {"ordersaldo", "lyx", "pafyllnadsprio"}
 BUSINESS_COREDATA_FLOW_DEFAULTS = {
     "allocate": {"items": "item_option"},
+    "goods-declaration": {"item_security_info": "item_security_info"},
     "forecast": {
         "custom": "custom",
         "item": "item",

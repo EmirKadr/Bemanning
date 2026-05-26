@@ -307,7 +307,10 @@ function apiActionLabel(path, method = "GET") {
   if (safePath.startsWith("/api/allokering/flow/")) return `Bearbeta: ${flowName || "flöde"}`;
   if (safePath.startsWith("/api/allokering/download/")) return "Bearbeta: CSV";
   if (safePath.startsWith("/api/allokering/open-excel/")) return "Bearbeta: Excel";
-  if (safePath.startsWith("/api/coredata/files")) return "Kärnfil";
+  if (safePath.startsWith("/api/coredata/files")) {
+    const lowerPath = String(path || "").toLowerCase();
+    return lowerPath.includes("artikel_max") || lowerPath.includes("article_max") ? "Sammanställd data" : "Kärnfil";
+  }
   if (safePath.startsWith("/api/productivity/files")) return "Produktivitetsfil";
   if (safePath.startsWith("/api/productivity/report")) return "Produktivitet";
   if (safePath.startsWith("/api/schedule/cells")) return "Bemanning: flera celler";

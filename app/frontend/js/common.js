@@ -13,13 +13,14 @@ const WAIT_METRIC_MAX_QUEUE = 100;
 const FLOW_PAGE_STARTED_AT = typeof performance !== "undefined" && performance.now
   ? performance.now()
   : Date.now();
-const ALLOCATION_CORE_UPLOAD_KEYS = [
+const ALLOCATION_PROTECTED_UPLOAD_KEYS = [
   "article_max",
   "custom",
   "dimension",
   "item",
   "item_alias",
   "item_attribute",
+  "item_security_info",
   "item_option",
   "kpi",
   "kpi_target_rule",
@@ -29,7 +30,7 @@ const ALLOCATION_CORE_UPLOAD_KEYS = [
   "pallet_type",
 ];
 const UPLOAD_FILE_STORES = [
-  { dbName: "flow-allokering-files", storeName: "files", protectedKeys: ALLOCATION_CORE_UPLOAD_KEYS },
+  { dbName: "flow-allokering-files", storeName: "files", protectedKeys: ALLOCATION_PROTECTED_UPLOAD_KEYS },
   { dbName: "flow-productivity-files", storeName: "files", protectedKeys: ["kpi"] },
 ];
 const SHARED_ALLOCATION_API = "/api/allokering";
@@ -41,6 +42,7 @@ const SHARED_ALLOCATION_FILE_TYPE_KEYS = {
   buffer: ["buffer"],
   overview: ["overview"],
   dispatch: ["dispatch"],
+  custom_adr: ["custom_adr"],
   automation: ["saldo"],
   item: ["items"],
   not_putaway: ["not_putaway"],
@@ -59,6 +61,7 @@ const SHARED_ALLOCATION_FILE_WORDS = {
   buffer: ["v_ask_article_buffertpallet", "v_ask_article_bufferpallet", "article_buffertpallet", "article_bufferpallet", "buffertpall", "buffertpallet", "bufferpall", "bufferpallet"],
   overview: ["v_ask_order_overview", "order_overview", "orderoversikt"],
   dispatch: ["v_ask_dispatch_pallet", "dispatch_pallet", "dispatchpall"],
+  custom_adr: ["v_ask_custom_adr", "custom_adr", "alternativ leveransadress"],
   saldo: ["v_ask_item_summary_stock_automation", "item_summary_stock_automation", "saldo ink", "automation"],
   items: ["item_option", "item option"],
   max_csv: ["artikel_max", "article_max"],
@@ -2195,7 +2198,7 @@ async function saveSharedAllocationFiles(files) {
 
 async function clearAllUploadedFiles({ confirmUser = true } = {}) {
   sharedAllocationMetadataGeneration += 1;
-  if (confirmUser && !confirm("Rensa alla vanliga filval i Uppladdningar? Kärnfiler ligger kvar.")) return false;
+  if (confirmUser && !confirm("Rensa alla vanliga filval i Uppladdningar? Kärnfiler och sammanställd data ligger kvar.")) return false;
   const results = await Promise.all(
     UPLOAD_FILE_STORES.map((item) => clearUploadIndexedDbStore(
       item.dbName,
@@ -2212,8 +2215,8 @@ async function clearAllUploadedFiles({ confirmUser = true } = {}) {
   }));
   showToast(
     deleted
-      ? "Vanliga filval är rensade. Kärnfiler ligger kvar."
-      : "Inga vanliga filval att rensa. Kärnfiler ligger kvar.",
+      ? "Vanliga filval är rensade. Kärnfiler och sammanställd data ligger kvar."
+      : "Inga vanliga filval att rensa. Kärnfiler och sammanställd data ligger kvar.",
     "success",
     3000,
   );

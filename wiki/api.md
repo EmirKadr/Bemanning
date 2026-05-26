@@ -69,9 +69,9 @@ eller skapa/importera med explicit verksamhet.
 - `POST /api/healthcheck/wait-metrics` - tyst insamling av anvandarens vantetider for vyload, API-anrop, nedladdningar och bakgrundsladdning. Payloaden ar sanerad till event, vy, steg, duration, status och begransad teknisk detalj.
 - `GET /api/healthcheck/wait-metrics/summary` - Super User-summering for Historik-fliken `Vantetider` och CLI-verktyget `tools.healthcheck`.
 - `GET /api/productivity/files`, `GET /api/productivity/targets`, `GET /api/productivity` - produktivitet, kraver `productivity=view`.
-- `POST /api/productivity/files`, `POST /api/productivity/files/raw`, `DELETE /api/productivity/files/{file_type}` - serverhanterade produktivitetsfiler, kraver `productivity=edit`.
-- `GET /api/coredata/files` - listar verksamhetens permanenta coredata-karnfiler for lagerverktygen.
-- `POST /api/coredata/files/raw` - laddar upp en coredata-karnfil till anvandarens verksamhet och ersatter aldre fil med samma prefix, kraver `allocationUploads=edit`.
+- `POST /api/productivity/files`, `POST /api/productivity/files/raw`, `DELETE /api/productivity/files/{file_type}` - serverhanterade produktivitetsfiler, kraver `productivity=edit`. Raw-upload av Plocklogg, Translogg och Palllastningslogg uppdaterar dessutom verksamhetens sammanstallda csv.gz-observationer.
+- `GET /api/coredata/files` - listar verksamhetens permanenta coredata-karnfiler samt sammanstalld data som `artikel_max.csv`, `productivity_pick_observations`, `productivity_trans_observations` och `productivity_pallet_observations`.
+- `POST /api/coredata/files/raw` - laddar upp en coredata-karnfil eller sammanstalld datafil till anvandarens verksamhet och ersatter aldre fil med samma prefix, kraver `allocationUploads=edit`.
 - `GET /api/allokering/health`, `/flows`, `/pool`, `GET/PUT /process-matrix`, `POST /detect`, `POST /flow/{flow_id}`, `POST /open-excel`, `GET /table-column/...`, `GET /download/...` - lagerverktyg.
 - `GET /api/public/...` - publika text/CSV-summeringar for timmar/personer. Queryparametern `business` defaultar till `STIGAMO`; publika endpoints summerar inte globalt.
 

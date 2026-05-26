@@ -24,6 +24,7 @@ from ..coredata_service import (
 )
 from ..deps import get_db, require_allocation_tools_user, require_view_access
 from ..models import Business, User
+from ..productivity_service import build_productivity_compiled_data_status
 
 
 router = APIRouter(prefix="/api/coredata", tags=["coredata"])
@@ -84,18 +85,21 @@ def _article_max_status(business_code: str) -> dict[str, Any]:
         path = _article_max_path(business_code)
     except Exception:
         path = None
-    return _file_status_payload(
+    payload = _file_status_payload(
         key=ARTICLE_MAX_FILE_TYPE,
         label="artikel_max.csv",
         prefix="artikel_max",
         path=path,
     )
+    payload["kind"] = "compiled_data"
+    return payload
 
 
 def _coredata_status(business_code: str) -> dict[str, Any]:
     payload = build_coredata_status(business_code=business_code)
     payload["files"] = {
         ARTICLE_MAX_FILE_TYPE: _article_max_status(business_code),
+        **build_productivity_compiled_data_status(business_code=business_code),
         **payload.get("files", {}),
     }
     return payload
@@ -118,12 +122,14 @@ def _save_article_max_file(*, source_path: Path, filename: str | None, business_
         if any(stem == prefix or re.match(rf"^{re.escape(prefix)}[-_.\s]", stem) for prefix in ARTICLE_MAX_PREFIXES):
             path.unlink()
     tmp_path.replace(final_path)
-    return _file_status_payload(
+    payload = _file_status_payload(
         key=ARTICLE_MAX_FILE_TYPE,
         label="artikel_max.csv",
         prefix="artikel_max",
         path=final_path,
     )
+    payload["kind"] = "compiled_data"
+    return payload
 
 
 def _warm_coredata_caches(file_type: str, business_code: str) -> None:
@@ -211,7 +217,7 @@ async def upload_coredata_file_raw(
             error_type="unknown_file_type",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Okand karnfil")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Okand karnfil eller sammanstalld datafil")
     if file_type == "kpi":
         _audit_coredata_file(
             db,

@@ -93,6 +93,8 @@ Kort svar: denna sida listar vad anvandaren kan se eller raka ut for: redirect, 
 | Saknar data for datum | "Saknar produktivitetsdata for YYYY-MM-DD" | Vald dag finns inte i loggarna | Valj datum som finns i underlaget. |
 | Filuppladdning saknas | "Filuppladdningen ar inte laddad." | `productivityUploads` saknas/JS laddade inte | Ladda om sidan, kontrollera JS-fel. |
 | Okand filtyp | Toast med okand fil | Filnamn/header matchar inte | Anvand ratt exportfil eller slot. |
+| Sammanstalld data uppdaterad | "Sammanstalld data uppdaterad (X nya rader)" | Plocklogg, Translogg eller Palllastningslogg sparades lokalt och backend lade till nya observationer i verksamhetens csv.gz-fil | Normalt klart; om X ar 0 fanns raderna redan enligt Radid/Rowid/timestamp-regeln. |
+| Sammanstalld data misslyckas | "Sammanstalld data kunde inte uppdateras..." | Lokal logg sparades men serveruppladdningen nekades eller misslyckades | Kontrollera behorighet `productivity=edit`, serverstatus och forsok igen. |
 
 ## Apphjalp
 

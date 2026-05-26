@@ -22,6 +22,7 @@ from ..productivity_service import (
     read_productivity_targets,
     save_productivity_file,
     source_files_from_session_logs,
+    update_productivity_compiled_log,
 )
 
 
@@ -141,14 +142,22 @@ def _save_classified_productivity_file(
     if file_type is None:
         return [], [filename or "okänd fil"]
     if file_type in LOCAL_FILE_TYPES:
-        return [
-            _save_session_log_file(
-                request=request,
-                temp_path=temp_path,
-                filename=filename,
-                file_type=file_type,
+        saved = _save_session_log_file(
+            request=request,
+            temp_path=temp_path,
+            filename=filename,
+            file_type=file_type,
+        )
+        saved_path_value = (request.session.get("productivity_files") or {}).get(file_type)
+        if saved_path_value:
+            compiled = update_productivity_compiled_log(
+                Path(str(saved_path_value)),
+                file_type,
+                business_code=business_code,
             )
-        ], []
+            if compiled is not None:
+                saved["compiled_data"] = compiled
+        return [saved], []
     return [
         save_productivity_file(
             source_path=temp_path,

@@ -1147,8 +1147,8 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert '"not_putaway", "wms_booking"' in flows
     assert "v_ask_receive_log" not in allocation
     assert "v_ask_correct_log" not in allocation
-    assert "ALLOCATION_CORE_FILES" in allocation
-    assert "allocationCoreFile" in allocation
+    assert "ALLOCATION_PERSISTENT_DATA_FILES" in allocation
+    assert "allocationPersistentDataFile" in allocation
     assert "lastForecastSessionId" in allocation
     assert "allocationRequiredSessionId" in allocation
     assert 'fd.append("forecast_session_id"' in allocation
@@ -1157,13 +1157,30 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert '"requiresSessionFlow": {"flowId": "forecast"' in catalog
     assert "flow_forecast" in flows
     assert "flow_ytgenerering" in flows
-    assert "Kärnfil" in allocation
-    assert '" (kärnfil)"' in allocation
-    assert "artikel_max.csv (kärnfil)" in catalog
+    assert "Sammanställd data" in allocation
+    assert "productivity_pick_observations" in allocation
+    assert "productivity_trans_observations" in allocation
+    assert "productivity_pallet_observations" in allocation
+    assert "allocationDataSuffixLabel" in allocation
+    assert '"kärnfil"' in allocation
+    assert "artikel_max.csv (sammanställd data)" in catalog
+    assert "copyAutoFlowColumn" in allocation
+    assert "copyOrdersaldoCompleteOrders" not in allocation
+    assert '"goods-declaration"' in allocation
+    assert "clear_orders" in allocation
+    assert "custom_adr" in allocation
+    assert "item_security_info" in allocation
+    assert "Alternativ leveransadress" in allocation
+    assert "Godsdeklaration" in catalog
+    assert "Godsdeklaration" in flows
+    assert "Orderöversikt (adressnummer)" in catalog
+    assert "Alternativ leveransadress" in catalog
+    assert "item_security_info" in catalog
+    assert "flow_goods_declaration" in flows
 
     assert "DATABASE_ICON" in common
     assert "ALLOCATION_UPLOAD_NOTICE_KEY" in common
-    assert "ALLOCATION_CORE_UPLOAD_KEYS" in common
+    assert "ALLOCATION_PROTECTED_UPLOAD_KEYS" in common
     assert "SHARED_ALLOCATION_FILE_TYPE_KEYS" in common
     assert "SHARED_ALLOCATION_SLOT_MIRRORS" in common
     assert "productivity_pallet" in common
@@ -1172,7 +1189,9 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert "protectedKeys" in common
     assert "store.openCursor()" in common
     assert "cursor.delete()" in common
-    assert "Kärnfiler ligger kvar" in common
+    assert "Kärnfiler och sammanställd data ligger kvar" in common
+    assert "item_security_info" in common
+    assert "custom_adr" in common
     assert 'new CustomEvent("flow:allocationFilesChanged"' in common
     assert "window.sharedAllocationUploads" in common
     assert "addAllocationUploadNotice(count)" in common
@@ -1189,6 +1208,10 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert "window.sharedAllocationUploads?.saveFiles" in productivity_uploads
     assert "window.allocationUploadActivity?.start()" in productivity_uploads
     assert "window.allocationUploadActivity?.finish(activityCount)" in productivity_uploads
+    assert "uploadProductivityRawFile" in productivity_uploads
+    assert "compiledUpdated" in productivity_uploads
+    assert "Sammanställd data uppdaterad" in productivity_uploads
+    assert "Sammanställd data kunde inte uppdateras" in productivity_uploads
     assert "syncAllocationUploads: false" in allocation
     assert "allocationResultSummaryEntries" in allocation
     assert "data.display_summary" in allocation
@@ -1197,10 +1220,11 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert "api.download(`${ALLOCATION_API}/download/" in allocation
     assert 'href="${ALLOCATION_API}/download/' not in allocation
     assert "Excel öppnas" in allocation
-    assert "copyOrdersaldoCompleteOrders" in allocation
-    assert 'data?.flow_id !== "ordersaldo"' in allocation
-    assert 'entry.key === "complete"' in allocation
-    assert "kompletta ordrar kopierade" in allocation
+    assert "ALLOCATION_AUTO_COPY_COLUMN_RULES" in allocation
+    assert "copyAutoFlowColumn" in allocation
+    assert 'tableKey: "complete"' in allocation
+    assert "entry.key === rule.tableKey" in allocation
+    assert "${orderCount} ${rule.successLabel} kopierade" in allocation
     assert "renderTextResult" in allocation
     assert 'class="allocation-copy-text"' in allocation
     assert "data-copy-text-result" in allocation

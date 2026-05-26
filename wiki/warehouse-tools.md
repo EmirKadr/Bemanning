@@ -24,21 +24,25 @@ Kort svar: Lagerverktygen ar tre vyer ovanpa `warehouse_tools`: Uppladdningar fo
 | Välj filer | Valjer en eller flera filer | Identifierar filtyp, mappar till slot, sparar i IndexedDB | `POST /api/allokering/detect` | Okand filtyp om namn/header inte matchar. |
 | Drag-drop | Drar filer till panel/slot/flode | Samma som Välj filer, med fallback till slot | `routeAllocationFiles` | Om flera filer okanda visas toast "Kunde inte sortera". |
 | Välj per slot | Valjer fil for en specifik slot | Forsoker detektera men fallbackar till sloten | `fallbackSlotKey` | Bra nar automatisk identifiering missar. |
-| X per slot | Rensar slot | Tar bort lokal IndexedDB-post | `deleteAllocationFile` | Karnfil som `artikel_max.csv` kan visas utan att vara uppladdad. |
-| Rensa alla | Rensar vanliga lokala filval | Tar bort icke-karnfiler ur allokerings- och produktivitetsstores men bevarar karnfiler som `artikel_max.csv`, coredata och KPI-mal | `clearAllUploadedFiles` | Bekraftelse sager att karnfiler ligger kvar. |
+| X per slot | Rensar slot | Tar bort lokal IndexedDB-post | `deleteAllocationFile` | Sammanstalld data som `artikel_max.csv` kan visas utan att vara uppladdad. |
+| Rensa alla | Rensar vanliga lokala filval | Tar bort icke-skyddade filer ur allokerings- och produktivitetsstores men bevarar karnfiler, sammanstalld data som `artikel_max.csv` och KPI-mal | `clearAllUploadedFiles` | Bekraftelse sager att karnfiler och sammanstalld data ligger kvar. |
 | Uppladdningsbadge | Visar antal nya filer | Lagrar notice i sessionStorage | `allocationUploadActivity` | Badge rensas nar Uppladdningar oppnas. |
 
-## Karnfiler i coredata
+## Karnfiler och sammanstalld data
 
-Uppladdningar visar en separat lista for permanenta karnfiler. `artikel_max.csv` visas ihop med coredata-filerna och uppdaterar samma verksamhetsfil som Ordersaldo, LYX och Pafyllnadsprio anvander. Coredata-prefixen `custom`, `dimension`, `item`, `item_alias`, `item_attribute`, `item_option`, `kpi_target_rule`, `location`, `location_cost` och `pallet_type` sparas server-side under `data/coredata/<verksamhetskod>/`. Om en anvandare laddar upp en ny fil med samma prefix for sin verksamhet tas den gamla filen med samma prefix bort och den nya blir sanningen for alla anvandare i verksamheten. Andra verksamheters filer rors inte.
+Uppladdningar visar separata listor for permanenta karnfiler och sammanstalld data. `artikel_max.csv` ar sammanstalld data och uppdaterar samma verksamhetsfil som Ordersaldo, LYX och Pafyllnadsprio anvander. Produktivitetens tre sammanstallda loggfiler visas ocksa har: `productivity_pick_observations`, `productivity_trans_observations` och `productivity_pallet_observations`. Coredata-prefixen `custom`, `dimension`, `item`, `item_alias`, `item_attribute`, `item_option`, `item_security_info`, `kpi_target_rule`, `location`, `location_cost` och `pallet_type` sparas server-side under `data/coredata/<verksamhetskod>/`. Om en anvandare laddar upp en ny fil med samma prefix for sin verksamhet tas den gamla filen med samma prefix bort och den nya blir sanningen for alla anvandare i verksamheten. Andra verksamheters filer rors inte.
 
 Allokering anvander verksamhetens `item_option`-karnfil nar anvandaren inte laddat upp en egen Item option-fil. En uppladdad lokal fil i sloten vinner for den korningen, men den permanenta karnfilen ligger kvar som verksamhetens fallback.
 
 Forecast anvander verksamhetens karnfiler `custom`, `item`, `item_alias`, `dimension`, `pallet_type` och `item_option` som standard. Ytgenerering anvander verksamhetens `location` som lagerplatsunderlag. Anvandaren kan fortfarande ladda upp egna lokala filer for en korning nar flodet har en motsvarande filslot, men karnfilen ligger kvar som verksamhetens fallback.
 
-Nar en slot redan har en verksamhetens karnfil, till exempel `item_option` eller `artikel_max.csv`, visas den i Karnfiler i stallet for att dubbelvisas i Filer. Om anvandaren laddar upp en lokal override i sessionen visas sloten i Filer igen.
+Godsdeklaration anvander verksamhetens `item_security_info` som artikelns farligt gods-underlag. En ny uppladdad `item_security_info-*.csv` ersatter tidigare `item_security_info` for samma verksamhet pa samma satt som andra karnfiler.
 
-`Rensa alla` i Uppladdningar tar bara bort vanliga lokala filval. Permanenta karnfiler och skyddade karnliknande poster ligger kvar, sa anvandaren kan rensa order-/buffert-/loggfiler utan att tappa verksamhetens standardunderlag.
+Nar en slot redan har verksamhetens karnfil eller sammanstallda data, till exempel `item_option` eller `artikel_max.csv`, visas den i respektive permanent lista i stallet for att dubbelvisas i Filer. Om anvandaren laddar upp en lokal override i sessionen visas sloten i Filer igen.
+
+`Rensa alla` i Uppladdningar tar bara bort vanliga lokala filval. Permanenta karnfiler, sammanstalld data och skyddade poster ligger kvar, sa anvandaren kan rensa order-/buffert-/loggfiler utan att tappa verksamhetens standardunderlag.
+
+Produktivitetens sammanstallda loggar skapas nar Plocklogg, Translogg eller Palllastningslogg laddas upp i Produktivitet. Plocklogg tar bara in nya `Radid` (kolumn-id `rowid`) och Translogg tar bara in nya `Rowid`; Palllastningslogg tar bara in rader nyare an senaste `Ändrad`/`timestamp` i den befintliga csv.gz-filen. Filerna ar verksamhetsscopeade pa samma katalogprincip som coredata.
 
 ## Bearbeta-floden
 
@@ -65,16 +69,19 @@ Reglerna normaliseras server-side i `allocation_bridge.normalize_process_matrix`
 | HIB-koppling | Detalj Kundorder, Orderoversikt | Andringar och missade avgangar |
 | Orderoversiktkontroll | Orderoversikt; valfritt Detalj Kundorder | Sändnings-/HIB-kontroller |
 | Dispatchkontroll | Orderoversikt, Dispatchpallar; valfritt Detalj Kundorder | Dispatchavvikelser |
+| Godsdeklaration | Detalj Kundorder, Orderoversikt, Alternativ leveransadress och verksamhetens `item_security_info` | DG-order blir klara direkt, LQ-order blir bara klara vid Gotlandspostnummer 620-624 och klara ordernummer kopieras automatiskt |
 | Vecka 27-kontroll | Detalj Kundorder | Avvikelser/text |
 | Prognosrapport | Prognos eller kampanj, samt Saldo; valfritt Buffert | Prognos vs Autoplock |
 | Forecast | Detalj Kundorder, Orderoversikt, Buffertpallar och karnfilerna `custom`, `item`, `item_alias`, `dimension`, `pallet_type`, `item_option` | Forecast per `Sandningsnr`, Excel/CSV-tabell och sessiondata for Ytgenerering |
 | Ytgenerering | Verksamhetens `location` och att Forecast har korts i samma session | Placering av forecastens sandningar pa `Typ=U`-lagerplatser, UTL1-UTL652, minst 6 tecken och `Max pall > 0` |
 
+Godsdeklaration kopplar orderrader via `Detalj Kundorder.Order nr` till `Orderoversikt.Ordernr`. `Orderoversikt.Alt adress` ar adressnumret som matchas mot `Alternativ leveransadress.Adr num` tillsammans med kundnumret. Flodet filtrerar forst bort artiklar som saknar `DG` eller `LQ` i `item_security_info.Farligt gods nivå`. DG-rader ar alltid klara. LQ-rader ar bara klara nar den alternativa leveransadressens `Post nr` ligger i Gotlandsintervallet 62000-62499. Resultatet visar `Klara ordernummer`, `Klara rader`, `LQ ej klara` och en liten referenstabell for Gotlands postnummerintervall.
+
 Forecastmotorn ligger fristaende i Flow under `warehouse_tools/mg_forecast/`. Den anvander ingen runtime-sokvag till det gamla forecastprojektet och laddar en paketerad kalibreringsartefakt (`calibration.pkl`) sa Render/prod inte behover lokal raw historik for att prediktera. Forecast-resultatet sparas som tabell i serversessionen, och Ytgenerering anvander den DataFrame-tabellen direkt for snabbaste mojliga kedja. En temporar JSON-artifact finns kvar som fallback/metadata, men anvandaren behover aldrig ladda upp en mellanfil. Om orderoversikten saknar transportor pa en sandning anvander Forecast default-transportoren `Schenker` internt for modellens transportorsignal, men resultatet och Ytgenerering far transportoren `Okand` sa fallbacken inte styr ytregler. Ytgenerering cachar ocksa den fardigfiltrerade `location`-ytlistan per filversion. Nar en ny `location`-karnfil laddas upp rensas den gamla location-cachen och den nya ytlistan forvarms direkt, sa upprepade placeringar slipper lasa och filtrera lagerplatser igen utan att riskera gammalt underlag.
 
 Ytgenerering sorterar transportorer efter total pallplatsbehov for att ge ett stabilt flode och en transportorsoversikt. Placeringen sker fortfarande per sandning: en lagerplats delas aldrig mellan flera sandningar, och en sandning kan spanna over flera lagerplatser om forecasten kraver mer kapacitet an en enskild yta har. Nar alla sandningar ar placerade och Forecast-resultatet innehaller `Ordernummer` skapas ocksa `ASK-import order/yta` och laddas ner automatiskt som `v_ask_order_overview_order_set_area_execute_command.csv`. Importfilen ar tabbseparerad med kolumnerna `area_num`, `company`, `order_num`, `pick_zone`; `area_num` innehaller sandningens UTL-ytor kommaseparerade, `company` ar `MG` och `pick_zone` ar `A`.
 
-Dolda/tekniska floden finns for observations-update, observations-sync och update-check. Observations kan aven triggas automatiskt nar ny buffertfil laggs in. Observations och den framraknade karnfilen `artikel_max.csv` ar verksamhetsseparerade: Stigamo anvander legacy-filerna i `lowfreqdata/buffertpall/`, medan R3 anvander egna filer under `lowfreqdata/buffertpall/r3/`. En R3-uppladdning ska darfor inte andra Stigamos observations- eller artikel_max-underlag, och tvartom.
+Dolda/tekniska floden finns for observations-update, observations-sync och update-check. Observations kan aven triggas automatiskt nar ny buffertfil laggs in. Observations och den framraknade sammanstallda datan `artikel_max.csv` ar verksamhetsseparerade: Stigamo anvander legacy-filerna i `lowfreqdata/buffertpall/`, medan R3 anvander egna filer under `lowfreqdata/buffertpall/r3/`. En R3-uppladdning ska darfor inte andra Stigamos observations- eller artikel_max-underlag, och tvartom.
 
 For Super User foljer lagerverktygens verksamhet sidebarens omradestoggle. R3-toggle skriver/laser R3:s observations, `artikel_max.csv` och coredata; Stigamo-omraden som GG/MG/AS/EH skriver/laser Stigamo. `∞` faller tillbaka till Super User-kontots egen verksamhet.
 
@@ -114,7 +121,7 @@ For Allokering visas huvudtabellen `Allokerade pallar` som en vanlig resultattab
 
 Pallplatser foljer Allokeras berakning: zon `R` raknas som `autostore`, zon `F` raknas separat som `HIB` med 20 rader per toppall, och `Topp Pallar`, `Totalt Pallar` och `Pallplatser` inkluderar HIB-delen.
 
-For Ordersaldo kopieras listan `Kompletta ordrar` till urklipp direkt nar flodet ar klart. Tabellen `Underskott` far kolumnen `Antal pa Helpall` fran `artikel_max.csv`; om anvandaren inte laddar upp en egen fil anvands karnfilen for anvandarens verksamhet.
+For Ordersaldo kopieras listan `Kompletta ordrar` till urklipp direkt nar flodet ar klart. Tabellen `Underskott` far kolumnen `Antal pa Helpall` fran `artikel_max.csv`; om anvandaren inte laddar upp en egen fil anvands verksamhetens sammanstallda data. For Godsdeklaration kopieras tabellen `Klara ordernummer` pa samma satt nar flodet ar klart.
 
 ## CLI och paritytester
 
@@ -143,8 +150,9 @@ python -m tools.compare_warehouse_results --left .\Resultat.csv --right .\tmp6jj
 | "Varfor hamnar filen i fel ruta?" | Automatisk detektion bygger pa filnamn/header. Anvand Välj pa exakt slot for att styra. |
 | "Varfor ser jag inte Bearbeta i menyn?" | Rollen saknar normalt `allocationProcess=edit`. Be admin/Super User kontrollera Vybehorigheter. |
 | "Varfor oppnas inte Excel?" | Funktionen kraver lokal desktop/OS-stod och servern maste ha kvar resultat-sessionen. Om servern startade om med `--reload`, kor flodet igen. Om Windows/Excel inte kan oppna filen automatiskt visas feltoast; testa Ladda ner CSV. |
-| "Vad betyder karnfil?" | En karnfil ar permanent serverdata for anvandarens verksamhet. `artikel_max.csv` och coredata-filer som `item_option` kan anvandas aven om anvandaren inte laddat upp en lokal fil i sessionen. |
+| "Vad betyder karnfil?" | En karnfil ar permanent serverdata for anvandarens verksamhet. `artikel_max.csv` ar sammanstalld data, medan coredata-filer som `item_option` ar karnfiler. Bada kan anvandas aven om anvandaren inte laddat upp en lokal fil i sessionen. |
 | "Vad hander om jag laddar upp ny item_option?" | Den gamla `item_option`-filen for din verksamhet tas bort och den nya blir sanningen. R3, Stigamo och framtida verksamheter paverkar inte varandra. |
+| "Vad hander om jag laddar upp ny artikel sakerhetsinformation?" | Den gamla `item_security_info`-filen for din verksamhet tas bort och den nya anvands av Godsdeklaration. Andra karnfiler, till exempel `item_option`, rors inte. |
 | "Vad hander om jag laddar upp nya lagerplatser/location?" | Den gamla `location`-filen for verksamheten tas bort, location-cachen rensas och den nya fardigfiltrerade ytlistan byggs direkt for Ytgenerering. |
 
 ## Kallor

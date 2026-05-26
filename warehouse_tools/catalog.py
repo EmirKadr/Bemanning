@@ -60,7 +60,7 @@ CATALOG_FLOWS: list[dict] = [
         "inputs": [
             {"key": "orders", "label": "Detalj Kundorder(alla)", "type": "file", "required": True, "detect": ["orders"]},
             {"key": "saldo", "label": "Saldo ink. Automation (Utbeställt)", "type": "file", "required": False, "detect": ["automation"]},
-            {"key": "max_csv", "label": "artikel_max.csv (kärnfil)", "type": "file", "required": False, "detect": []},
+            {"key": "max_csv", "label": "artikel_max.csv (sammanställd data)", "type": "file", "required": False, "detect": []},
         ],
     },
     {
@@ -70,7 +70,7 @@ CATALOG_FLOWS: list[dict] = [
         "description": "Identifiera LYX-artiklar utifrån en saldofil och artikel_max-referens.",
         "inputs": [
             {"key": "saldo", "label": "Saldofil", "type": "file", "required": True, "detect": ["automation", "buffer"]},
-            {"key": "max_csv", "label": "artikel_max.csv (kärnfil)", "type": "file", "required": False, "detect": []},
+            {"key": "max_csv", "label": "artikel_max.csv (sammanställd data)", "type": "file", "required": False, "detect": []},
         ],
     },
     {
@@ -82,7 +82,7 @@ CATALOG_FLOWS: list[dict] = [
             {"key": "orders", "label": "Detalj Kundorder(alla)", "type": "file", "required": True, "detect": ["orders"]},
             {"key": "saldo", "label": "Saldo ink. Automation", "type": "file", "required": False, "detect": ["automation"]},
             {"key": "overview", "label": "Orderöversikt (lastningsfönster)", "type": "file", "required": False, "detect": ["overview"]},
-            {"key": "max_csv", "label": "artikel_max.csv (kärnfil)", "type": "file", "required": False, "detect": []},
+            {"key": "max_csv", "label": "artikel_max.csv (sammanställd data)", "type": "file", "required": False, "detect": []},
         ],
     },
     {
@@ -114,6 +114,20 @@ CATALOG_FLOWS: list[dict] = [
             {"key": "overview", "label": "Orderöversikt", "type": "file", "required": True, "detect": ["overview"]},
             {"key": "dispatch", "label": "Dispatchpallar", "type": "file", "required": True, "detect": ["dispatch"]},
             {"key": "details", "label": "Detalj Kundorder(alla) (kundnamn)", "type": "file", "required": False, "detect": ["orders"]},
+        ],
+    },
+    {
+        "id": "goods-declaration",
+        "label": "Godsdeklaration",
+        "category": "Kontroller",
+        "description": "Kontrollera DG/LQ-artiklar mot artikel säkerhetsinformation och Gotlandsadresser för sjö/hav.",
+        "inputs": [
+            {"key": "orders", "label": "Detalj Kundorder(alla)", "type": "file", "required": True, "detect": ["orders"]},
+            {"key": "overview", "label": "Orderöversikt (adressnummer)", "type": "file", "required": True, "detect": ["overview"]},
+            {"key": "custom_adr", "label": "Alternativ leveransadress", "type": "file", "required": True, "detect": ["custom_adr"]},
+        ],
+        "coredata": [
+            {"key": "item_security_info", "label": "Artikel säkerhetsinformation", "required": True},
         ],
     },
     {
@@ -190,6 +204,7 @@ DATA_POOL: list[dict] = [
     {"key": "saldo", "label": "Saldo ink. Automation", "detect": ["automation"]},
     {"key": "overview", "label": "Orderöversikt", "detect": ["overview"]},
     {"key": "dispatch", "label": "Dispatchpallar", "detect": ["dispatch"]},
+    {"key": "custom_adr", "label": "Alternativ leveransadress", "detect": ["custom_adr"]},
     {"key": "items", "label": "Item option", "detect": ["item"]},
     {"key": "not_putaway", "label": "Ej inlagrade", "detect": ["not_putaway", "wms_booking"]},
     {"key": "prognos", "label": "Prognosfil", "detect": ["prognos"]},

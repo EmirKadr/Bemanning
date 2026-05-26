@@ -1,13 +1,13 @@
 ---
 title: Produktivitet
 status: aktiv
-updated: 2026-05-25
+updated: 2026-05-26
 tags: [produktivitet, filer, kpi, ui]
 ---
 
 # Produktivitet
 
-Kort svar: Produktivitet analyserar stora lokala CSV-loggar i klienten och kombinerar dem med permanenta KPI-mal fran servern. KPI-malet ar en verksamhetsseparerad karnfil: Stigamo, R3 och framtida verksamheter har samma filtyp men egna data. Tre synliga loggar kravs lokalt: Plocklogg, Translogg och Palllastningslogg. Atkomst styrs via Vybehorigheter for `productivity`, inte via hard Super User-krav.
+Kort svar: Produktivitet analyserar stora lokala CSV-loggar i klienten och kombinerar dem med permanenta KPI-mal fran servern. KPI-malet ar en verksamhetsseparerad karnfil: Stigamo, R3 och framtida verksamheter har samma filtyp men egna data. Tre synliga loggar kravs lokalt: Plocklogg, Translogg och Palllastningslogg. Nar en sadan logg laddas upp uppdaterar backend samtidigt verksamhetens sammanstallda csv.gz-observationer for samma loggtyp. Atkomst styrs via Vybehorigheter for `productivity`, inte via hard Super User-krav.
 
 ## Behorighet
 
@@ -29,10 +29,22 @@ Rollen behover minst `productivity=view` for att oppna sidan och lasa status/KPI
 
 | Nyckel | Label | Prefix/header-hints | Var sparas |
 | --- | --- | --- | --- |
-| `pick` | Plocklogg | `v_ask_pick_log_full`, headers `Zon`, `Plockat`, `Anvandare`, `Andrad`, `Bolag` | IndexedDB lokalt |
-| `trans` | Translogg | `v_ask_trans_log`, headers `Pallid`, `Fran`, `Till`, `Antal`, `Timestamp` | IndexedDB lokalt |
-| `pallet` | Palllastningslogg | `v_ask_palletloading_log`, headers `Plockpallsnr.`, `Palltyp`, `Pallplacering`, `Transnr.`, `Vikt` | IndexedDB lokalt |
+| `pick` | Plocklogg | `v_ask_pick_log_full`, headers `Zon`, `Plockat`, `Anvandare`, `Andrad`, `Bolag` | IndexedDB lokalt + `productivity_pick_observations` |
+| `trans` | Translogg | `v_ask_trans_log`, headers `Pallid`, `Fran`, `Till`, `Antal`, `Timestamp` | IndexedDB lokalt + `productivity_trans_observations` |
+| `pallet` | Palllastningslogg | `v_ask_palletloading_log`, headers `Plockpallsnr.`, `Palltyp`, `Pallplacering`, `Transnr.`, `Vikt` | IndexedDB lokalt + `productivity_pallet_observations` |
 | `kpi` | KPI-mal | `v_ask_kpi_target`, headers `Flodesnamn`, `Processnamn`, `Beskrivning`, `Rader`, `Kollin` | Server/permanent verksamhetskatalog |
+
+## Sammanstallda loggar
+
+Plocklogg, Translogg och Palllastningslogg har varsin sammanstalld csv.gz-fil i verksamhetens `data/coredata/<verksamhetskod>/`:
+
+- `v_ask_pick_log_full_observations.csv.gz` for Plocklogg.
+- `v_ask_trans_log_observations.csv.gz` for Translogg.
+- `v_ask_palletloading_log_observations.csv.gz` for Palllastningslogg.
+
+Flodet liknar `artikel_max.csv`: ny uppladdad logg bevaras lokalt for aktuell klient men skickas ocksa till `/api/productivity/files/raw`, dar backend lagger till nya observationer i den verksamhetsscopeade csv.gz-filen. Plocklogg dedupliceras pa `Radid` (katalogens kolumn-id `rowid`) och Translogg pa `Rowid`, inklusive dubbletter i samma upload. Palllastningslogg anvander i stallet en strikt timestamp-grans pa `Ändrad`/`timestamp`: bara rader nyare an senaste timestampen som redan finns laggs till. Nya palllastningsrader med samma timestamp i samma upload far vara dubbletter.
+
+De tre sammanstallda filerna visas under `Sammanstalld data` i Uppladdningar och `/api/coredata/files`. De blandas aldrig mellan verksamheter.
 
 ## Karnfiler och verksamhet
 
@@ -56,11 +68,12 @@ Vissa anvandare exkluderas hardkodat i frontend/backendlogik for specifika grupp
 ## Tekniskt flode
 
 1. `productivity_uploads.js` sparar synliga loggar lokalt i IndexedDB.
-2. KPI-fil laddas upp via `/api/productivity/files/raw` och sparas server-side i anvandarens verksamhetskatalog.
-3. `productivity.js` laser lokala filer radvis i browsern, bygger dataset och hamtar verksamhetens KPI-mal via `/api/productivity/targets`.
-4. Rapport for vald dag byggs lokalt och cachas. Intilliggande datum kan forhamtas.
-5. Backend har motsvarande service for serverklassning/status och permanenta KPI-mal.
-6. Serverhanterade uppladdningar/rensningar via `/api/productivity/files*` auditloggas som `productivity_file` med filtyp, antal forsokta, antal sparade och antal okanda filer. Om uppladdningen kraschar innan svar loggas `upload_failed` med feltyp och eventuell HTTP-status. Privata filnamn sparas inte i auditloggen.
+2. Samma loggfil skickas ocksa till `/api/productivity/files/raw`; backend uppdaterar ratt sammanstalld csv.gz-fil om filtypen ar Plocklogg, Translogg eller Palllastningslogg.
+3. KPI-fil laddas upp via `/api/productivity/files/raw` och sparas server-side i anvandarens verksamhetskatalog.
+4. `productivity.js` laser lokala filer radvis i browsern, bygger dataset och hamtar verksamhetens KPI-mal via `/api/productivity/targets`.
+5. Rapport for vald dag byggs lokalt och cachas. Intilliggande datum kan forhamtas.
+6. Backend har motsvarande service for serverklassning/status, permanenta KPI-mal och sammanstallda produktivitetsloggar.
+7. Serverhanterade uppladdningar/rensningar via `/api/productivity/files*` auditloggas som `productivity_file` med filtyp, antal forsokta, antal sparade och antal okanda filer. Om uppladdningen kraschar innan svar loggas `upload_failed` med feltyp och eventuell HTTP-status. Privata filnamn sparas inte i auditloggen.
 
 ## Felsokningssvar for framtida chat
 
@@ -70,6 +83,7 @@ Vissa anvandare exkluderas hardkodat i frontend/backendlogik for specifika grupp
 | "Varfor ar nasta/foregaende datum disabled?" | Datasetet har inget tillgangligt datum i den riktningen. |
 | "Varfor kanner appen inte igen filen?" | Filnamnet maste matcha prefix eller header-raden maste innehalla forvantade kolumner. |
 | "Varfor syns KPI inte som fil jag kan rensa?" | KPI-mal ar permanent serverdata for verksamheten, inte lokal loggfil. |
+| "Varfor star det 0 nya rader for sammanstalld data?" | Loggen var igenkand, men alla rowid/timestamps fanns redan i verksamhetens sammanstallda fil. |
 | "Varfor skiljer Produktivitet fran annan anvandares dator?" | De stora loggfilerna ar lokala per klient; KPI-mal ar gemensamt inom verksamheten. |
 
 ## Kallor

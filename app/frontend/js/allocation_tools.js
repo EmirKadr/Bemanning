@@ -67,6 +67,7 @@ const ALLOCATION_FILE_WORDS = {
   buffer: ["v_ask_article_buffertpallet", "v_ask_article_bufferpallet", "article_buffertpallet", "article_bufferpallet", "buffertpall", "buffertpallet", "bufferpall", "bufferpallet"],
   overview: ["v_ask_order_overview", "order_overview", "orderoversikt"],
   dispatch: ["v_ask_dispatch_pallet", "dispatch_pallet", "dispatchpall"],
+  custom_adr: ["v_ask_custom_adr", "custom_adr", "alternativ leveransadress"],
   saldo: ["v_ask_item_summary_stock_automation", "item_summary_stock_automation", "saldo ink", "automation"],
   items: ["item_option", "item option"],
   max_csv: ["artikel_max", "article_max"],
@@ -97,6 +98,7 @@ const ALLOCATION_SLOT_LABELS = {
   buffer: "Buffertpallar",
   overview: "Orderöversikt",
   dispatch: "Dispatchpallar",
+  custom_adr: "Alternativ leveransadress",
   saldo: "Saldo ink. Automation",
   items: "Item option",
   not_putaway: "Ej inlagrade",
@@ -111,7 +113,7 @@ const ALLOCATION_SLOT_LABELS = {
   values_file: "Textfil med värden",
 };
 const ALLOCATION_SLOT_ORDER = [
-  "orders", "buffer", "overview", "dispatch", "saldo", "items", "not_putaway",
+  "orders", "buffer", "overview", "dispatch", "custom_adr", "saldo", "items", "not_putaway",
   "prognos", "campaign", "max_csv", "wms_booking", "wms_trans", "wms_pick",
   "productivity_pallet", "remote_file", "values_file",
 ];
@@ -123,12 +125,13 @@ const ALLOCATION_PRODUCTIVITY_KEYS = {
   wms_trans: "trans",
   productivity_pallet: "pallet",
 };
-const ALLOCATION_COREDATA_UPLOAD_SPECS = [
+const ALLOCATION_PERSISTENT_DATA_UPLOAD_SPECS = [
   { key: "article_max", prefix: "artikel_max" },
   { key: "article_max", prefix: "article_max" },
   { key: "item_attribute", prefix: "item_attribute" },
   { key: "kpi_target_rule", prefix: "kpi_target_rule" },
   { key: "location_cost", prefix: "location_cost" },
+  { key: "item_security_info", prefix: "item_security_info" },
   { key: "item_option", prefix: "item_option" },
   { key: "pallet_type", prefix: "pallet_type" },
   { key: "item_alias", prefix: "item_alias" },
@@ -137,25 +140,30 @@ const ALLOCATION_COREDATA_UPLOAD_SPECS = [
   { key: "custom", prefix: "custom" },
   { key: "item", prefix: "item" },
 ];
-const ALLOCATION_COREDATA_SLOT_TYPES = {
+const ALLOCATION_PERSISTENT_DATA_SLOT_TYPES = {
   max_csv: "article_max",
   items: "item_option",
   custom: "custom",
   dimension: "dimension",
   item: "item",
   item_alias: "item_alias",
+  item_security_info: "item_security_info",
   item_option: "item_option",
   location: "location",
   location_cost: "location_cost",
   pallet_type: "pallet_type",
 };
-const ALLOCATION_COREDATA_DISPLAY_ORDER = [
+const ALLOCATION_PERSISTENT_DATA_DISPLAY_ORDER = [
   "article_max",
+  "productivity_pick_observations",
+  "productivity_trans_observations",
+  "productivity_pallet_observations",
   "custom",
   "dimension",
   "item",
   "item_alias",
   "item_attribute",
+  "item_security_info",
   "item_option",
   "kpi_target_rule",
   "location",
@@ -163,13 +171,17 @@ const ALLOCATION_COREDATA_DISPLAY_ORDER = [
   "pallet_type",
   "kpi",
 ];
-const ALLOCATION_COREDATA_LABELS = {
+const ALLOCATION_PERSISTENT_DATA_LABELS = {
   article_max: "artikel_max.csv",
+  productivity_pick_observations: "Plocklogg sammanställd data",
+  productivity_trans_observations: "Translogg sammanställd data",
+  productivity_pallet_observations: "Palllastningslogg sammanställd data",
   custom: "Custom",
   dimension: "Dimension",
   item: "Item",
   item_alias: "Item alias",
   item_attribute: "Item attribute",
+  item_security_info: "Artikel säkerhetsinformation",
   item_option: "Item option",
   kpi_target_rule: "KPI target rule",
   location: "Location",
@@ -177,13 +189,54 @@ const ALLOCATION_COREDATA_LABELS = {
   pallet_type: "Pallet type",
   kpi: "KPI-Mål",
 };
-const ALLOCATION_CORE_FILES = {
-  max_csv: {
-    name: "artikel_max.csv",
-    badge: "Kärnfil",
-    sizeLabel: "Kärnfil",
+const ALLOCATION_COMPILED_DATA_KEYS = new Set([
+  "article_max",
+  "productivity_pick_observations",
+  "productivity_trans_observations",
+  "productivity_pallet_observations",
+]);
+const ALLOCATION_COMPILED_DATA_LABEL = "Sammanställd data";
+const ALLOCATION_CORE_DATA_LABEL = "Kärnfil";
+const ALLOCATION_AUTO_COPY_COLUMN_RULES = {
+  ordersaldo: {
+    tableKey: "complete",
+    emptyToast: "Inga kompletta ordrar att kopiera",
+    successLabel: "kompletta ordrar",
+    errorToast: "Kunde inte kopiera kompletta ordrar.",
+  },
+  "goods-declaration": {
+    tableKey: "clear_orders",
+    emptyToast: "Inga klara ordernummer att kopiera",
+    successLabel: "klara ordernummer",
+    errorToast: "Kunde inte kopiera klara ordernummer.",
   },
 };
+const ALLOCATION_PERSISTENT_DATA_FILES = {
+  max_csv: {
+    name: "artikel_max.csv",
+    badge: ALLOCATION_COMPILED_DATA_LABEL,
+    sizeLabel: ALLOCATION_COMPILED_DATA_LABEL,
+    suffixLabel: "sammanställd data",
+    kind: "compiled_data",
+  },
+};
+
+function allocationDataKindForKey(key, entry = {}) {
+  return entry.kind || (ALLOCATION_COMPILED_DATA_KEYS.has(key) ? "compiled_data" : "coredata");
+}
+
+function allocationDataBadge(kind) {
+  return kind === "compiled_data" ? ALLOCATION_COMPILED_DATA_LABEL : ALLOCATION_CORE_DATA_LABEL;
+}
+
+function allocationDataSuffixLabel(key, entry = {}) {
+  return allocationDataKindForKey(key, entry) === "compiled_data" ? "sammanställd data" : "kärnfil";
+}
+
+function allocationDataMissingText(kind) {
+  return kind === "compiled_data" ? "Ingen sammanställd data för verksamheten" : "Ingen kärnfil för verksamheten";
+}
+
 const ALLOCATION_COPY_ICON = `
   <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
     <rect x="8" y="8" width="10" height="10" rx="2"></rect>
@@ -230,32 +283,36 @@ function allocationSlotLabel(key) {
   return ALLOCATION_SLOT_LABELS[allocationLogicalKey(key)] || key;
 }
 
-function allocationCoreDataFile(key) {
+function allocationPersistentStatusFile(key) {
   const logicalKey = allocationLogicalKey(key);
-  const fileType = ALLOCATION_COREDATA_SLOT_TYPES[logicalKey] || logicalKey;
+  const fileType = ALLOCATION_PERSISTENT_DATA_SLOT_TYPES[logicalKey] || logicalKey;
   const entry = fileType ? allocationState.coredata?.files?.[fileType] : null;
   if (!entry?.uploaded) return null;
+  const kind = allocationDataKindForKey(fileType, entry);
+  const badge = allocationDataBadge(kind);
   return {
     name: entry.name || `${entry.prefix || fileType}.csv`,
-    badge: "KÃ¤rnfil",
-    sizeLabel: "KÃ¤rnfil",
+    badge,
+    sizeLabel: badge,
+    suffixLabel: allocationDataSuffixLabel(fileType, { kind }),
+    kind,
   };
 }
 
-function allocationCoreDataBackedSlotIsHidden(key) {
+function allocationPersistentDataBackedSlotIsHidden(key) {
   const logicalKey = allocationLogicalKey(key);
   if (allocationState.files[logicalKey]) return false;
-  return Boolean(allocationCoreDataFile(logicalKey));
+  return Boolean(allocationPersistentStatusFile(logicalKey));
 }
 
-function allocationCoreFile(key) {
+function allocationPersistentDataFile(key) {
   const logicalKey = allocationLogicalKey(key);
-  return allocationCoreDataFile(logicalKey) || ALLOCATION_CORE_FILES[logicalKey] || null;
+  return allocationPersistentStatusFile(logicalKey) || ALLOCATION_PERSISTENT_DATA_FILES[logicalKey] || null;
 }
 
 function allocationDisplayFile(key) {
   const logicalKey = allocationLogicalKey(key);
-  return allocationState.files[logicalKey] || allocationCoreFile(logicalKey);
+  return allocationState.files[logicalKey] || allocationPersistentDataFile(logicalKey);
 }
 
 function allocationFileMetadata(entry) {
@@ -609,18 +666,22 @@ function allocationFileSize(size) {
   return `${Math.round(size / 1024 / 102.4) / 10} MB`;
 }
 
-function allocationDisplaySizeLabel(entry, coreEntry) {
+function allocationDisplaySizeLabel(entry, persistentEntry) {
   if (entry) return allocationFileSize(entry.size);
-  return coreEntry?.sizeLabel || "";
+  return persistentEntry?.sizeLabel || "";
 }
 
-function allocationCoreDataItems() {
+function allocationPersistentDataItems() {
   const files = allocationState.coredata?.files || {};
-  return ALLOCATION_COREDATA_DISPLAY_ORDER.map((key) => {
+  return ALLOCATION_PERSISTENT_DATA_DISPLAY_ORDER.map((key) => {
     const entry = files[key] || {};
+    const kind = allocationDataKindForKey(key, entry);
     return {
       key,
-      label: ALLOCATION_COREDATA_LABELS[key] || entry.label || key,
+      label: ALLOCATION_PERSISTENT_DATA_LABELS[key] || entry.label || key,
+      kind,
+      badge: allocationDataBadge(kind),
+      missingText: allocationDataMissingText(kind),
       uploaded: Boolean(entry.uploaded),
       name: entry.name || "",
       sizeLabel: entry.size_label || "",
@@ -803,7 +864,7 @@ function productivitySharedUploadCandidates(files) {
 function classifyAllocationCoreDataFile(file) {
   const stem = String(file?.name || "").toLowerCase().replace(/\.[^.]+$/, "");
   if (!stem) return null;
-  for (const spec of ALLOCATION_COREDATA_UPLOAD_SPECS) {
+  for (const spec of ALLOCATION_PERSISTENT_DATA_UPLOAD_SPECS) {
     if (
       stem === spec.prefix
       || stem.startsWith(`${spec.prefix}-`)
@@ -891,6 +952,9 @@ async function routeAllocationFiles(files, slots, options = {}) {
       }
     }
     productivityResult = await routeProductivityFilesFromSharedUpload(dropped);
+    if ((productivityResult.compiledUpdated || []).length) {
+      await loadAllocationCoreDataStatus();
+    }
   } finally {
     const uploadedNames = new Set([
       ...assigned.map((item) => item.file?.name || ""),
@@ -992,7 +1056,7 @@ function currentAllocationSlots() {
 
 function visibleUploadFileSlots(slots) {
   if (allocationState.page !== "uploads") return slots;
-  return slots.filter((slot) => !allocationCoreDataBackedSlotIsHidden(slot.key));
+  return slots.filter((slot) => !allocationPersistentDataBackedSlotIsHidden(slot.key));
 }
 
 function flowById(id) {
@@ -1006,9 +1070,9 @@ function combinedAllocationFlows() {
 function allocationFileRows(slots) {
   return slots.map((slot) => {
     const entry = allocationState.files[slot.key];
-    const coreEntry = entry ? null : allocationCoreFile(slot.key);
-    const displayEntry = entry || coreEntry;
-    const sizeLabel = allocationDisplaySizeLabel(entry, coreEntry);
+    const persistentEntry = entry ? null : allocationPersistentDataFile(slot.key);
+    const displayEntry = entry || persistentEntry;
+    const sizeLabel = allocationDisplaySizeLabel(entry, persistentEntry);
     const inputId = `allocation-file-${slot.key}`;
     return `
       <div class="allocation-file-slot ${displayEntry ? "filled" : ""}" data-allocation-drop data-drop-slot="${allocationEscape(slot.key)}">
@@ -1017,7 +1081,7 @@ function allocationFileRows(slots) {
           <p>${displayEntry ? `${allocationEscape(displayEntry.name)} ${sizeLabel ? `<span>${allocationEscape(sizeLabel)}</span>` : ""}` : "Ingen fil vald"}</p>
         </div>
         <div class="allocation-file-actions">
-          <span class="allocation-file-badge">${entry ? "Inlagd" : coreEntry ? coreEntry.badge : "Ej fil"}</span>
+          <span class="allocation-file-badge">${entry ? "Inlagd" : persistentEntry ? persistentEntry.badge : "Ej fil"}</span>
           <label class="button-like" for="${inputId}">Välj</label>
           <input id="${inputId}" type="file" hidden data-slot="${allocationEscape(slot.key)}" />
           <button type="button" class="ghost danger" data-clear-slot="${allocationEscape(slot.key)}" ${entry ? "" : "disabled"}>×</button>
@@ -1108,7 +1172,7 @@ function renderUploadsView() {
       ${allocationState.status ? `<p class="allocation-status">${allocationEscape(allocationState.status)}</p>` : ""}
       <div class="allocation-file-grid">${allocationFileRows(slots)}</div>
     </section>
-    ${renderCoreDataFilesView()}
+    ${renderPersistentDataFilesView()}
   `);
   document.getElementById("allocation-upload-all")?.addEventListener("change", async (event) => {
     await routeAllocationFiles(event.target.files, slots);
@@ -1122,14 +1186,12 @@ function renderUploadsView() {
   });
 }
 
-function renderCoreDataFilesView() {
-  const items = allocationCoreDataItems();
-  if (!items.length) return "";
+function renderPersistentDataGroup(title, items) {
   const uploaded = items.filter((item) => item.uploaded).length;
   return `
     <section class="allocation-panel allocation-coredata-panel" data-allocation-drop>
       <div class="allocation-panel-head">
-        <h2>Kärnfiler</h2>
+        <h2>${allocationEscape(title)}</h2>
         <div><span class="allocation-muted">${uploaded}/${items.length} finns</span></div>
       </div>
       <div class="allocation-file-grid compact">
@@ -1139,16 +1201,28 @@ function renderCoreDataFilesView() {
               <h3>${allocationEscape(item.label)}</h3>
               <p>${item.uploaded
                 ? `${allocationEscape(item.name)} ${item.sizeLabel ? `<span>${allocationEscape(item.sizeLabel)}</span>` : ""}`
-                : "Ingen kärnfil för verksamheten"}</p>
+                : allocationEscape(item.missingText)}</p>
             </div>
             <div class="allocation-file-actions">
-              <span class="allocation-file-badge">${item.uploaded ? "Kärnfil" : "Saknas"}</span>
+              <span class="allocation-file-badge">${item.uploaded ? allocationEscape(item.badge) : "Saknas"}</span>
             </div>
           </div>
         `).join("")}
       </div>
     </section>
   `;
+}
+
+function renderPersistentDataFilesView() {
+  const items = allocationPersistentDataItems();
+  if (!items.length) return "";
+  return [
+    { title: ALLOCATION_COMPILED_DATA_LABEL, items: items.filter((item) => item.kind === "compiled_data") },
+    { title: "Kärnfiler", items: items.filter((item) => item.kind !== "compiled_data") },
+  ]
+    .filter((group) => group.items.length)
+    .map((group) => renderPersistentDataGroup(group.title, group.items))
+    .join("");
 }
 
 function slotsForFlow(flow) {
@@ -1162,7 +1236,7 @@ function missingForFlow(flow) {
     return !allocationState.values[input.key];
   });
   for (const input of flow?.coredata || []) {
-    if (input.required && !allocationCoreDataFile(input.key)) missing.push({ ...input, type: "coredata" });
+    if (input.required && !allocationPersistentStatusFile(input.key)) missing.push({ ...input, type: "coredata" });
   }
   if (flow?.requiresSessionFlow && !allocationRequiredSessionId(flow)) {
     missing.push({
@@ -1184,11 +1258,13 @@ function renderFlowFileList(flow) {
       ${fileInputs.map((input) => {
         const key = allocationFileInputKey(input);
         const entry = allocationState.files[key];
-        const coreEntry = entry ? null : allocationCoreFile(key);
-        const displayEntry = entry || coreEntry;
+        const persistentEntry = entry ? null : allocationPersistentDataFile(key);
+        const displayEntry = entry || persistentEntry;
         const cls = displayEntry ? "ok" : input.required ? "missing" : "optional";
         const prefix = displayEntry ? "✓" : input.required ? "✗" : "○";
-        const suffix = coreEntry ? " (kärnfil)" : input.required || displayEntry ? "" : " (valfri)";
+        const suffix = persistentEntry
+          ? ` (${allocationEscape(persistentEntry.suffixLabel || persistentEntry.badge.toLowerCase())})`
+          : input.required || displayEntry ? "" : " (valfri)";
         return `
           <div class="allocation-flow-file ${displayEntry ? "filled" : ""}">
             <span class="allocation-file-tag ${cls}">${prefix} ${allocationEscape(allocationSlotLabel(key))}${suffix}</span>
@@ -1197,13 +1273,14 @@ function renderFlowFileList(flow) {
         `;
       }).join("")}
       ${coreInputs.map((input) => {
-        const entry = allocationCoreDataFile(input.key);
-        const label = input.label || ALLOCATION_COREDATA_LABELS[input.key] || input.key;
+        const entry = allocationPersistentStatusFile(input.key);
+        const label = input.label || ALLOCATION_PERSISTENT_DATA_LABELS[input.key] || input.key;
         const cls = entry ? "ok" : input.required ? "missing" : "optional";
         const prefix = entry ? "✓" : input.required ? "✗" : "○";
+        const suffixLabel = allocationDataSuffixLabel(input.key, entry || {});
         return `
           <div class="allocation-flow-file ${entry ? "filled" : ""}">
-            <span class="allocation-file-tag ${cls}">${prefix} ${allocationEscape(label)} (kärnfil)</span>
+            <span class="allocation-file-tag ${cls}">${prefix} ${allocationEscape(label)} (${allocationEscape(suffixLabel)})</span>
             <span>${entry ? allocationEscape(entry.name) : "Saknas"}</span>
           </div>
         `;
@@ -1293,7 +1370,7 @@ async function runAllocationFlow(flow) {
       allocationState.lastForecastLabel = `${flow.label} ${new Date().toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}`;
     }
     allocationState.status = `Klart: ${flow.label}`;
-    await copyOrdersaldoCompleteOrders(data);
+    await copyAutoFlowColumn(data);
     await downloadAllocationAutoDownloads(data);
   } catch (error) {
     showToast(error.message, "error");
@@ -1321,22 +1398,23 @@ async function downloadAllocationAutoDownloads(data) {
   }
 }
 
-async function copyOrdersaldoCompleteOrders(data) {
-  if (data?.flow_id !== "ordersaldo") return;
-  const completeTable = (data.tables || []).find((entry) => entry.key === "complete");
-  const orderCount = Number(completeTable?.table?.row_count || 0);
+async function copyAutoFlowColumn(data) {
+  const rule = ALLOCATION_AUTO_COPY_COLUMN_RULES[data?.flow_id];
+  if (!rule) return;
+  const targetTable = (data.tables || []).find((entry) => entry.key === rule.tableKey);
+  const orderCount = Number(targetTable?.table?.row_count || 0);
   if (!data.session_id || !orderCount) {
-    showToast("Inga kompletta ordrar att kopiera", "info", 2500);
+    showToast(rule.emptyToast, "info", 2500);
     return;
   }
   try {
     const columnData = await allocationJson(
-      `${ALLOCATION_API}/table-column/${encodeURIComponent(data.session_id)}/complete/0`,
+      `${ALLOCATION_API}/table-column/${encodeURIComponent(data.session_id)}/${encodeURIComponent(rule.tableKey)}/0`,
     );
     await writeClipboardText(columnData.text || "");
-    showToast(`${orderCount} kompletta ordrar kopierade`, "success", 2500);
+    showToast(`${orderCount} ${rule.successLabel} kopierade`, "success", 2500);
   } catch (error) {
-    showToast(error.message || "Kunde inte kopiera kompletta ordrar.", "error", 7000);
+    showToast(error.message || rule.errorToast, "error", 7000);
   }
 }
 
@@ -1945,7 +2023,7 @@ window.addEventListener("flow:uploadsCleared", async () => {
   allocationState.files = await loadStoredAllocationFiles();
   cacheAllocationFileMetadata();
   await loadAllocationCoreDataStatus();
-  allocationState.status = "Vanliga filval rensade. Kärnfiler ligger kvar.";
+  allocationState.status = "Vanliga filval rensade. Kärnfiler och sammanställd data ligger kvar.";
   allocationState.autoStatus = "";
   allocationState.lastBufferSignature = "";
   renderAllocationPage();

@@ -750,6 +750,7 @@ def test_forecast_and_ytgenerering_coredata_defaults_are_business_scoped(monkeyp
 
     forecast_defaults = allocation_router._business_coredata_default_files("forecast", {}, "R3")
     ytgenerering_defaults = allocation_router._business_coredata_default_files("ytgenerering", {}, "R3")
+    goods_declaration_defaults = allocation_router._business_coredata_default_files("goods-declaration", {}, "R3")
 
     assert set(forecast_defaults) == {
         "custom",
@@ -760,7 +761,9 @@ def test_forecast_and_ytgenerering_coredata_defaults_are_business_scoped(monkeyp
         "item_option",
     }
     assert set(ytgenerering_defaults) == {"location"}
+    assert set(goods_declaration_defaults) == {"item_security_info"}
     assert ("location", "R3") in captured
+    assert ("item_security_info", "R3") in captured
     assert all(business_code == "R3" for _file_type, business_code in captured)
 
 
@@ -947,7 +950,7 @@ def test_allocation_catalog_loads_without_pandas_when_started_from_app_root():
     )
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip().split() == ["15", "10"]
+    assert result.stdout.strip().split() == ["16", "11"]
 
 
 def test_native_detector_recognizes_wms_csv_without_pandas(tmp_path):
@@ -971,6 +974,7 @@ def test_native_detector_recognizes_current_upload_filename_hints(tmp_path):
         "v_ask_article_buffertpallet-20260519090645.csv": "buffer",
         "v_ask_booking_putaway-20260519090707.csv": "wms_booking",
         "v_ask_trans_log-20260519051930.csv": "wms_trans",
+        "v_ask_custom_adr-20260526135512.csv": "custom_adr",
         "ej_inlagrade-20260519090707.csv": "not_putaway",
         "not_putaway-20260519090707.csv": "not_putaway",
         "Granngarden prognos kampanjplock +6v.xlsx": "campaign",

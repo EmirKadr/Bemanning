@@ -85,8 +85,8 @@ verksamheter.
 | `allocation.open_excel` | `POST` | `/api/allokering/open-excel` | Öppna lagerverktygsresultat i Excel |
 | `allocation.table_column` | `GET` | `/api/allokering/table-column/{session_id}/{key}/{column_index}` | Hämta resultatkolumn |
 | `allocation.download` | `GET` | `/api/allokering/download/{session_id}/{key}` | Ladda ner Allokering-resultat |
-| `coredata.files` | `GET` | `/api/coredata/files` | Coredata-karnfiler for verksamheten |
-| `coredata.upload_raw` | `POST` | `/api/coredata/files/raw` | Ladda upp coredata-karnfil |
+| `coredata.files` | `GET` | `/api/coredata/files` | Coredata-karnfiler och sammanstalld data for verksamheten |
+| `coredata.upload_raw` | `POST` | `/api/coredata/files/raw` | Ladda upp coredata-karnfil eller sammanstalld datafil |
 | `areas.list` | `GET` | `/api/areas` | Lista områden |
 | `areas.create` | `POST` | `/api/areas` | Skapa område |
 | `areas.update` | `PUT` | `/api/areas/{area_id}` | Uppdatera område |
@@ -147,7 +147,7 @@ verksamheter.
 | `productivity.files` | `GET` | `/api/productivity/files` | Produktivitetsfilstatus |
 | `productivity.targets` | `GET` | `/api/productivity/targets` | Hämta KPI-mål |
 | `productivity.upload` | `POST` | `/api/productivity/files` | Ladda upp produktivitetsfil(er) |
-| `productivity.upload_raw` | `POST` | `/api/productivity/files/raw` | Ladda upp rå produktivitetsfil |
+| `productivity.upload_raw` | `POST` | `/api/productivity/files/raw` | Ladda upp rå produktivitetsfil och uppdatera sammanstallda loggar |
 | `productivity.delete_file` | `DELETE` | `/api/productivity/files/{file_type}` | Ta bort produktivitetsfil |
 | `productivity.report` | `GET` | `/api/productivity` | Produktivitetsrapport |
 | `public.hours` | `GET` | `/api/public/hours` | Publika timmar för dag |

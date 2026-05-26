@@ -1,3 +1,4 @@
+import gzip
 from pathlib import Path
 
 import pytest
@@ -5,18 +6,28 @@ import pytest
 from app.backend.productivity_service import (
     build_productivity_file_status,
     build_productivity_report,
+    build_productivity_compiled_data_status,
     build_productivity_session_file_status,
     classify_productivity_file,
     ProductivitySourceError,
+    productivity_compiled_log_path,
     read_productivity_targets,
     save_productivity_file,
     source_files_from_session_logs,
+    update_productivity_compiled_log,
 )
 
 
 def write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content.strip() + "\n", encoding="utf-8")
+
+
+def read_gzip_csv(path: Path) -> list[dict[str, str]]:
+    with gzip.open(path, "rt", encoding="utf-8") as handle:
+        import csv
+
+        return list(csv.DictReader(handle))
 
 
 def test_productivity_file_status_shows_only_required_user_uploads(tmp_path):
@@ -218,6 +229,145 @@ def test_productivity_session_status_uses_local_logs_and_permanent_kpi(tmp_path)
     assert status["missing"] == []
     assert source_files["pick"] == log_files["pick"]
     assert source_files["kpi"].name.startswith("v_ask_kpi_target")
+
+
+def test_compiled_pick_and_trans_logs_deduplicate_by_rowid(tmp_path):
+    pick_first = tmp_path / "pick-first.csv"
+    pick_second = tmp_path / "pick-second.csv"
+    trans_first = tmp_path / "trans-first.csv"
+    trans_second = tmp_path / "trans-second.csv"
+    write(
+        pick_first,
+        """
+Radid\tZon\tPlockat\tAnvändare\tÄndrad\tVikt\tBolag
+1\tA\t3\tUSER1\t2026-05-18 08:10:00\t1\tGG
+2\tB\t4\tUSER1\t2026-05-18 08:40:00\t1\tGG
+""",
+    )
+    write(
+        pick_second,
+        """
+Radid\tZon\tPlockat\tAnvändare\tÄndrad\tVikt\tBolag
+2\tB\t4\tUSER1\t2026-05-18 08:40:00\t1\tGG
+3\tS\t5\tUSER2\t2026-05-18 09:05:00\t2\tGG
+3\tS\t5\tUSER2\t2026-05-18 09:05:00\t2\tGG
+""",
+    )
+    write(
+        trans_first,
+        """
+rowid\tTill\tAntal\tAnvändare\tTimestamp\tBolag
+T1\tAS100\t9\tDEC1\t2026-05-18 10:30:00\tGG
+""",
+    )
+    write(
+        trans_second,
+        """
+rowid\tTill\tAntal\tAnvändare\tTimestamp\tBolag
+T1\tAS100\t9\tDEC1\t2026-05-18 10:30:00\tGG
+T2\tAS200\t6\tDEC2\t2026-05-18 11:00:00\tMG
+""",
+    )
+
+    first_pick = update_productivity_compiled_log(pick_first, "pick", tmp_path, "R3")
+    second_pick = update_productivity_compiled_log(pick_second, "pick", tmp_path, "R3")
+    update_productivity_compiled_log(trans_first, "trans", tmp_path, "R3")
+    second_trans = update_productivity_compiled_log(trans_second, "trans", tmp_path, "R3")
+
+    assert first_pick["new_rows"] == 2
+    assert second_pick["new_rows"] == 1
+    assert second_pick["total_rows"] == 3
+    assert second_trans["new_rows"] == 1
+
+    pick_rows = read_gzip_csv(productivity_compiled_log_path("pick", tmp_path, "R3"))
+    trans_rows = read_gzip_csv(productivity_compiled_log_path("trans", tmp_path, "R3"))
+    assert [row["Radid"] for row in pick_rows] == ["1", "2", "3"]
+    assert [row["rowid"] for row in trans_rows] == ["T1", "T2"]
+
+
+def test_compiled_pallet_log_uses_timestamp_watermark_and_allows_new_duplicates(tmp_path):
+    first = tmp_path / "pallet-first.csv"
+    second = tmp_path / "pallet-second.csv"
+    third = tmp_path / "pallet-third.csv"
+    write(
+        first,
+        """
+Typ\tAnvändare\tÄndrad\tBolag
+220\tPACK1\t2026-05-18 13:00:00\tGG
+220\tPACK2\t2026-05-18 14:00:00\tGG
+""",
+    )
+    write(
+        second,
+        """
+Typ\tAnvändare\tÄndrad\tBolag
+220\tOLD\t2026-05-18 13:30:00\tGG
+220\tSAME\t2026-05-18 14:00:00\tGG
+220\tNEW1\t2026-05-18 15:00:00\tGG
+220\tNEW1\t2026-05-18 15:00:00\tGG
+""",
+    )
+    write(
+        third,
+        """
+Typ\tAnvändare\tÄndrad\tBolag
+220\tNEW1\t2026-05-18 15:00:00\tGG
+""",
+    )
+
+    first_result = update_productivity_compiled_log(first, "pallet", tmp_path, "STIGAMO")
+    second_result = update_productivity_compiled_log(second, "pallet", tmp_path, "STIGAMO")
+    third_result = update_productivity_compiled_log(third, "pallet", tmp_path, "STIGAMO")
+
+    assert first_result["new_rows"] == 2
+    assert second_result["new_rows"] == 2
+    assert third_result["new_rows"] == 0
+
+    rows = read_gzip_csv(productivity_compiled_log_path("pallet", tmp_path, "STIGAMO"))
+    assert [row["Användare"] for row in rows] == ["PACK1", "PACK2", "NEW1", "NEW1"]
+
+
+def test_compiled_logs_do_not_create_empty_file_when_dedupe_key_is_missing(tmp_path):
+    pick = tmp_path / "pick-without-rowid.csv"
+    pallet = tmp_path / "pallet-without-timestamp.csv"
+    write(
+        pick,
+        """
+Zon\tPlockat\tAnvändare\tÄndrad\tBolag
+A\t3\tUSER1\t2026-05-18 08:10:00\tGG
+""",
+    )
+    write(
+        pallet,
+        """
+Typ\tAnvändare\tBolag
+220\tPACK1\tGG
+""",
+    )
+
+    pick_result = update_productivity_compiled_log(pick, "pick", tmp_path, "R3")
+    pallet_result = update_productivity_compiled_log(pallet, "pallet", tmp_path, "R3")
+
+    assert pick_result["new_rows"] == 0
+    assert pick_result["uploaded"] is False
+    assert pick_result["skipped_reason"] == "saknar rowid/radid"
+    assert pallet_result["new_rows"] == 0
+    assert pallet_result["uploaded"] is False
+    assert pallet_result["skipped_reason"] == "saknar timestamp"
+    assert not productivity_compiled_log_path("pick", tmp_path, "R3").exists()
+    assert not productivity_compiled_log_path("pallet", tmp_path, "R3").exists()
+
+
+def test_compiled_status_lists_all_productivity_observation_files(tmp_path):
+    status = build_productivity_compiled_data_status(tmp_path, "R3")
+
+    assert set(status) == {
+        "productivity_pick_observations",
+        "productivity_trans_observations",
+        "productivity_pallet_observations",
+    }
+    assert all(item["kind"] == "compiled_data" for item in status.values())
+    assert all(item["uploaded"] is False for item in status.values())
 
 
 def test_productivity_report_groups_pick_trans_and_pallet_logs(tmp_path):

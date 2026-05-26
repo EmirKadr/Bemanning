@@ -7,6 +7,30 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-26] feature | Produktivitetsloggar sammanstalls
+
+Produktivitet uppdaterar nu tre verksamhetsscopeade csv.gz-filer nar Plocklogg,
+Translogg eller Palllastningslogg laddas upp. Plocklogg tar nya `Radid`
+(kolumn-id `rowid`) och Translogg nya `Rowid`, medan Palllastningslogg tar
+rader nyare an senaste sparade `Ändrad`/timestamp och tillater dubbletter inom de nya raderna. Uppladdningar visar de
+tre filerna som `Sammanstalld data` ihop med `artikel_max.csv`.
+
+## [2026-05-26] feature | Godsdeklaration i Bearbeta
+
+Bearbeta har fatt flodet `Godsdeklaration`. Flodet anvander Detalj Kundorder,
+Orderoversikt och Alternativ leveransadress ihop med verksamhetens
+`item_security_info`-karnfil. DG-rader blir klara direkt, LQ-rader blir bara
+klara nar adressen gar till Gotlandspostnummer 620-624, och klara ordernummer
+kopieras automatiskt nar korningen ar klar. Ny uppladdad `item_security_info`
+ersatter tidigare fil for samma verksamhet pa samma satt som andra karnfiler.
+
+## [2026-05-26] fix | Artikel_max visas som sammanstalld data
+
+Uppladdningar skiljer nu pa coredata-karnfiler och den framraknade
+`artikel_max.csv`. Artikel_max visas som `Sammanstalld data`, flowkatalogen
+markerar den som `sammanstalld data`, och rensa-alla-texterna sager att bade
+karnfiler och sammanstalld data ligger kvar.
+
 ## [2026-05-26] fix | Forecast laddar paketerad modell i prod
 
 Forecastens prediktering laddar nu en paketerad kalibreringsartefakt i

@@ -18,6 +18,7 @@ def write(path: Path, content: str = "Kolumn\nvarde\n") -> None:
 def test_coredata_classification_prefers_longest_prefix():
     assert classify_coredata_file("item_option-20260525120000.csv") == "item_option"
     assert classify_coredata_file("item_attribute-20260525120000.csv") == "item_attribute"
+    assert classify_coredata_file("item_security_info-20260526135153.csv") == "item_security_info"
     assert classify_coredata_file("item-20260525120000.csv") == "item"
     assert classify_coredata_file("location_cost-20260525120000.csv") == "location_cost"
     assert classify_coredata_file("location-20260525120000.csv") == "location"
@@ -44,6 +45,29 @@ def test_coredata_save_replaces_same_file_type_only_for_business(tmp_path):
     assert r3_existing.exists()
     assert find_coredata_file("item_option", tmp_path, "STIGAMO").read_text(encoding="utf-8").endswith("NEW\n")
     assert find_coredata_file("item_option", tmp_path, "R3") == r3_existing
+
+
+def test_item_security_info_upload_replaces_previous_file_for_business(tmp_path):
+    old_security = tmp_path / "coredata" / "Stigamo" / "item_security_info-20260526135153.csv"
+    item_option = tmp_path / "coredata" / "Stigamo" / "item_option-20260525120000.csv"
+    source = tmp_path / "upload" / "item_security_info-20260527101010.csv"
+    write(old_security, "Artikel\tFarligt gods niv\u00e5\nA1\tDG\n")
+    write(item_option, "Artikel\tPack Klass\nA1\tOLD\n")
+    write(source, "Artikel\tFarligt gods niv\u00e5\nA2\tLQ\n")
+
+    saved = save_coredata_file(
+        source_path=source,
+        filename=source.name,
+        file_type="item_security_info",
+        reference_dir=tmp_path,
+        business_code="STIGAMO",
+    )
+
+    assert saved["name"] == source.name
+    assert saved["kind"] == "coredata"
+    assert not old_security.exists()
+    assert item_option.exists()
+    assert find_coredata_file("item_security_info", tmp_path, "STIGAMO").read_text(encoding="utf-8").endswith("A2\tLQ\n")
 
 
 def test_coredata_save_does_not_delete_other_item_prefixes(tmp_path):
@@ -95,6 +119,7 @@ def test_coredata_status_is_business_scoped_and_uses_existing_directory_case(tmp
 
     assert stigamo["files"]["dimension"]["uploaded"] is True
     assert stigamo["files"]["dimension"]["name"] == stigamo_file.name
+    assert stigamo["files"]["dimension"]["kind"] == "coredata"
     assert stigamo["files"]["location"]["uploaded"] is True
     assert stigamo["files"]["location_cost"]["uploaded"] is True
     assert r3["files"]["dimension"]["uploaded"] is False
@@ -113,11 +138,26 @@ def test_coredata_router_status_includes_business_article_max(monkeypatch, tmp_p
         }
 
     monkeypatch.setattr(coredata_router.bridge, "business_allocation_data_paths", fake_business_paths)
+    monkeypatch.setattr(
+        coredata_router,
+        "build_productivity_compiled_data_status",
+        lambda business_code: {
+            "productivity_pick_observations": {
+                "key": "productivity_pick_observations",
+                "name": "v_ask_pick_log_full_observations.csv.gz",
+                "uploaded": True,
+                "kind": "compiled_data",
+            }
+        },
+    )
 
     status = coredata_router._coredata_status("R3")
 
     assert status["files"]["article_max"]["uploaded"] is True
     assert status["files"]["article_max"]["name"] == "artikel_max.csv"
+    assert status["files"]["article_max"]["kind"] == "compiled_data"
+    assert status["files"]["productivity_pick_observations"]["uploaded"] is True
+    assert status["files"]["productivity_pick_observations"]["kind"] == "compiled_data"
 
 
 def test_coredata_router_saves_article_max_to_business_path(monkeypatch, tmp_path):
@@ -143,6 +183,7 @@ def test_coredata_router_saves_article_max_to_business_path(monkeypatch, tmp_pat
     )
 
     assert saved["name"] == "artikel_max.csv"
+    assert saved["kind"] == "compiled_data"
     assert target.read_text(encoding="utf-8").endswith("NEW,3\n")
     assert not old_variant.exists()
 
