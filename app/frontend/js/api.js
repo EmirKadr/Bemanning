@@ -40,9 +40,15 @@ const CLIENT_ERROR_REPORT_PATH = "/api/audit/client-error";
 const CLIENT_EVENT_REPORT_PATH = "/api/audit/client-event";
 const API_PREFETCH_DEFAULT_TTL_MS = 45 * 1000;
 const API_GET_CACHE_STORAGE_PREFIX = "flow-api-get-cache-v1:";
+const API_NETWORK_ERROR_REPORT_DEDUPE_MS = 60 * 1000;
 const apiGetCache = new Map();
 const apiGetInFlight = new Map();
+const apiNetworkErrorReportLastAt = new Map();
 let apiGetCacheGeneration = 0;
+
+function isAbortError(error) {
+  return error?.name === "AbortError";
+}
 
 function cloneApiCacheValue(value) {
   if (value == null) return value;
@@ -200,6 +206,13 @@ function reportApiError(path, details = {}) {
     detail: errorDetailForReport(details.body) || truncateErrorText(details.detail),
     page_path: pathWithoutQuery(window.location?.pathname || "/"),
   };
+  if (status === 0) {
+    const key = `${payload.method}|${payload.path}|${payload.error_code || "network_error"}|${payload.page_path}`;
+    const now = Date.now();
+    const lastAt = apiNetworkErrorReportLastAt.get(key) || 0;
+    if (now - lastAt < API_NETWORK_ERROR_REPORT_DEDUPE_MS) return;
+    apiNetworkErrorReportLastAt.set(key, now);
+  }
   const body = JSON.stringify(payload);
   fetch(CLIENT_ERROR_REPORT_PATH, {
     method: "POST",
@@ -357,12 +370,15 @@ async function request(path, options = {}) {
   const requestHeaders = isFormData ? headers : { "Content-Type": "application/json", ...headers };
   const method = String(rest.method || "GET").toUpperCase();
   const useGetCache = method === "GET" && !skipCache;
+  const useSharedInFlight = useGetCache && !rest.signal;
   const requestCacheGeneration = apiGetCacheGeneration;
   if (useGetCache) {
     const cached = readApiGetCache(path);
     if (cached !== null) return cached;
-    const inFlight = apiGetInFlight.get(apiCacheKey(path));
-    if (inFlight) return cloneApiCacheValue(await inFlight);
+    if (useSharedInFlight) {
+      const inFlight = apiGetInFlight.get(apiCacheKey(path));
+      if (inFlight) return cloneApiCacheValue(await inFlight);
+    }
   }
 
   const run = async () => {
@@ -374,6 +390,7 @@ async function request(path, options = {}) {
         ...rest,
       });
     } catch (error) {
+      if (isAbortError(error)) throw error;
       const err = connectionError(path, error);
       reportApiError(path, {
         method,
@@ -427,7 +444,7 @@ async function request(path, options = {}) {
     return body;
   };
 
-  if (!useGetCache) return run();
+  if (!useSharedInFlight) return run();
   const promise = run().finally(() => apiGetInFlight.delete(apiCacheKey(path)));
   apiGetInFlight.set(apiCacheKey(path), promise);
   return cloneApiCacheValue(await promise);
@@ -454,6 +471,7 @@ async function download(path, fallbackFilename = "download") {
   try {
     resp = await fetch(path, { credentials: "include" });
   } catch (error) {
+    if (isAbortError(error)) throw error;
     const err = connectionError(path, error);
     reportApiError(path, {
       method,

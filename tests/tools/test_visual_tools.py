@@ -630,6 +630,14 @@ def test_area_focus_toggle_is_wired_to_views():
     assert 'preferredAreaIdFromFocus(state.areas) : null' in overview
     assert "compareActivitiesForAreaFocus(a, b, state.areas, state.currentUser?.area_id)" in schedule
     assert "compareActivitiesForAreaFocus(a, b, state.areas, state.currentUser?.area_id)" in overview
+    assert "const scheduleAreaCache = new Map();" in schedule
+    assert "function scheduleAreaCacheKey" in schedule
+    assert "function renderScheduleFromCache" in schedule
+    assert "setScheduleAreaCache(scheduleAreaCacheKey(requestedAreaId, baseKey), cachedData)" in schedule
+    assert "const overviewAreaCache = new Map();" in overview
+    assert "function overviewAreaCacheKey" in overview
+    assert "function renderOverviewFromCache" in overview
+    assert "setOverviewAreaCache(overviewAreaCacheKey(requestedAreaId, baseKey), cachedData)" in overview
     assert '"flow:areaFocusChanged"' in schedule
     assert '"flow:areaFocusChanged"' in overview
     assert '"flow:areaFocusChanged"' in productivity
@@ -694,7 +702,12 @@ def test_planning_views_cache_all_scope_and_have_top_scrollbars():
     for source, prefix in ((schedule, "Schedule"), (overview, "Overview")):
         assert f"filter{prefix}DataForArea" in source
         assert f"prefetchAll{prefix}" in source
-        assert f"render{prefix}FromAllCache" in source
+        if prefix == "Schedule":
+            assert "renderScheduleFromCache" in source
+            assert "scheduleAreaCache" in source
+        else:
+            assert "renderOverviewFromCache" in source
+            assert "overviewAreaCache" in source
         assert f"invalidate{prefix}AllCache" in source
         assert f"revalidate{prefix}" in source
         assert "function canSortPersonsAcrossAreas" in source
@@ -896,6 +909,11 @@ def test_api_fetch_failures_get_clear_swedish_message():
     api_js = (ROOT / "app" / "frontend" / "js" / "api.js").read_text(encoding="utf-8")
 
     assert "function connectionError" in api_js
+    assert "function isAbortError" in api_js
+    assert "if (isAbortError(error)) throw error;" in api_js
+    assert "API_NETWORK_ERROR_REPORT_DEDUPE_MS" in api_js
+    assert "apiNetworkErrorReportLastAt" in api_js
+    assert "const useSharedInFlight = useGetCache && !rest.signal;" in api_js
     assert "Kunde inte ansluta till servern" in api_js
     assert "Appen måste öppnas via servern" in api_js
     assert "const err = connectionError(path, error)" in api_js

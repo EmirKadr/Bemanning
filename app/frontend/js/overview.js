@@ -52,11 +52,13 @@ const loadState = {
 };
 
 const overviewAllCache = new Map();
+const overviewAreaCache = new Map();
 const overviewAllFetchState = {
   controller: null,
   key: "",
 };
 const OVERVIEW_ALL_CACHE_LIMIT = 4;
+const OVERVIEW_AREA_CACHE_LIMIT = 24;
 const OVERVIEW_REVALIDATE_ACTIVE_MS = 10000;
 const OVERVIEW_REVALIDATE_IDLE_MS = 30000;
 const OVERVIEW_REVALIDATE_SOON_MS = 1500;
@@ -90,6 +92,10 @@ function overviewCacheKey() {
   return `${overviewScopeKey()}|${period}`;
 }
 
+function overviewAreaCacheKey(areaId = state.areaId, baseKey = overviewCacheKey()) {
+  return `${baseKey}|area:${areaId == null ? "ALLT" : Number(areaId)}`;
+}
+
 function overviewUrl(areaId = state.areaId) {
   if (state.view === "week") {
     return `/api/overview?year=${state.year}&week=${state.week}` +
@@ -116,8 +122,17 @@ function setOverviewAllCache(key, data) {
   }
 }
 
+function setOverviewAreaCache(key, data) {
+  overviewAreaCache.delete(key);
+  overviewAreaCache.set(key, data);
+  while (overviewAreaCache.size > OVERVIEW_AREA_CACHE_LIMIT) {
+    overviewAreaCache.delete(overviewAreaCache.keys().next().value);
+  }
+}
+
 function invalidateOverviewAllCache() {
   overviewAllCache.clear();
+  overviewAreaCache.clear();
   overviewAllFetchState.controller?.abort();
   overviewRevalidateState.controller?.abort();
   overviewAllFetchState.controller = null;
@@ -1379,12 +1394,16 @@ function applyOverviewData(data) {
   scheduleNextOverviewRevalidate();
 }
 
-function renderOverviewFromAllCache() {
-  const cached = overviewAllCache.get(overviewCacheKey());
+function renderOverviewFromCache() {
+  const baseKey = overviewCacheKey();
+  const cachedAll = overviewAllCache.get(baseKey);
+  const cached = cachedAll
+    ? filterOverviewDataForArea(cachedAll, state.areaId)
+    : overviewAreaCache.get(overviewAreaCacheKey(state.areaId, baseKey));
   if (!cached) return false;
   loadState.controller?.abort();
   loadState.requestSeq += 1;
-  applyOverviewData(filterOverviewDataForArea(cached, state.areaId));
+  applyOverviewData(cached);
   scheduleNextOverviewRevalidate(500);
   return true;
 }
@@ -1397,9 +1416,11 @@ async function prefetchAllOverview() {
   overviewAllFetchState.controller = controller;
   overviewAllFetchState.key = key;
   try {
-    const data = await api.get(overviewUrl(null), { signal: controller.signal });
+    const data = await api.get(overviewUrl(null), { signal: controller.signal, cacheTtlMs: 25 * 1000 });
     if (controller.signal.aborted) return;
-    setOverviewAllCache(key, filterOverviewDataForArea(data, null));
+    const allData = filterOverviewDataForArea(data, null);
+    setOverviewAllCache(key, allData);
+    setOverviewAreaCache(overviewAreaCacheKey(null, key), allData);
     scheduleNextOverviewRevalidate();
   } catch (err) {
     if (err?.name !== "AbortError") console.warn("Kunde inte forhämta hela översikten", err);
@@ -1444,9 +1465,11 @@ async function revalidateOverview() {
       return;
     }
 
-    const fresh = await api.get(overviewUrl(null), { signal: controller.signal });
+    const fresh = await api.get(overviewUrl(null), { signal: controller.signal, cacheTtlMs: 25 * 1000 });
     if (controller.signal.aborted || key !== overviewCacheKey()) return;
-    setOverviewAllCache(key, filterOverviewDataForArea(fresh, null));
+    const freshAllData = filterOverviewDataForArea(fresh, null);
+    setOverviewAllCache(key, freshAllData);
+    setOverviewAreaCache(overviewAreaCacheKey(null, key), freshAllData);
     const result = patchOverviewFromAllData(fresh);
     notifyOverviewBackgroundUpdate(result.patched ? 1 : 0);
     overviewRevalidateState.errorCount = 0;
@@ -1465,7 +1488,7 @@ async function revalidateOverview() {
 }
 
 async function load() {
-  if (renderOverviewFromAllCache()) {
+  if (renderOverviewFromCache()) {
     void prefetchAllOverview();
     return true;
   }
@@ -1476,19 +1499,27 @@ async function load() {
   try {
 
   if (state.view === "week") {
-    const data = await api.get(overviewUrl(state.areaId), { signal: controller.signal });
+    const requestedAreaId = state.areaId;
+    const data = await api.get(overviewUrl(requestedAreaId), { signal: controller.signal, cacheTtlMs: 25 * 1000 });
     if (controller.signal.aborted || requestSeq !== loadState.requestSeq) return false;
-    if (state.areaId == null) {
-      setOverviewAllCache(overviewCacheKey(), filterOverviewDataForArea(data, null));
+    const baseKey = overviewCacheKey();
+    const cachedData = filterOverviewDataForArea(data, requestedAreaId);
+    setOverviewAreaCache(overviewAreaCacheKey(requestedAreaId, baseKey), cachedData);
+    if (requestedAreaId == null) {
+      setOverviewAllCache(baseKey, cachedData);
     }
     applyOverviewData(data);
     void prefetchAllOverview();
     return true;
   } else {
-    const data = await api.get(overviewUrl(state.areaId), { signal: controller.signal });
+    const requestedAreaId = state.areaId;
+    const data = await api.get(overviewUrl(requestedAreaId), { signal: controller.signal, cacheTtlMs: 25 * 1000 });
     if (controller.signal.aborted || requestSeq !== loadState.requestSeq) return false;
-    if (state.areaId == null) {
-      setOverviewAllCache(overviewCacheKey(), filterOverviewDataForArea(data, null));
+    const baseKey = overviewCacheKey();
+    const cachedData = filterOverviewDataForArea(data, requestedAreaId);
+    setOverviewAreaCache(overviewAreaCacheKey(requestedAreaId, baseKey), cachedData);
+    if (requestedAreaId == null) {
+      setOverviewAllCache(baseKey, cachedData);
     }
     applyOverviewData(data);
     void prefetchAllOverview();

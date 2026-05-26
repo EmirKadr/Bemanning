@@ -78,11 +78,13 @@ const scheduleLoadState = {
 };
 
 const scheduleAllCache = new Map();
+const scheduleAreaCache = new Map();
 const scheduleAllFetchState = {
   controller: null,
   key: "",
 };
 const SCHEDULE_ALL_CACHE_LIMIT = 4;
+const SCHEDULE_AREA_CACHE_LIMIT = 24;
 const SCHEDULE_REVALIDATE_ACTIVE_MS = 10000;
 const SCHEDULE_REVALIDATE_IDLE_MS = 30000;
 const SCHEDULE_REVALIDATE_SOON_MS = 1500;
@@ -113,6 +115,10 @@ function scheduleCacheKey() {
   return `${scheduleScopeKey()}|${state.year}|${state.week}|${state.weekday}`;
 }
 
+function scheduleAreaCacheKey(areaId = state.areaId, baseKey = scheduleCacheKey()) {
+  return `${baseKey}|area:${areaId == null ? "ALLT" : Number(areaId)}`;
+}
+
 function scheduleUrl(areaId = state.areaId) {
   return `/api/schedule?year=${state.year}&week=${state.week}&weekday=${state.weekday}` +
     (areaId ? `&area_id=${areaId}` : "");
@@ -131,8 +137,17 @@ function setScheduleAllCache(key, data) {
   }
 }
 
+function setScheduleAreaCache(key, data) {
+  scheduleAreaCache.delete(key);
+  scheduleAreaCache.set(key, data);
+  while (scheduleAreaCache.size > SCHEDULE_AREA_CACHE_LIMIT) {
+    scheduleAreaCache.delete(scheduleAreaCache.keys().next().value);
+  }
+}
+
 function invalidateScheduleAllCache() {
   scheduleAllCache.clear();
+  scheduleAreaCache.clear();
   scheduleAllFetchState.controller?.abort();
   scheduleRevalidateState.controller?.abort();
   scheduleAllFetchState.controller = null;
@@ -2604,8 +2619,8 @@ async function refreshSummary() {
 
   try {
     const [rows, allRows] = await Promise.all([
-      api.get(filteredUrl, { signal: controller.signal }),
-      api.get(allUrl, { signal: controller.signal }),
+      api.get(filteredUrl, { signal: controller.signal, cacheTtlMs: 15 * 1000 }),
+      api.get(allUrl, { signal: controller.signal, cacheTtlMs: 15 * 1000 }),
     ]);
     if (controller.signal.aborted || requestSeq < summaryState.appliedSeq) return;
     summaryState.appliedSeq = requestSeq;
@@ -2666,13 +2681,17 @@ function applyScheduleData(data) {
   scheduleNextScheduleRevalidate();
 }
 
-function renderScheduleFromAllCache() {
-  const cached = scheduleAllCache.get(scheduleCacheKey());
+function renderScheduleFromCache() {
+  const baseKey = scheduleCacheKey();
+  const cachedAll = scheduleAllCache.get(baseKey);
+  const cached = cachedAll
+    ? filterScheduleDataForArea(cachedAll, state.areaId)
+    : scheduleAreaCache.get(scheduleAreaCacheKey(state.areaId, baseKey));
   if (!cached) return false;
   cancelSummaryRefresh({ abortInFlight: true });
   scheduleLoadState.controller?.abort();
   scheduleLoadState.requestSeq += 1;
-  applyScheduleData(filterScheduleDataForArea(cached, state.areaId));
+  applyScheduleData(cached);
   scheduleNextScheduleRevalidate(500);
   return true;
 }
@@ -2685,9 +2704,11 @@ async function prefetchAllSchedule() {
   scheduleAllFetchState.controller = controller;
   scheduleAllFetchState.key = key;
   try {
-    const data = await api.get(scheduleUrl(null), { signal: controller.signal });
+    const data = await api.get(scheduleUrl(null), { signal: controller.signal, cacheTtlMs: 25 * 1000 });
     if (controller.signal.aborted) return;
-    setScheduleAllCache(key, filterScheduleDataForArea(data, null));
+    const allData = filterScheduleDataForArea(data, null);
+    setScheduleAllCache(key, allData);
+    setScheduleAreaCache(scheduleAreaCacheKey(null, key), allData);
     scheduleNextScheduleRevalidate();
   } catch (err) {
     if (err?.name !== "AbortError") console.warn("Kunde inte forhämta hela bemanningen", err);
@@ -2732,9 +2753,11 @@ async function revalidateSchedule() {
       return;
     }
 
-    const fresh = await api.get(scheduleUrl(null), { signal: controller.signal });
+    const fresh = await api.get(scheduleUrl(null), { signal: controller.signal, cacheTtlMs: 25 * 1000 });
     if (controller.signal.aborted || key !== scheduleCacheKey()) return;
-    setScheduleAllCache(key, filterScheduleDataForArea(fresh, null));
+    const freshAllData = filterScheduleDataForArea(fresh, null);
+    setScheduleAllCache(key, freshAllData);
+    setScheduleAreaCache(scheduleAreaCacheKey(null, key), freshAllData);
     const result = patchScheduleFromAllData(fresh);
     notifyScheduleBackgroundUpdate(result.patched ? 1 : 0);
     scheduleRevalidateState.errorCount = 0;
@@ -2753,7 +2776,7 @@ async function revalidateSchedule() {
 }
 
 async function loadSchedule() {
-  if (renderScheduleFromAllCache()) {
+  if (renderScheduleFromCache()) {
     void prefetchAllSchedule();
     return true;
   }
@@ -2764,11 +2787,15 @@ async function loadSchedule() {
   scheduleLoadState.controller = controller;
 
   try {
-    const data = await api.get(scheduleUrl(state.areaId), { signal: controller.signal });
+    const requestedAreaId = state.areaId;
+    const data = await api.get(scheduleUrl(requestedAreaId), { signal: controller.signal, cacheTtlMs: 25 * 1000 });
     if (controller.signal.aborted || requestSeq !== scheduleLoadState.requestSeq) return false;
 
-    if (state.areaId == null) {
-      setScheduleAllCache(scheduleCacheKey(), filterScheduleDataForArea(data, null));
+    const baseKey = scheduleCacheKey();
+    const cachedData = filterScheduleDataForArea(data, requestedAreaId);
+    setScheduleAreaCache(scheduleAreaCacheKey(requestedAreaId, baseKey), cachedData);
+    if (requestedAreaId == null) {
+      setScheduleAllCache(baseKey, cachedData);
     }
     applyScheduleData(data);
     void prefetchAllSchedule();

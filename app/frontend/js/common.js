@@ -2592,6 +2592,10 @@ function enqueueVisiblePagePrefetches(user, activePage) {
     enqueueBackgroundPrefetch("/api/areas");
     enqueueBackgroundPrefetch("/api/activities");
     enqueueBackgroundPrefetch("/api/activities?include_inactive=true");
+    if (areaQuery) {
+      enqueueBackgroundPrefetch(`/api/schedule?year=${year}&week=${week}&weekday=${weekday}`, 25 * 1000);
+      enqueueBackgroundPrefetch(`/api/schedule/summary?year=${year}&week=${week}&weekday=${weekday}`, 25 * 1000);
+    }
     enqueueBackgroundPrefetch(`/api/schedule?year=${year}&week=${week}&weekday=${weekday}${areaQuery}`, 25 * 1000);
     enqueueBackgroundPrefetch(`/api/schedule/summary?year=${year}&week=${week}&weekday=${weekday}${areaQuery}`, 25 * 1000);
   }
@@ -2599,6 +2603,9 @@ function enqueueVisiblePagePrefetches(user, activePage) {
     enqueueBackgroundPrefetch("/api/areas");
     enqueueBackgroundPrefetch("/api/activities");
     enqueueBackgroundPrefetch("/api/activities?include_inactive=true");
+    if (areaQuery) {
+      enqueueBackgroundPrefetch(`/api/overview?year=${year}&week=${week}`, 25 * 1000);
+    }
     enqueueBackgroundPrefetch(`/api/overview?year=${year}&week=${week}${areaQuery}`, 25 * 1000);
   }
   if (canViewPage(user, "productivity")) {
