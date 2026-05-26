@@ -7,7 +7,7 @@ tags: [historik, audit, ui]
 
 # Historik och audit
 
-Kort svar: Historik har tre lagen: anvandarhistorik, analys och felkoder. Den ar byggd for Super User och hjalper till att forklara vem som andrade vad, vilka handelser som ar vanligast och vilka API-/felkoder anvandare faktiskt traffar.
+Kort svar: Historik har fem lagen: anvandarhistorik, analys, felkoder, vantetider och Halsa. Den ar byggd for Super User och hjalper till att forklara vem som andrade vad, var anvandare vantar, vilka fel de traffar och hur server/databas mar.
 
 ## Knappar och kontroller
 
@@ -27,6 +27,8 @@ Kort svar: Historik har tre lagen: anvandarhistorik, analys och felkoder. Den ar
 - `Anvandarhistorik`: tabell med tid, anvandare, typ, atgard, objekt och detalj.
 - `Analys`: statkort for antal handelser, senaste 24 h och unika anvandare samt topplistor for anvandare, atgarder och typer.
 - `Felkoder`: statkort for felkoder, topplistor for felkod, vy/API och felatgard samt senaste felhandelser.
+- `Vantetider`: p50/p95/max for vyload, API-anrop, nedladdningar och bakgrundsladdning, sa flaskhalsar syns utan manuell magkansla.
+- `Halsa`: app-, databas- och Render-status for lokal/serverdrift; samma signal anvands av `tools.healthcheck`.
 - Detalj byggs av old/new snapshots och forsoker oversatta person, aktivitet och omrade via lookups.
 - Loggade floden omfattar nu register/schema, anvandare/forsta losenord, globala installningar, Hamta data, serverhanterade produktivitetsfiler och korda lagerverktygsfloden.
 - Misslyckade filuppladdningar som hinner na backend loggas som `productivity_file/upload_failed`, `allocation_flow/upload_failed` eller `allocation_flow/detect_failed` med steg, feltyp, kort felmeddelande och eventuell HTTP-status.
@@ -35,6 +37,9 @@ Kort svar: Historik har tre lagen: anvandarhistorik, analys och felkoder. Den ar
 - Sidoppningar rapporteras tyst som `view/open` via `/api/audit/client-event`. De syns i Historik, men ska inte fylla dokumentloggen.
 - Dokument-loggen i sidebaren ar separat fran auditloggen och fylls klient-side av funktioner, toastar, API-success/failure, bakgrundsvarningar och `window.flowLog`: success, info, warn och error. Den sparas i `sessionStorage`, foljer med vid sidbyte i samma browserflik och kan rensas av anvandaren; vanliga sidbyten filtreras bort.
 - Auditpayloadar ska vara felsokningsbara men inte innehalla losenord, API-detaljer, sessionscookies eller privata filnamn.
+- Efter storre push/deploy ska agenter anvanda `tools.healthcheck report` och
+  `tools.healthcheck waits` som driftgrind. Tydliga `warn`/`error` ska fixas
+  eller rapporteras med kommando, tidpunkt och feltext.
 
 ## Tekniskt flode
 
@@ -65,4 +70,6 @@ Kort svar: Historik har tre lagen: anvandarhistorik, analys och felkoder. Den ar
 - `../app/frontend/js/api.js`
 - `../app/frontend/js/analytics.js`
 - `../app/backend/routers/audit_logs.py`
+- `../app/backend/routers/healthcheck.py`
 - `../app/backend/audit.py`
+- `../tools/healthcheck.py`

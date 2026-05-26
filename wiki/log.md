@@ -7,6 +7,14 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-26] process | Halsa som driftregel
+
+Halsa och Vantetider ar nu dokumenterat som permanent agentarbetsregel i
+`AGENTS.md`, `TESTPROTOCOL.md` och `wiki/testing-release.md`. Efter storre
+pushar/deploys ska agenter kora eller verifiera `tools.healthcheck report` och
+`tools.healthcheck waits` for lokal/serverdrift, databas och anvandarvantetider,
+och tydligt fixa eller rapportera kvarvarande `warn`/`error`.
+
 ## [2026-05-26] fix | Seed och lokal bootstrap spärras mot live
 
 `backend.seed` stoppar nu körning mot `ENVIRONMENT=production` och Render-databas-URL:er. `backend.bootstrap_local` vägrar köra mot annat än SQLite, så lokal schema-/seedbootstrap inte kan råka skriva till live-Postgres om `DATABASE_URL` pekar fel. Dokumentationen skiljer nu på engångsmigrationer, lokal/dev-seed och production-deploy.

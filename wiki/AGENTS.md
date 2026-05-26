@@ -1,7 +1,7 @@
 ---
 title: Wiki-agentregler
 status: aktiv
-updated: 2026-05-25
+updated: 2026-05-26
 tags: [wiki, agent, arbetsflode]
 ---
 
@@ -32,6 +32,7 @@ Uppdatera wikin nar du:
 - andrar bemanningslogik, veckomallar, oversikt, produktivitet eller lagerverktyg
 - lagger till nya felmeddelanden, toastar eller konfliktfall
 - andrar anvandarsynlig loggning, bakgrundsladdning, cache eller auditbeteende
+- andrar Halsa, Vantetider, driftkontroller eller `tools.healthcheck`
 - upptacker att dokumentationen ar fel eller for vag
 
 Nar du lagger till eller andrar ett Bearbeta-flode ska du ocksa uppdatera
@@ -44,6 +45,14 @@ maste koras fore Ytgenerering, ska wikin beskriva bade anvandarflodet och
 sessionkontraktet. Testerna ska tacka minst ett backend-/kontraktstest och ett
 anvandarnara test som verifierar knappens enabled/disabled-lage eller inskickad
 session-parameter.
+
+Halsa och Vantetider ar en del av arbetsmetoden. Nar en agent andrar drift,
+databas, Render, cache, bakgrundsladdning, import/export, Bearbeta-floden eller
+releasefiler ska `AGENTS.md`, `TESTPROTOCOL.md` och `testing-release.md` hallas
+i synk om healthcheck-regeln paverkas. Efter storre push/deploy ska agenten
+normalt kora eller verifiera `tools.healthcheck report` och
+`tools.healthcheck waits`. Kvarvarande `warn`/`error` ska dokumenteras i
+slutrapporten om det inte kan fixas direkt.
 
 Varje uppdatering ska ocksa laggas append-only i `log.md` med formatet:
 

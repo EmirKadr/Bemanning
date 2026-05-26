@@ -136,6 +136,27 @@ anvandaren faktiskt vantar pa vyer, API:er, nedladdningar och bakgrundsladdning.
 Den ska vara sanerad, kortfattad och synas i Historik/Halsa-analys, inte i
 dokumentloggen.
 
+## Halsa- och driftregel for agenter
+
+Halsa och vantetider ar ett arbetssatt, inte en engangsfeature. Nar en agent gor
+en storre andring, pushar backend/frontend-beteende, andrar cache/bakgrundsladdning,
+databas, Render-konfiguration, import/export, Bearbeta-floden eller releasefiler
+ska agenten aktivt kontrollera systemhalsan.
+
+Fore slutrapport efter storre push ska agenten normalt kora eller verifiera:
+
+- `python -m tools.healthcheck report --local --no-render` for lokal app- och
+  databassignal.
+- `python -m tools.healthcheck waits --local --period 24h` nar vantetidsdata finns.
+- `python -m tools.healthcheck report --base-url <url>` mot servern efter deploy
+  nar agenten har inloggning/cookie och Render-secrets ar konfigurerade.
+- Historik-flikarna `Halsa` och `Vantetider` visuellt eller via API nar UI:t
+  paverkas.
+
+Om healthcheck visar `error` eller tydliga `warn` efter en stor andring ska
+agenten inte behandla arbetet som fardigt utan att antingen fixa orsaken eller
+tydligt rapportera kvarvarande risk, exakt kommando, tidpunkt och feltext.
+
 ## Testregel for agenter
 
 Varje gang en agent bygger nytt, andrar befintligt beteende eller lagger till ett

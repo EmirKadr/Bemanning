@@ -238,12 +238,34 @@ def test_testprotocol_documents_agent_test_tools():
         "python -m tools.visual_smoke",
         "python -m tools.interactive_e2e",
         "python -m tools.performance_benchmark",
+        "python -m tools.healthcheck report --local --no-render",
+        "python -m tools.healthcheck waits --local --period 24h",
         "python -m tools.desktop_shell_screens",
         "python -m tools.desktop_app_probe",
         "python -m tools.release_check",
         "cmd /c build_windows.bat",
     ):
         assert command in protocol
+
+
+def test_project_protocol_documents_healthcheck_workflow():
+    docs = {
+        "AGENTS.md": (ROOT / "AGENTS.md").read_text(encoding="utf-8"),
+        "TESTPROTOCOL.md": (ROOT / "TESTPROTOCOL.md").read_text(encoding="utf-8"),
+        "wiki/AGENTS.md": (ROOT / "wiki" / "AGENTS.md").read_text(encoding="utf-8"),
+        "wiki/testing-release.md": (ROOT / "wiki" / "testing-release.md").read_text(encoding="utf-8"),
+    }
+
+    for name, text in docs.items():
+        assert "tools.healthcheck report" in text, name
+        assert "tools.healthcheck waits" in text, name
+        assert "Halsa" in text, name
+        assert "Vantetider" in text, name
+
+    assert "Halsa och vantetider ar ett arbetssatt" in docs["AGENTS.md"]
+    assert "storre push" in docs["AGENTS.md"]
+    assert "error" in docs["AGENTS.md"]
+    assert "warn" in docs["AGENTS.md"]
 
 
 def test_allocation_observations_github_sync_is_wired():

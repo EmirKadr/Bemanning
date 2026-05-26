@@ -1,7 +1,7 @@
 ---
 title: Test och release
 status: aktiv
-updated: 2026-05-25
+updated: 2026-05-26
 tags: [test, release, agent]
 ---
 
@@ -16,6 +16,8 @@ python -m pytest
 Get-ChildItem -Path app\frontend\js -Filter *.js | ForEach-Object { node --check $_.FullName }
 python -m tools.flow_cli routes --format table
 python desktop\main.py --smoke-test
+python -m tools.healthcheck report --local --no-render
+python -m tools.healthcheck waits --local --period 24h
 ```
 
 ## Visuella tester
@@ -37,6 +39,7 @@ python -m tools.desktop_app_probe
 | Frontend-JS | `node --check`, visuell smoke eller interaktiv E2E beroende pa risk |
 | Laddning/cache/UX-hastighet | `tools.performance_benchmark` for kall/varm navigation, bakgrundsladdning, toggle, import, drag och copy |
 | Anvandarsynlig loggning | `tests/tools/test_sidebar_user_browser.py` for dokumentlogg i browser + `tests/tools/test_visual_tools.py` for global logg-/API-wiring |
+| Halsa/vantetid/drift | `tools.healthcheck report --local --no-render` + `tools.healthcheck waits --local --period 24h`; efter deploy aven servercheck med `--base-url` nar auth och Render-secrets finns |
 | flow/Oversikt | Interaktiv E2E for celler, drag, undo/redo och roller |
 | Sidebar/roller | Rolltester + visual smoke for flera roller |
 | Produktivitet/lager | `tests/services/test_warehouse_tools_local_data.py` och relevanta UI-screenshots |
@@ -44,6 +47,34 @@ python -m tools.desktop_app_probe
 | Bearbeta-flode med sessionberoende | Testa att forsta flodet sparar artifact/session, att nasta flode kraver den, och att frontend skickar session-id:t vidare |
 | Desktop-app | `desktop\main.py --smoke-test`, desktop probe/shell screens |
 | Dokumentation/wiki | Kontrollera att nya wiki-lankar finns och att `index.md`/`log.md` ar uppdaterade |
+
+## Driftgrind for agenter
+
+Halsa och Vantetider ar ett permanent arbetssatt. Efter storre pushar, deploys,
+databas-/Render-andringar, cache/bakgrundsladdning, import/export, Bearbeta-floden
+eller releasefiler ska agenten kontrollera lokal halsa och anvandarvantetider:
+
+```powershell
+python -m tools.healthcheck report --local --no-render
+python -m tools.healthcheck waits --local --period 24h
+```
+
+Om `DATABASE_URL` i terminalen pekar mot en annan databas ska agenten satta den
+till lokal SQLite for lokal grind, till exempel
+`$env:DATABASE_URL='sqlite:///app/flow_local.db'`, eller rapportera miljoavvikelsen
+som en healthcheck-risk.
+
+Efter deploy ska agenten dessutom kora servercheck nar auth och Render-secrets
+finns:
+
+```powershell
+python -m tools.healthcheck report --base-url <url>
+python -m tools.healthcheck waits --base-url <url> --period 24h
+```
+
+`error` eller tydliga `warn` ska fixas eller rapporteras med kommando, tidpunkt
+och feltext innan arbetet betraktas som klart. Nar Historik paverkas ska flikarna
+`Halsa` och `Vantetider` verifieras visuellt eller via API.
 
 ## Releasekontroll
 
@@ -54,8 +85,9 @@ For release: folj `TESTPROTOCOL.md` och `RELEASE.md`. Kort version:
 3. Desktop smoke/probe.
 4. Visual smoke for huvudroller.
 5. Interaktiv E2E.
-6. Build Windows.
-7. Release check.
+6. Healthcheck lokalt och, efter deploy, mot servern.
+7. Build Windows.
+8. Release check.
 
 ## Kallor
 
@@ -65,3 +97,4 @@ For release: folj `TESTPROTOCOL.md` och `RELEASE.md`. Kort version:
 - `../tools/visual_smoke.py`
 - `../tools/interactive_e2e.py`
 - `../tools/performance_benchmark.py`
+- `../tools/healthcheck.py`

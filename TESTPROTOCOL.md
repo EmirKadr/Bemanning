@@ -23,6 +23,8 @@ Get-ChildItem -Path app\frontend\js -Filter *.js | ForEach-Object { node --check
 python -m tools.flow_cli routes --format table
 python desktop\main.py --smoke-test
 python -m tools.performance_benchmark --runs 1
+python -m tools.healthcheck report --local --no-render
+python -m tools.healthcheck waits --local --period 24h
 ```
 
 Samma skydd finns i GitHub Actions pa varje push och pull request via
@@ -36,6 +38,38 @@ For release eller desktop-andringar:
 cmd /c build_windows.bat
 python -m tools.release_check
 ```
+
+## Halsa efter storre push eller deploy
+
+Halsa och vantetider ar en driftgrind for agentarbete. Efter storre pushar,
+backend-/frontendandringar, cache/bakgrundsladdning, databas, Render-konfiguration,
+import/export, Bearbeta-floden eller releasefiler ska agenten verifiera att app,
+databas och anvandarnas vantan fortfarande ser rimlig ut.
+
+Lokal grind:
+
+```powershell
+python -m tools.healthcheck report --local --no-render
+python -m tools.healthcheck waits --local --period 24h
+```
+
+Om terminalen redan har `DATABASE_URL` mot en annan databas ska agenten antingen
+satta den till lokal SQLite fore kommandot, till exempel
+`$env:DATABASE_URL='sqlite:///app/flow_local.db'`, eller rapportera att miljot
+pekar mot fel/otillganglig databas.
+
+Server-/deploygrind nar agenten har inloggning/cookie och Render-secrets ar
+konfigurerade:
+
+```powershell
+python -m tools.healthcheck report --base-url <url>
+python -m tools.healthcheck waits --base-url <url> --period 24h
+```
+
+Om kommandona visar `error` eller tydliga `warn` ska arbetet inte lamnas som
+klart utan att orsaken antingen ar fixad eller tydligt rapporterad med kommando,
+tidpunkt och feltext. Nar Historik-UI:t paverkas ska flikarna `Halsa` och
+`Vantetider` ocksa verifieras visuellt eller via API.
 
 ## Automatiska tester som finns
 
@@ -438,5 +472,9 @@ Innan ny release:
 6. `python -m tools.interactive_e2e`
 7. `python -m tools.desktop_shell_screens`
 8. `python -m tools.desktop_app_probe`
-9. `cmd /c build_windows.bat`
-10. Skapa och pusha release-tagg enligt `RELEASE.md`.
+9. `python -m tools.healthcheck report --local --no-render`
+10. `python -m tools.healthcheck waits --local --period 24h`
+11. `cmd /c build_windows.bat`
+12. Skapa och pusha release-tagg enligt `RELEASE.md`.
+13. Efter deploy: kor `python -m tools.healthcheck report --base-url <url>`
+    nar servern ar uppe och auth/Render-secrets finns.

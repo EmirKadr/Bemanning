@@ -81,6 +81,16 @@ hemliga miljo variabler i driftens secret store:
 - `RENDER_POSTGRES_ID`
 - `HEALTHCHECK_PUBLIC_URL` (valfri publik ping-URL)
 
+Efter storre pushar/deploys ska agenter anvanda samma signaler via CLI:
+
+```powershell
+python -m tools.healthcheck report --local --no-render
+python -m tools.healthcheck waits --local --period 24h
+```
+
+Om terminalens `DATABASE_URL` pekar mot annan databas, satt den till lokal
+SQLite for lokal kontroll: `$env:DATABASE_URL='sqlite:///app/flow_local.db'`.
+
 ## Lokal seed-inlogg
 
 När du kör `python -m backend.seed` lokalt skapas en admin-användare:
