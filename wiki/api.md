@@ -1,7 +1,7 @@
 ---
 title: API-karta
 status: aktiv
-updated: 2026-05-25
+updated: 2026-05-26
 tags: [api, backend]
 ---
 
@@ -63,6 +63,7 @@ eller skapa/importera med explicit verksamhet.
 
 - `GET /api/audit`, `GET /api/audit/summary`, `GET /api/audit/errors` - historik, analytics och felkodsdashboard.
 - `POST /api/audit/client-error` - tyst klientrapportering av API-fel som anvandaren traffar, inklusive sidmoduler med egen fetch-wrapper via `window.reportApiError`; sparar sanerad path/status/felkod utan request body eller queryvarden.
+- `POST /api/audit/client-event` - tyst klientrapportering av auditbara UI-handlingar som sidoppning; sparar sanerad path och vyinfo utan att skriva i dokumentloggen.
 - `GET /api/productivity/files`, `GET /api/productivity/targets`, `GET /api/productivity` - produktivitet, kraver `productivity=view`.
 - `POST /api/productivity/files`, `POST /api/productivity/files/raw`, `DELETE /api/productivity/files/{file_type}` - serverhanterade produktivitetsfiler, kraver `productivity=edit`.
 - `GET /api/coredata/files` - listar verksamhetens permanenta coredata-karnfiler for lagerverktygen.

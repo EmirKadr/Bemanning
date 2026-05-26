@@ -1,11 +1,15 @@
 ---
 title: Wiki-logg
 status: aktiv
-updated: 2026-05-25
+updated: 2026-05-26
 tags: [wiki, logg]
 ---
 
 # Wiki-logg
+
+## [2026-05-26] polish | Mindre brus i dokumentloggen
+
+Sidoppningar skrivs inte langre i dokumentloggen och gamla `Oppnade vy`-rader filtreras bort fran sessionloggen. Samma handelse rapporteras i stallet tyst till Historik som `view/open` via `/api/audit/client-event`. Bemanningens summeringsvarning visar nu orsak och kontext, till exempel HTTP-/natverksfel, vecka, dag och omrade, sa anvandaren far mer felsokningsbar information utan att loggen fylls av vanliga sidbyten.
 
 ## [2026-05-25] feature | NoMan pa personer
 

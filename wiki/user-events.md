@@ -1,7 +1,7 @@
 ---
 title: Anvandarhandelser
 status: aktiv
-updated: 2026-05-25
+updated: 2026-05-26
 tags: [anvandare, handelser, toast, state, chat]
 ---
 
@@ -19,7 +19,8 @@ Kort svar: denna sida listar vad anvandaren kan se eller raka ut for: redirect, 
 | Saknar redigeringsbehorighet | Knapp dold/disabled eller toast | Rollen har bara `view` | Be om `edit` for vyn eller anvand laslage. |
 | Server kan inte nas | "Kunde inte ansluta till servern..." | Backend nere, fel adress eller appen oppnad som fil | Oppna ratt URL/starta lokal server/kontrollera natverk. |
 | API-fel loggas | Ingen extra UI-storning | Frontend far 4xx/5xx eller natverksfel fran API | Felet rapporteras tyst som `client_error` nar anvandaren ar inloggad, sa Super User kan felsoka i Historik > Felkoder. Galler aven Bearbeta. |
-| Dokument-logg fylls | Dokument-ikonen visar success/info/varning/fel och kan rensas | `showToast`, API-wrappern och globala `flowLog` skriver till en sessionlagrad loggpanel | Oppna dokument-ikonen for snabb felsokning; loggen foljer med vid sidbyte i samma browserflik. Anvand Historik for sparad audit. |
+| Vy oppnas | Ingen rad i dokumentloggen | Sidan rapporterar tyst `view/open` till Historik | Anvands for sparad audit, inte for snabb felsokningslogg. |
+| Dokument-logg fylls | Dokument-ikonen visar success/info/varning/fel och kan rensas | Funktioner, importer, exporter, bakgrundsvarningar och API-wrappern skriver till en sessionlagrad loggpanel | Oppna dokument-ikonen for snabb felsokning; loggen foljer med vid sidbyte i samma browserflik men ska inte fyllas av vanliga sidbyten. Anvand Historik for sparad audit. |
 | Bakgrundsladdning misslyckas | Warn-rad i dokumentloggen | En forvarmning/cachehamtning kunde inte hamtas utan att stoppa vyn | Fortsatt jobba; om samma varning upprepas, ladda om eller kontrollera backend/natverk. |
 | Tema andras | Ikon/vy byter ljust/morkt | Tema sparas lokalt | Inget fel; per enhet/browser. |
 | Sidebar kollapsas | Bara ikoner syns | Anvandaren klickade hamburgare | Klicka hamburgare igen. |

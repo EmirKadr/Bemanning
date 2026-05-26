@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from app.backend.database import Base
 from app.backend.models import AuditLog, Business, User
 from app.backend.routers import allocation, audit_logs, productivity
-from app.backend.schemas import AuditClientErrorIn
+from app.backend.schemas import AuditClientErrorIn, AuditClientEventIn
 
 
 class FakeAuditDb:
@@ -273,6 +273,48 @@ def test_client_error_report_writes_sanitized_audit_event(audit_db_session):
         "message": "Kunde inte spara",
         "detail": "Serverfel",
         "page_path": "/personer.html",
+    }
+    assert "secret" not in json.dumps(entry.new_value, ensure_ascii=False)
+
+
+def test_client_event_report_writes_view_open_audit_event(audit_db_session):
+    business = Business(code="STIGAMO", name="Stigamo", sort_order=1)
+    audit_db_session.add(business)
+    audit_db_session.flush()
+    user = User(
+        username="admin",
+        display_name="Admin",
+        role="super_user",
+        roles=["super_user"],
+        business_id=business.id,
+        is_active=True,
+    )
+    audit_db_session.add(user)
+    audit_db_session.commit()
+    audit_db_session.refresh(user)
+
+    response = audit_logs.report_client_event(
+        AuditClientEventIn(
+            event_type="view_open",
+            view_id="schedule",
+            view_label="Bemanning",
+            page_path="/index.html?token=secret",
+        ),
+        db=audit_db_session,
+        user=user,
+    )
+
+    entry = audit_db_session.query(AuditLog).filter_by(entity_type="view").one()
+    assert response.status_code == 204
+    assert entry.business_id == business.id
+    assert entry.user_id == user.id
+    assert entry.entity_id == 0
+    assert entry.action == "open"
+    assert entry.new_value == {
+        "event_type": "view_open",
+        "view_id": "schedule",
+        "view_label": "Bemanning",
+        "page_path": "/index.html",
     }
     assert "secret" not in json.dumps(entry.new_value, ensure_ascii=False)
 

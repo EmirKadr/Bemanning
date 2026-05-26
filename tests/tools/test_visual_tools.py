@@ -75,12 +75,17 @@ def test_history_view_has_error_dashboard_and_client_error_logging():
     assert 'const CLIENT_ERROR_REPORT_PATH = "/api/audit/client-error";' in api
     assert "function reportApiError" in api
     assert "window.reportApiError = reportApiError;" in api
+    assert 'const CLIENT_EVENT_REPORT_PATH = "/api/audit/client-event";' in api
+    assert "function reportClientEvent" in api
+    assert "window.reportClientEvent = reportClientEvent;" in api
     assert "logApiSuccess" in api
     assert "logApiFailure" in api
     assert "apiResultSummary" in api
     assert "window.reportApiError?.(path" in allocation
     assert "appendAppLog(message" in common
     assert "APP_LOG_STORAGE_KEY" in common
+    assert "reportPageOpen(user, activePage)" in common
+    assert 'appendAppLog(`Öppnade vy:' not in common
     assert "window.flowLog" in common
     assert "clearAppLog" in common
     assert "pathWithoutQuery(path)" in api
@@ -681,6 +686,10 @@ def test_planning_views_cache_all_scope_and_have_top_scrollbars():
     assert "synced-scrollbar-spacer" in styles
     assert '<table class="matrix" id="scheduleTable">' in schedule_html
     assert '<table class="overview" id="overviewTable">' in overview_html
+    assert "function summaryRefreshErrorMessage" in schedule
+    assert "summaryRefreshErrorMessage(err)" in schedule
+    assert "Orsak:" in schedule
+    assert "Kontext:" in schedule
 
     for source, prefix in ((schedule, "Schedule"), (overview, "Overview")):
         assert f"filter{prefix}DataForArea" in source

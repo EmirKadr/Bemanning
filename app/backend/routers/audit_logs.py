@@ -15,6 +15,7 @@ from ..deps import get_current_user, get_db, require_super_user
 from ..models import AuditLog, User
 from ..schemas import (
     AuditClientErrorIn,
+    AuditClientEventIn,
     AuditEntryOut,
     AuditErrorEventOut,
     AuditErrorSummaryOut,
@@ -158,6 +159,15 @@ def _client_error_payload(payload: AuditClientErrorIn) -> dict[str, Any]:
         "error_code": error_code,
         "message": _clean_text(payload.message),
         "detail": _detail_summary(payload.detail),
+        "page_path": _safe_path(payload.page_path),
+    }
+
+
+def _client_event_payload(payload: AuditClientEventIn) -> dict[str, Any]:
+    return {
+        "event_type": _clean_text(payload.event_type, max_length=80) or "client_event",
+        "view_id": _clean_text(payload.view_id, max_length=80),
+        "view_label": _clean_text(payload.view_label, max_length=120),
         "page_path": _safe_path(payload.page_path),
     }
 
@@ -422,5 +432,29 @@ def report_client_error(
         business_id=user.business_id,
         logger=logger,
         context="client error audit event",
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/client-event", status_code=status.HTTP_204_NO_CONTENT)
+def report_client_event(
+    payload: AuditClientEventIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Response:
+    sanitized = _client_event_payload(payload)
+    event_type = sanitized.get("event_type") or "client_event"
+    is_view_open = event_type == "view_open"
+    audit_writer.log_and_commit(
+        db,
+        entity_type="view" if is_view_open else "client_event",
+        entity_id=0,
+        action="open" if is_view_open else event_type,
+        old_value=None,
+        new_value=sanitized,
+        user_id=user.id,
+        business_id=user.business_id,
+        logger=logger,
+        context="client event audit event",
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

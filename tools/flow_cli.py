@@ -90,6 +90,7 @@ ROUTES: tuple[ApiRoute, ...] = (
     ApiRoute("audit.summary", "GET", "/api/audit/summary", "Audit-summering"),
     ApiRoute("audit.errors", "GET", "/api/audit/errors", "Felkodsdashboard"),
     ApiRoute("audit.client_error", "POST", "/api/audit/client-error", "Logga användarens API-fel"),
+    ApiRoute("audit.client_event", "POST", "/api/audit/client-event", "Logga tysta UI-händelser som vyöppning"),
     ApiRoute("persons.list", "GET", "/api/persons", "Lista personer"),
     ApiRoute("persons.import_template", "GET", "/api/persons/import-template", "Hämta importmall för personer"),
     ApiRoute("persons.import", "POST", "/api/persons/import", "Importera personer"),

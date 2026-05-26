@@ -76,7 +76,7 @@ def test_sidebar_log_persists_across_view_navigation(local_sidebar_server, chrom
 
         expect(page.locator("#log-sidebar")).to_be_visible()
         expect(page.locator("#log-sidebar")).to_contain_text("Testlogg sparad över vybyte")
-        expect(page.locator("#log-sidebar")).to_contain_text("Öppnade vy")
+        expect(page.locator("#log-sidebar")).not_to_contain_text("Öppnade vy")
         page.click("#log-sidebar-clear")
         expect(page.locator("#log-sidebar")).to_contain_text("Ingen logg")
     finally:

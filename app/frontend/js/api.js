@@ -37,6 +37,7 @@ function errorMessageFromBody(body, status) {
 }
 
 const CLIENT_ERROR_REPORT_PATH = "/api/audit/client-error";
+const CLIENT_EVENT_REPORT_PATH = "/api/audit/client-event";
 const API_PREFETCH_DEFAULT_TTL_MS = 45 * 1000;
 const API_GET_CACHE_STORAGE_PREFIX = "flow-api-get-cache-v1:";
 const apiGetCache = new Map();
@@ -180,6 +181,7 @@ function shouldReportApiError(path, status) {
   const safePath = pathWithoutQuery(path);
   if (!safePath.startsWith("/api/")) return false;
   if (safePath === CLIENT_ERROR_REPORT_PATH) return false;
+  if (safePath === CLIENT_EVENT_REPORT_PATH) return false;
   if (safePath === "/api/auth/me") return false;
   if (status === 401) return false;
   return true;
@@ -200,6 +202,23 @@ function reportApiError(path, details = {}) {
   };
   const body = JSON.stringify(payload);
   fetch(CLIENT_ERROR_REPORT_PATH, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body,
+    keepalive: body.length < 60000,
+  }).catch(() => {});
+}
+
+function reportClientEvent(eventType, details = {}) {
+  const payload = {
+    event_type: String(eventType || "client_event").slice(0, 80),
+    view_id: details.view_id ? String(details.view_id).slice(0, 80) : null,
+    view_label: details.view_label ? String(details.view_label).slice(0, 120) : null,
+    page_path: pathWithoutQuery(details.page_path || window.location?.pathname || "/"),
+  };
+  const body = JSON.stringify(payload);
+  fetch(CLIENT_EVENT_REPORT_PATH, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -229,6 +248,7 @@ function apiActionLabel(path, method = "GET") {
   const verb = String(method || "GET").toUpperCase();
   const flowName = apiFlowName(safePath);
   if (safePath === CLIENT_ERROR_REPORT_PATH) return "";
+  if (safePath === CLIENT_EVENT_REPORT_PATH) return "";
   if (safePath === "/api/auth/logout") return "Utloggning";
   if (safePath.startsWith("/api/assistant/chat")) return "Apphjälp";
   if (safePath.startsWith("/api/assistant/clear")) return "Apphjälpsdialog";
@@ -300,6 +320,7 @@ function shouldLogApiUserEvent(path, method, options = {}) {
   if (options.logUserEvent === false) return false;
   const safePath = pathWithoutQuery(path);
   if (safePath === CLIENT_ERROR_REPORT_PATH) return false;
+  if (safePath === CLIENT_EVENT_REPORT_PATH) return false;
   if (safePath === "/api/auth/me") return false;
   if (String(method || "GET").toUpperCase() === "GET") return Boolean(options.logGetUserEvent);
   return true;
@@ -503,7 +524,9 @@ const api = {
   prefetchGet,
   clearGetCache: clearApiGetCache,
   download,
+  reportClientEvent,
 };
 
 window.api = api;
 window.reportApiError = reportApiError;
+window.reportClientEvent = reportClientEvent;

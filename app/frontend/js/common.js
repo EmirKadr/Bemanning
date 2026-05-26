@@ -743,10 +743,12 @@ function storedAppLogEntry(entry) {
   if (!entry || typeof entry !== "object") return null;
   const message = String(entry.message || "").replace(/\s+/g, " ").trim();
   if (!message) return null;
+  const title = String(entry.title || "System").slice(0, 80);
+  if (title === "Vy" || message.startsWith("Öppnade vy:")) return null;
   return {
     time: String(entry.time || new Date().toLocaleString("sv-SE")),
     kind: normalizeAppLogKind(entry.kind),
-    title: String(entry.title || "System").slice(0, 80),
+    title,
     message: message.slice(0, 600),
   };
 }
@@ -2645,6 +2647,25 @@ function enqueueVisiblePagePrefetches(user, activePage) {
   scheduleNextBackgroundPrefetch();
 }
 
+function reportPageOpen(user, activePage) {
+  if (!activePage || activePage === "passwordSetup") return;
+  const openedPage = sidebarPageDefinitions(user, activePage).find((page) => page.id === activePage);
+  const viewLabel = openedPage?.label || activePage;
+  if (typeof window.reportClientEvent === "function") {
+    window.reportClientEvent("view_open", {
+      view_id: activePage,
+      view_label: viewLabel,
+      page_path: window.location?.pathname || "/",
+    });
+  } else if (typeof window.api?.reportClientEvent === "function") {
+    window.api.reportClientEvent("view_open", {
+      view_id: activePage,
+      view_label: viewLabel,
+      page_path: window.location?.pathname || "/",
+    });
+  }
+}
+
 async function initPage(activePage, options = {}) {
   const cachedUser = readCachedSidebarUser();
   if (cachedUserCanRenderPage(cachedUser, activePage, options)) {
@@ -2698,8 +2719,7 @@ async function initPage(activePage, options = {}) {
   }
   cacheSidebarUser(user);
   renderSidebar(user, activePage);
-  const openedPage = sidebarPageDefinitions(user, activePage).find((page) => page.id === activePage)?.label || activePage || "Okänd vy";
-  appendAppLog(`Öppnade vy: ${openedPage}`, "info", "Vy");
+  reportPageOpen(user, activePage);
   void refreshRoleViewAccess(user, activePage);
   void refreshSidebarLayout(user, activePage);
   void enqueueVisiblePagePrefetches(user, activePage);

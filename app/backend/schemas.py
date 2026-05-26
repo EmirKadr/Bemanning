@@ -540,6 +540,13 @@ class AuditClientErrorIn(BaseModel):
     page_path: str | None = Field(default=None, max_length=300)
 
 
+class AuditClientEventIn(BaseModel):
+    event_type: str = Field(max_length=80)
+    view_id: str | None = Field(default=None, max_length=80)
+    view_label: str | None = Field(default=None, max_length=120)
+    page_path: str | None = Field(default=None, max_length=300)
+
+
 class AuditErrorEventOut(BaseModel):
     id: int
     created_at: datetime

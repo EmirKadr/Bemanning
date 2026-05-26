@@ -105,6 +105,7 @@ verksamheter.
 | `audit.summary` | `GET` | `/api/audit/summary` | Audit-summering |
 | `audit.errors` | `GET` | `/api/audit/errors` | Felkodsdashboard |
 | `audit.client_error` | `POST` | `/api/audit/client-error` | Logga användarens API-fel |
+| `audit.client_event` | `POST` | `/api/audit/client-event` | Logga tysta UI-händelser som vyöppning |
 | `persons.list` | `GET` | `/api/persons` | Lista personer |
 | `persons.import_template` | `GET` | `/api/persons/import-template` | Hämta importmall för personer |
 | `persons.import` | `POST` | `/api/persons/import` | Importera personer |
