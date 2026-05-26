@@ -70,13 +70,15 @@ python tools/build_external_data_catalog.py --views <views.xlsx> --columns <colu
 
 Den skriver `data/external_data_catalog.json`, som commitas så Render får katalogen direkt. Endast riktiga API-värden, endpointmallar och headernamn ska ligga i `.env`/Render secrets.
 
-## Default-inlogg
+## Lokal seed-inlogg
 
-Seeden skapar en admin-användare:
+När du kör `python -m backend.seed` lokalt skapas en admin-användare:
 - **Användarnamn:** `admin`
 - **Lösenord:** `admin123`
 
 **Byt lösenordet direkt efter första inloggning** och lägg gärna upp minst en extra administratör i adminvyn.
+
+I produktion kör Render inte seed. Live-data är användarstyrd och första admin-kontot ska redan finnas eller skapas via en kontrollerad engångsbootstrap.
 
 ## Deploya till Render
 
@@ -91,7 +93,7 @@ Seeden skapar en admin-användare:
    ```
 2. På [render.com](https://render.com): **New → Blueprint** → välj GitHub-repot. Render läser `app/render.yaml` automatiskt.
 3. Render skapar databasen `flow-db` och web-servicen `flow-web`, sätter `DATABASE_URL` och auto-genererar `SECRET_KEY`.
-4. Build-steget kör `pip install`, `alembic upgrade head` och `python -m backend.seed`. Vid varje deploy uppdateras seed-data (idempotent).
+4. Build-steget kör `pip install` och `alembic upgrade head`. Seed körs inte i produktion, så raderade verksamheter, områden, aktiviteter, personer eller användare återskapas inte av deployen.
 5. När deploy är klar: öppna `https://stigamo.nu` och logga in.
 
 **Kostnad:** Starter web (~7 USD/mån) + PostgreSQL free 90 dagar → basic-256mb (~7 USD/mån).

@@ -7,6 +7,10 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-26] fix | Production kör inte seed vid deploy
+
+Render-builden kör nu bara `pip install` och `alembic upgrade head`. `backend.seed` är kvar för lokal/dev-bootstrap och manuell engångsseed, men körs inte längre automatiskt i produktion. Därmed återskapas inte raderade verksamheter, områden, aktiviteter, personer eller användare vid nästa deploy.
+
 ## [2026-05-26] fix | Snabbare omradestoggle i planeringsvyer
 
 Bemanning och Oversikt anvander nu en exakt kortlivad cache per omrade/period utöver all-cache. Om anvandaren vaxlar tillbaka till ett omrade som redan hamtats ritas vyn direkt utan nytt API-anrop, medan all-data fortsatter forvarmas och revisionskontrolleras i bakgrunden. Aborts fran egna snabba omladdningar rapporteras inte langre som `network_error | HTTP 0`, och riktiga natverksfel dedupliceras per path en kort stund for att inte fylla Historik.

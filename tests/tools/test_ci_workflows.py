@@ -18,6 +18,14 @@ def test_push_ci_runs_core_test_gates_against_postgres_render_simulation():
     assert "python desktop/main.py --smoke-test" in workflow
 
 
+def test_render_production_build_does_not_run_seed():
+    blueprint = (ROOT / "render.yaml").read_text(encoding="utf-8")
+
+    assert "buildCommand:" in blueprint
+    assert "alembic upgrade head" in blueprint
+    assert "python -m backend.seed" not in blueprint
+
+
 def test_windows_release_is_blocked_by_tests_before_packaging():
     workflow = (ROOT / ".github" / "workflows" / "windows-release.yml").read_text(encoding="utf-8")
 

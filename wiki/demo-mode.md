@@ -1,7 +1,7 @@
 ---
 title: Demo-läge
 status: aktiv
-updated: 2026-05-25
+updated: 2026-05-26
 tags: [demo, sandbox, presentationsläge, försäljning]
 ---
 
@@ -35,7 +35,7 @@ Kort svar: flow har ett fast `demo`-konto som vid inloggning får en privat snap
 | [app/backend/main.py](../app/backend/main.py) | HTTP-middleware sätter `demo_data_root_var` per request; startup-hook rensar stale sessioner |
 | [app/backend/coredata_service.py](../app/backend/coredata_service.py) | `default_data_dir()` returnerar demo-mapp under demo. `coredata_read_dirs()` faller tillbaka till prod-data så demo ser befintliga filer |
 | [app/backend/allocation_bridge.py](../app/backend/allocation_bridge.py) | `_active_upload_cache_dir()` routar allokerings-uploads till demo-mapp |
-| [app/backend/seed.py](../app/backend/seed.py) | `seed_demo_user()` skapar/uppdaterar `demo`-kontot vid varje deploy |
+| [app/backend/seed.py](../app/backend/seed.py) | `seed_demo_user()` finns för lokal/dev-bootstrap. Produktion kör inte seed vid deploy, så demo-kontot måste redan finnas eller skapas via kontrollerad engångsbootstrap |
 | [app/backend/config.py](../app/backend/config.py) | `DEMO_USER_PASSWORD` (default `demo1234`), `DEMO_SESSION_MAX_AGE_HOURS` (default 6) |
 | [app/frontend/js/common.js](../app/frontend/js/common.js) | `ensureDemoBanner`, `maybeShowDemoTourPrompt`, tour-state via sessionStorage, rensning vid logout |
 | [app/frontend/css/styles.css](../app/frontend/css/styles.css) | `.demo-banner`, `.demo-tour-card`, `.demo-user-pill` |
