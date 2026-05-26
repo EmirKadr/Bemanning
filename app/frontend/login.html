@@ -40,8 +40,10 @@
     const form = document.getElementById("login-form");
     const errEl = document.getElementById("err");
 
-    function nextPage(user) {
-      return user?.must_change_password ? "/set-password.html" : "/index.html";
+    async function nextPage(user) {
+      return typeof resolvePostAuthPage === "function"
+        ? await resolvePostAuthPage(user)
+        : (user?.must_change_password ? "/set-password.html" : "/index.html");
     }
 
     function clearSessionDate() {
@@ -57,7 +59,7 @@
           password: document.getElementById("password").value,
         });
         clearSessionDate();
-        window.location.href = nextPage(user);
+        window.location.href = await nextPage(user);
       } catch (err) {
         errEl.textContent = err.message || "Inloggning misslyckades";
         errEl.hidden = false;
@@ -67,7 +69,7 @@
     (async () => {
       try {
         const user = await api.get("/api/auth/me");
-        window.location.href = nextPage(user);
+        window.location.href = await nextPage(user);
       } catch (_) { /* inte inloggad */ }
     })();
   </script>

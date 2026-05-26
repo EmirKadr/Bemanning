@@ -1308,6 +1308,62 @@ async function refreshRoleViewAccess(user, activePage) {
   }
 }
 
+async function refreshRoleViewAccessForRouting() {
+  try {
+    const response = await api.get("/api/settings/role-access");
+    cacheRoleViewAccess(response?.access || {});
+    return true;
+  } catch (e) {
+    // Om servern inte svarar anvands cache/standard, men redirect ska aldrig loopa.
+    return false;
+  }
+}
+
+function firstAccessiblePageHref(user, activePage = "") {
+  const pages = sidebarPageDefinitions(user, activePage);
+  const currentPath = window.location?.pathname || "";
+  const visiblePage = pages.find((page) => page.visible && page.href && page.href !== currentPath);
+  return visiblePage?.href || "";
+}
+
+function renderAccessDeniedFallback(message) {
+  document.body.classList.remove("with-sidebar");
+  document.body.innerHTML = `
+    <main class="access-denied-page">
+      <section class="card access-denied-card">
+        <h1>Ingen behörig vy</h1>
+        <p>${escapeHtml(message || "Ditt konto saknar behörighet till den här sidan.")}</p>
+        <button type="button" id="access-denied-logout">Logga ut</button>
+      </section>
+    </main>`;
+  document.getElementById("access-denied-logout")?.addEventListener("click", () => {
+    window.location.href = "/login.html";
+  });
+}
+
+function redirectAfterDeniedAccess(user, message, activePage = "") {
+  const href = firstAccessiblePageHref(user, activePage);
+  if (href) {
+    queueToast(message, "error");
+    window.location.href = href;
+    return true;
+  }
+  renderAccessDeniedFallback(message);
+  return true;
+}
+
+function clearAuthNavigationCache() {
+  clearCachedSidebarUser();
+  try { localStorage.removeItem(ROLE_VIEW_ACCESS_CACHE_KEY); } catch (e) {}
+}
+
+async function resolvePostAuthPage(user) {
+  if (user?.must_change_password) return "/set-password.html";
+  clearAuthNavigationCache();
+  await refreshRoleViewAccessForRouting();
+  return firstAccessiblePageHref(user, "") || "/index.html";
+}
+
 function renderSidebarLink(page, { active = false, subview = false } = {}) {
   const classes = [
     "sidebar-link",
@@ -2857,14 +2913,16 @@ async function initPage(activePage, options = {}) {
     window.location.href = "/set-password.html";
     return null;
   }
+  if (activePage !== "passwordSetup") {
+    await refreshRoleViewAccessForRouting();
+  }
   if (options.requireAdmin && !isAdminUser(user)) {
     queueToast("Sidan kräver administratörsbehörighet", "error");
     window.location.href = "/index.html";
     return null;
   }
   if (activePage !== "passwordSetup" && !canViewPage(user, activePage)) {
-    queueToast("Sidan kräver behörighet", "error");
-    window.location.href = options.denyRedirect || "/index.html";
+    redirectAfterDeniedAccess(user, "Sidan kräver behörighet", activePage);
     return null;
   }
   if (options.requireSuperUser && !canViewPage(user, activePage)) {
@@ -2873,23 +2931,19 @@ async function initPage(activePage, options = {}) {
     return null;
   }
   if (options.requirePlanningView && !canViewPage(user, activePage || "schedule")) {
-    queueToast("Sidan kräver planerings- eller visningsbehörighet", "error");
-    window.location.href = options.denyRedirect || "/overblick.html";
+    redirectAfterDeniedAccess(user, "Sidan kräver planerings- eller visningsbehörighet", activePage);
     return null;
   }
   if (options.requireEditor && !canEditPage(user, activePage)) {
-    queueToast("Sidan kräver redigeringsbehörighet", "error");
-    window.location.href = "/index.html";
+    redirectAfterDeniedAccess(user, "Sidan kräver redigeringsbehörighet", activePage);
     return null;
   }
   if (options.requireAllocationTools && !canViewPage(user, activePage)) {
-    queueToast("Sidan kräver rollen Lagerkontorist eller Artikelplacerare", "error");
-    window.location.href = "/index.html";
+    redirectAfterDeniedAccess(user, "Sidan kräver rollen Lagerkontorist eller Artikelplacerare", activePage);
     return null;
   }
   if (options.requireAllocationProcess && !canViewPage(user, activePage)) {
-    queueToast("Bearbeta kräver behörighet", "error");
-    window.location.href = options.denyRedirect || "/dela.html";
+    redirectAfterDeniedAccess(user, "Bearbeta kräver behörighet", activePage);
     return null;
   }
   cacheSidebarUser(user);

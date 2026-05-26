@@ -877,6 +877,31 @@ def test_frontend_keeps_lager_and_artikelplacering_out_of_flow_and_bearbeta():
     assert 'pageOptions.denyRedirect = "/dela.html"' in allocation
 
 
+def test_frontend_denied_view_redirect_uses_accessible_page_not_fixed_loop():
+    common = (ROOT / "app" / "frontend" / "js" / "common.js").read_text(encoding="utf-8")
+
+    assert "refreshRoleViewAccessForRouting" in common
+    assert "firstAccessiblePageHref" in common
+    assert "resolvePostAuthPage" in common
+    assert "clearAuthNavigationCache" in common
+    assert "redirectAfterDeniedAccess" in common
+    assert 'redirectAfterDeniedAccess(user, "Sidan kräver behörighet", activePage)' in common
+    assert 'window.location.href = options.denyRedirect || "/index.html"' not in common
+    assert 'window.location.href = options.denyRedirect || "/overblick.html"' not in common
+
+
+def test_login_pages_resolve_first_authorized_view_after_auth():
+    frontend = ROOT / "app" / "frontend"
+    login = (frontend / "login.html").read_text(encoding="utf-8")
+    set_password = (frontend / "set-password.html").read_text(encoding="utf-8")
+
+    assert "async function nextPage(user)" in login
+    assert "await resolvePostAuthPage(user)" in login
+    assert "window.location.href = await nextPage(user)" in login
+    assert 'return user?.must_change_password ? "/set-password.html" : "/index.html";' not in login
+    assert "await resolvePostAuthPage(user)" in set_password
+
+
 def test_import_views_have_templates_and_help_buttons():
     frontend = ROOT / "app" / "frontend"
     common = (frontend / "js" / "common.js").read_text(encoding="utf-8")
@@ -1050,7 +1075,9 @@ def test_allocation_frontend_uses_local_file_store_and_upload_indicator():
     assert "window.allocationUploadActivity?.finish(uploadedNames.size)" in allocation
     assert "observationsUpdateStatusText" in allocation
     assert "observationsUpdateLogText" in allocation
+    assert '"inte aktuell (0 nya pallid)"' in allocation
     assert "function appendAllocationAreaFocus(formData)" in allocation
+    assert 'appendAllocationAreaFocus(fd);\n  fd.append("file", file, entry.name);' in allocation
     assert "appendAllocationAreaFocus(fd);" in allocation
     assert "github_sent_rows" in allocation
     assert "article_max_changed_rows" in allocation

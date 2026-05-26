@@ -175,6 +175,17 @@ body.with-sidebar:not(.sidebar-hydrated) > :not(script) {
   visibility: hidden;
 }
 
+.access-denied-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.access-denied-card {
+  max-width: 460px;
+}
+
 
 /* ============================================================
    Layout: sidebar + main

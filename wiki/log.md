@@ -7,6 +7,28 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-26] fix | Observations foljer R3-toggle
+
+Automatisk observations-uppdatering fran buffertfil skickar nu med samma
+omradesfokus som ovriga Bearbeta-anrop. Nar Super User star pa R3 anvands
+darmed R3:s observations och `artikel_max.csv` i stallet for kontots
+standardverksamhet. Dokumentloggen skiljer ocksa pa 0 nya pallid, dar GitHub-
+push inte ar aktuell, och nya pallid dar GitHub inte bekraftade pushen.
+
+## [2026-05-26] fix | Forecast tal saknad transportor
+
+Forecast faller nu tillbaka till default-transportoren `Schenker` nar en
+sandningsgrupp finns men orderoversikten saknar transportorvarde for gruppen.
+Det hindrar att Bearbeta/Forecast stoppar pa `mode().iloc[0]` nar underlaget i
+ovrigt ar giltigt.
+
+## [2026-05-26] fix | Stoppa vy-redirect-loop
+
+Sidinitiering hamtar nu farsk vybehorighet innan redirect-beslut tas. Om en
+anvandare saknar behorighet till aktuell vy skickas den till forsta vy kontot
+faktiskt far se, och om ingen vy finns visas ett stoppmeddelande i stallet for
+att studsa mellan Bemanning och Oversikt.
+
 ## [2026-05-26] fix | Healthcheck laser Render build-loggar
 
 Render-loggar i Halsa anvander nu Render Logs API med `ownerId`, service-id och
