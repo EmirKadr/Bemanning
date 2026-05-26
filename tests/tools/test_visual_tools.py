@@ -633,11 +633,17 @@ def test_area_focus_toggle_is_wired_to_views():
     assert "const scheduleAreaCache = new Map();" in schedule
     assert "function scheduleAreaCacheKey" in schedule
     assert "function renderScheduleFromCache" in schedule
+    assert "api.get(scheduleUrl(null), { signal: controller.signal, cacheTtlMs: 25 * 1000 })" in schedule
+    assert "setScheduleAllCache(baseKey, allData)" in schedule
     assert "setScheduleAreaCache(scheduleAreaCacheKey(requestedAreaId, baseKey), cachedData)" in schedule
+    assert "applyScheduleData(cachedData)" in schedule
     assert "const overviewAreaCache = new Map();" in overview
     assert "function overviewAreaCacheKey" in overview
     assert "function renderOverviewFromCache" in overview
+    assert "api.get(overviewUrl(null), { signal: controller.signal, cacheTtlMs: 25 * 1000 })" in overview
+    assert "setOverviewAllCache(baseKey, allData)" in overview
     assert "setOverviewAreaCache(overviewAreaCacheKey(requestedAreaId, baseKey), cachedData)" in overview
+    assert "applyOverviewData(cachedData)" in overview
     assert '"flow:areaFocusChanged"' in schedule
     assert '"flow:areaFocusChanged"' in overview
     assert '"flow:areaFocusChanged"' in productivity

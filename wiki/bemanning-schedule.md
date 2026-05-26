@@ -12,7 +12,7 @@ Kort svar: Bemanning ar huvudmatrisen. Anvandaren valjer ar/vecka/dag och styr o
 ## Anvandarflode
 
 1. Sidan laddar omraden och aktiviteter.
-2. Sidan laddar schema for valt ar, vecka och veckodag. Om vald period finns i lokal all-cache filtreras valt omradesfokus direkt i klienten. Om bara ett enskilt omrade redan har hamtats anvands den omradescachen direkt; annars laddas vald vy fran API och alla omraden forhamtas i bakgrunden.
+2. Sidan laddar hela schemadagen for aktuell verksamhet och filtrerar valt omradesfokus direkt i klienten. Om perioden redan finns i lokal all-cache eller exakt omradescache ritas den utan nytt API-anrop.
 3. Varje rad ar en person; varje kolumn ar timme 06-23.
 4. Anvandaren valjer aktivitet i cellens dropdown, delar cell i halvtimmar vid behov, drar for att fylla flera celler eller anvander copy/paste.
 5. Summering och bemanningskalkyl uppdateras efter andringar.
@@ -62,7 +62,7 @@ Falt:
 - Om en person har fast veckomall visas standardaktivitet aven utan explicit cell.
 - Om anvandaren tommer en malltimme skapas explicit tom override.
 - `lock_foreign_schedule_cells` kan hindra ledare fran att andra celler skapade av annan anvandare.
-- Bemanning cachar bara API-svar som redan ar synliga for inloggad anvandare och aktuell verksamhet. Den har bade all-cache per dag och kortlivad exakt omradescache per dag/omrade, sa aterbesokta omraden kan visas utan nytt API-anrop aven innan all-cache hunnit forvarmas. Cachen ogiltigforklaras vid cellandring, split/merge, drag, undo/redo, rensa och kopiera dag sa omradestoggle inte visar gamla data.
+- Bemanning cachar bara API-svar som redan ar synliga for inloggad anvandare och aktuell verksamhet. Nar cache saknas prioriterar klienten all-data for hela dagen/verksamheten, filtrerar vald area lokalt och fyller bade all-cache och exakt omradescache innan anvandaren togglar vidare. Cachen ogiltigforklaras vid cellandring, split/merge, drag, undo/redo, rensa och kopiera dag sa omradestoggle inte visar gamla data.
 - Nar en period finns i cache kontrollerar klienten `/api/schedule/revision` tyst i bakgrunden. Aktiv vy kontrollerar ungefär var 10:e sekund, idle-vy ungefär var 30:e sekund, och dold browserflik pausar. Vid ny revision hamtas all-data och bara andrade synliga timmar patchas om anvandaren inte haller pa i just den cellen.
 - `fill-from-left` finns som API (`POST /api/schedule/fill-from-left`) men har ingen synlig knapp i nuvarande `index.html`/`schedule.js`.
 - Personnamn kan dras for att andra personernas sorteringsnummer. Klienten skickar hela synliga ordningen till `/api/persons/sort-order`; backend nekar andra roller, filtrerade/forandrade personlistor och, for vanliga admin/bemanningsansvariga, personer med annat hemomrade. Super User och demo far sortera over omradesgranser nar de har `Personsortering=Redigera`.

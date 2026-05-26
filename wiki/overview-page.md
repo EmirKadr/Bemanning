@@ -42,7 +42,7 @@ Daghuvudena visar bade datum och ISO-vecka, till exempel `Vecka 21`, sa man ser 
 - Vid blandad dag fragar klienten innan den skriver over med ett enda varde.
 - Drag skapar manga heldagsandringar och pushar undo-snapshot for de lyckade.
 - Drag pa personnamn andrar inte bemanningsceller utan personernas sorteringsnummer i registret. Samma backendregel som Bemanning anvands: Bemanningsansvarig/admin sorterar eget omrade, medan Super User och demo sorterar alla synliga personer med `Personsortering=Redigera`.
-- Oversikt cachar bara API-svar som redan ar synliga for inloggad anvandare och aktuell verksamhet. Cachen ar separat for veckovy och manadsvy och har bade all-cache och kortlivad exakt omradescache, sa aterbesokta omraden kan visas utan nytt API-anrop aven innan all-cache hunnit forvarmas. Cachen ogiltigforklaras vid dagandring, drag och undo/redo.
+- Oversikt cachar bara API-svar som redan ar synliga for inloggad anvandare och aktuell verksamhet. Nar cache saknas prioriterar klienten all-data for hela veckan/manaden i verksamheten, filtrerar valt omrade lokalt och fyller bade all-cache och exakt omradescache innan anvandaren togglar vidare. Cachen ar separat for veckovy och manadsvy och ogiltigforklaras vid dagandring, drag och undo/redo.
 - Nar en period finns i cache kontrollerar klienten `/api/overview/revision` eller `/api/overview/revision/month` tyst i bakgrunden. Aktiv vy kontrollerar ungefär var 10:e sekund, idle-vy ungefär var 30:e sekund, och dold browserflik pausar. Vid ny revision hamtas all-data och bara andrade synliga dagceller patchas om anvandaren inte haller pa i just den cellen.
 
 ## Felsokningssvar for framtida chat

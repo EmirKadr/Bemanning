@@ -2788,17 +2788,16 @@ async function loadSchedule() {
 
   try {
     const requestedAreaId = state.areaId;
-    const data = await api.get(scheduleUrl(requestedAreaId), { signal: controller.signal, cacheTtlMs: 25 * 1000 });
+    const data = await api.get(scheduleUrl(null), { signal: controller.signal, cacheTtlMs: 25 * 1000 });
     if (controller.signal.aborted || requestSeq !== scheduleLoadState.requestSeq) return false;
 
     const baseKey = scheduleCacheKey();
+    const allData = filterScheduleDataForArea(data, null);
     const cachedData = filterScheduleDataForArea(data, requestedAreaId);
+    setScheduleAllCache(baseKey, allData);
+    setScheduleAreaCache(scheduleAreaCacheKey(null, baseKey), allData);
     setScheduleAreaCache(scheduleAreaCacheKey(requestedAreaId, baseKey), cachedData);
-    if (requestedAreaId == null) {
-      setScheduleAllCache(baseKey, cachedData);
-    }
-    applyScheduleData(data);
-    void prefetchAllSchedule();
+    applyScheduleData(cachedData);
     return true;
   } catch (err) {
     if (err?.name === "AbortError") return false;
