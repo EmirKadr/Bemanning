@@ -7,6 +7,13 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-26] fix | Forecast laddar paketerad modell i prod
+
+Forecastens prediktering laddar nu en paketerad kalibreringsartefakt i
+`warehouse_tools/mg_forecast/calibration.pkl` innan den forsoker bygga om
+traningsdata. Det gor Render/prod oberoende av lokal raw historik och hindrar
+`No objects to concatenate` nar `data/history/orders` saknas i servermiljon.
+
 ## [2026-05-26] fix | Narvarande ligger fore Undo/Redo
 
 Knappen `Narvarande` ligger nu till vanster om Undo/Redo i bade Bemanning och

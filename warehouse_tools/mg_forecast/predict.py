@@ -4,6 +4,8 @@ large-order tail correction on top because it improved the walk-forward MAE
 without hurting hit-rate.
 """
 import os
+import pickle
+from pathlib import Path
 
 import lightgbm as lgb
 import numpy as np
@@ -21,6 +23,8 @@ _TAIL_SKRYM_STAGE2_SHRINKAGE_K = 10
 _TAIL_SKRYM_STAGE2_CORR_CAP = 1.0
 _LARGE_ORDER_SHRINKAGE_K = 24
 _LARGE_ORDER_CORR_CAP = 0.75
+_CALIBRATION_PATH = Path(__file__).with_name("calibration.pkl")
+_TRAINING_CACHE_PATH = Path(__file__).with_name("training.parquet")
 
 
 def _round_half(value: float) -> float:
@@ -288,6 +292,9 @@ def _calibrate(train: pd.DataFrame) -> dict:
 
 
 def _load_train() -> pd.DataFrame:
+    if _TRAINING_CACHE_PATH.exists():
+        return pd.read_parquet(_TRAINING_CACHE_PATH)
+
     from .pipeline import build_training_data, split
 
     df = build_training_data()
@@ -295,7 +302,14 @@ def _load_train() -> pd.DataFrame:
     return train
 
 
-_CALIBRATION = _calibrate(_load_train())
+def _load_calibration() -> dict:
+    if _CALIBRATION_PATH.exists():
+        with _CALIBRATION_PATH.open("rb") as handle:
+            return pickle.load(handle)
+    return _calibrate(_load_train())
+
+
+_CALIBRATION = _load_calibration()
 
 
 def predict(features: pd.DataFrame) -> pd.Series:

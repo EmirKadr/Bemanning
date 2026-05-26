@@ -507,6 +507,13 @@ def test_forecast_stage_support_files_uses_canonical_names(tmp_path):
     assert (fore_dir / "item_option-flow.csv").is_file()
 
 
+def test_forecast_has_packaged_calibration_artifact():
+    from warehouse_tools.mg_forecast import predict
+
+    assert predict._CALIBRATION_PATH.is_file()
+    assert predict._CALIBRATION["feature_cols"]
+
+
 def test_forecast_inference_uses_default_transportor_when_overview_value_missing(monkeypatch, tmp_path):
     from warehouse_tools.mg_forecast import forecast as mg_forecast
 
