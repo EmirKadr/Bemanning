@@ -27,6 +27,8 @@ services:
         sync: false
       - key: RENDER_SERVICE_ID
         sync: false
+      - key: RENDER_OWNER_ID
+        sync: false
       - key: RENDER_POSTGRES_ID
         sync: false
       - key: HEALTHCHECK_PUBLIC_URL

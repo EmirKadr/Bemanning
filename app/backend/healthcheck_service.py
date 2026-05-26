@@ -4,7 +4,7 @@ import os
 import platform
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -66,6 +66,15 @@ def service_id() -> str:
 
 def postgres_id() -> str:
     return settings.RENDER_POSTGRES_ID or settings.RENDER_DATABASE_ID or os.getenv("RENDER_POSTGRES_ID", "")
+
+
+def owner_id() -> str:
+    return (
+        settings.RENDER_OWNER_ID
+        or settings.RENDER_WORKSPACE_ID
+        or os.getenv("RENDER_OWNER_ID", "")
+        or os.getenv("RENDER_WORKSPACE_ID", "")
+    )
 
 
 def bytes_to_mb(value: int | float | None) -> float | None:
@@ -192,13 +201,29 @@ def extract_log_lines(payload: Any) -> list[str]:
     return [line for line in lines if line]
 
 
-def collect_render_logs(client: RenderClient, sid: str, checks: list[dict[str, Any]]) -> dict[str, Any]:
+def service_owner_id(service: dict[str, Any] | None, fallback: str = "") -> str:
+    if not isinstance(service, dict):
+        return fallback
+    owner = service.get("owner")
+    nested_owner = owner.get("id") if isinstance(owner, dict) else ""
+    return str(service.get("ownerId") or service.get("owner_id") or nested_owner or fallback or "")
+
+
+def collect_render_logs(client: RenderClient, sid: str, oid: str, checks: list[dict[str, Any]]) -> dict[str, Any]:
     if not sid:
         return {"lines": [], "error": "service_id_missing"}
+    if not oid:
+        checks.append(check(
+            "Render loggar",
+            "warn",
+            "Render ownerId saknas. Satt RENDER_OWNER_ID eller lat verktyget hamta service med RENDER_SERVICE_ID.",
+        ))
+        return {"lines": [], "error": "owner_id_missing"}
+    start_time = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
     attempts = (
-        (f"/services/{sid}/logs", {"limit": 100}),
+        ("/logs", {"ownerId": oid, "resource": [sid], "type": ["build"], "direction": "backward", "startTime": start_time, "limit": 100}),
+        ("/logs", {"ownerId": oid, "resource": [sid], "type": ["app"], "direction": "backward", "startTime": start_time, "limit": 100}),
         (f"/services/{sid}/events", {"limit": 100}),
-        ("/logs", {"resource": sid, "limit": 100}),
     )
     errors: list[str] = []
     for path, params in attempts:
@@ -256,9 +281,11 @@ def collect_render(include_render: bool, checks: list[dict[str, Any]]) -> dict[s
     client = RenderClient(api_key=settings.RENDER_API_KEY)
     sid = service_id()
     pid = postgres_id()
+    oid = owner_id()
     configured = {
         "api_key": bool(settings.RENDER_API_KEY),
         "service_id": bool(sid),
+        "owner_id": bool(oid),
         "postgres_id": bool(pid),
     }
     if not client.configured:
@@ -266,15 +293,18 @@ def collect_render(include_render: bool, checks: list[dict[str, Any]]) -> dict[s
         return {"enabled": True, "configured": configured}
     render_checks: list[dict[str, Any]] = []
     service = collect_render_resource(client, "service", sid, render_checks)
+    resolved_owner_id = service_owner_id(service.get("resource") if isinstance(service, dict) else None, oid)
+    configured["owner_id"] = bool(resolved_owner_id)
     database = collect_render_resource(client, "postgres", pid, render_checks) if pid else {"resource": None, "error": "postgres_id_missing"}
     deploys = collect_render_deploys(client, sid, render_checks)
-    logs = collect_render_logs(client, sid, render_checks)
+    logs = collect_render_logs(client, sid, resolved_owner_id, render_checks)
     metrics = collect_render_metrics(client, sid, pid, render_checks)
     checks.extend(render_checks)
     return {
         "enabled": True,
         "configured": configured,
         "service_id": sid or None,
+        "owner_id": resolved_owner_id or None,
         "postgres_id": pid or None,
         "service": service,
         "database": database,

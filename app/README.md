@@ -78,6 +78,7 @@ hemliga miljo variabler i driftens secret store:
 
 - `RENDER_API_KEY`
 - `RENDER_SERVICE_ID`
+- `RENDER_OWNER_ID` (valfri fallback; Halsa forsoker annars lasa ownerId fran service-svaret)
 - `RENDER_POSTGRES_ID`
 - `HEALTHCHECK_PUBLIC_URL` (valfri publik ping-URL)
 
@@ -89,7 +90,9 @@ python -m tools.healthcheck waits --local --period 24h
 ```
 
 Produktionens databas ar Postgres via Render. SQLite anvands bara for lokal
-utveckling och temporara tester. Om du bara vill hamta Render deploy/loggar utan
+utveckling och temporara tester. Render build-loggar hamtas via Render Logs API
+med `ownerId`, `resource=<service-id>` och `type=build`. Om du bara vill hamta
+Render deploy/loggar utan
 att koppla verktyget mot en databas kan du kora:
 
 ```powershell

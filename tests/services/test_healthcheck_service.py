@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.backend.database import Base
-from app.backend.healthcheck_service import clean_text, run_healthcheck
+from app.backend.healthcheck_service import clean_text, collect_render_logs, run_healthcheck
 from app.backend.models import Business, User, UserWaitMetric
 from app.backend.routers import healthcheck
 from app.backend.schemas import WaitMetricBatchIn, WaitMetricIn
@@ -78,3 +78,42 @@ def test_wait_metric_collection_summarizes_slowest_steps():
 def test_healthcheck_redacts_secret_like_text():
     assert "secret[redacted]" in clean_text("secret=abc123")
     assert "abc123" not in clean_text("token=abc123")
+
+
+def test_render_logs_use_owner_id_and_build_log_type():
+    calls = []
+
+    class FakeRenderClient:
+        def get(self, path, params=None):
+            calls.append((path, params))
+            return {
+                "logs": [
+                    {
+                        "timestamp": "2026-05-26T07:36:00Z",
+                        "message": "Build failed with traceback",
+                    }
+                ]
+            }, None
+
+    checks = []
+    result = collect_render_logs(FakeRenderClient(), "srv-test", "tea-test", checks)
+
+    assert calls[0][0] == "/logs"
+    assert calls[0][1]["ownerId"] == "tea-test"
+    assert calls[0][1]["resource"] == ["srv-test"]
+    assert calls[0][1]["type"] == ["build"]
+    assert result["error_count"] == 1
+    assert result["source"] == "/logs"
+
+
+def test_render_logs_explains_missing_owner_id():
+    class FakeRenderClient:
+        def get(self, path, params=None):  # pragma: no cover - should never be called
+            raise AssertionError("ownerId should be required before Render log calls")
+
+    checks = []
+    result = collect_render_logs(FakeRenderClient(), "srv-test", "", checks)
+
+    assert result["error"] == "owner_id_missing"
+    assert checks[0]["name"] == "Render loggar"
+    assert "ownerId" in checks[0]["message"]

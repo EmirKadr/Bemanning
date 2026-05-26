@@ -7,6 +7,13 @@ tags: [wiki, logg]
 
 # Wiki-logg
 
+## [2026-05-26] fix | Healthcheck laser Render build-loggar
+
+Render-loggar i Halsa anvander nu Render Logs API med `ownerId`, service-id och
+`type=build`. `ownerId` forsoker lasas fran service-svaret och kan annars sattas
+som `RENDER_OWNER_ID`, sa deployfel kan hamtas utan att blanda ihop Postgres med
+lokal SQLite.
+
 ## [2026-05-26] fix | Healthcheck skiljer Postgres och lokal test
 
 `tools.healthcheck` har fatt `--skip-db` sa agenter kan hamta Render deploy/loggar

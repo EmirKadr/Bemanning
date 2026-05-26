@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     RENDER_API_BASE_URL: str = "https://api.render.com/v1"
     RENDER_SERVICE_ID: str = ""
     RENDER_WEB_SERVICE_ID: str = ""
+    RENDER_OWNER_ID: str = ""
+    RENDER_WORKSPACE_ID: str = ""
     RENDER_POSTGRES_ID: str = ""
     RENDER_DATABASE_ID: str = ""
     HEALTHCHECK_PUBLIC_URL: str = ""

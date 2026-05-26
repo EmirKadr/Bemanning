@@ -28,7 +28,7 @@ Kort svar: Historik har fem lagen: anvandarhistorik, analys, felkoder, vantetide
 - `Analys`: statkort for antal handelser, senaste 24 h och unika anvandare samt topplistor for anvandare, atgarder och typer.
 - `Felkoder`: statkort for felkoder, topplistor for felkod, vy/API och felatgard samt senaste felhandelser.
 - `Vantetider`: p50/p95/max for vyload, API-anrop, nedladdningar och bakgrundsladdning, sa flaskhalsar syns utan manuell magkansla.
-- `Halsa`: app-, databas- och Render-status for lokal/serverdrift; samma signal anvands av `tools.healthcheck`.
+- `Halsa`: app-, databas- och Render-status for lokal/serverdrift; samma signal anvands av `tools.healthcheck` och kan lasa Render build-loggar nar API-nyckel, service-id och ownerId finns.
 - Detalj byggs av old/new snapshots och forsoker oversatta person, aktivitet och omrade via lookups.
 - Loggade floden omfattar nu register/schema, anvandare/forsta losenord, globala installningar, Hamta data, serverhanterade produktivitetsfiler och korda lagerverktygsfloden.
 - Misslyckade filuppladdningar som hinner na backend loggas som `productivity_file/upload_failed`, `allocation_flow/upload_failed` eller `allocation_flow/detect_failed` med steg, feltyp, kort felmeddelande och eventuell HTTP-status.
