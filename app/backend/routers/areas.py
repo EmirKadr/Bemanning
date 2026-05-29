@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from ..audit import log as audit_log
 from ..business_scope import filter_query_for_business, resolve_write_business_id, scoped_get
+from ..code_utils import code_part
 from ..deps import get_current_user, get_db, require_view_access
 from ..models import Activity, Area, Person, ScheduleCell, User
 from ..schemas import AreaCreate, AreaOut, AreaUpdate
@@ -19,6 +20,34 @@ def _area_snapshot(area: Area) -> dict:
         "sort_order": area.sort_order,
         "is_active": area.is_active,
     }
+
+
+def _clean_area_code(value: str | None) -> str:
+    code = code_part(value)
+    if not code:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Områdeskod saknar giltiga tecken")
+    return code[:20]
+
+
+def _unique_area_code(db: Session, *, business_id: int | None, base: str) -> str:
+    base = (base or "OMRADE")[:20].rstrip("_") or "OMRADE"
+    candidate = base
+    suffix = 2
+    while db.query(Area).filter_by(business_id=business_id, code=candidate).first():
+        suffix_text = f"_{suffix}"
+        candidate = f"{base[:20 - len(suffix_text)].rstrip('_')}{suffix_text}"
+        suffix += 1
+    return candidate
+
+
+def _resolve_area_code(db: Session, payload: AreaCreate, business_id: int | None) -> str:
+    provided = (payload.code or "").strip()
+    if provided:
+        code = _clean_area_code(provided)
+        if db.query(Area).filter_by(business_id=business_id, code=code).first():
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="Område med samma kod finns redan")
+        return code
+    return _unique_area_code(db, business_id=business_id, base=code_part(payload.name))
 
 
 def _area_has_linked_data(db: Session, area_id: int) -> bool:
@@ -86,10 +115,10 @@ def list_areas(
 @router.post("", response_model=AreaOut, status_code=status.HTTP_201_CREATED)
 def create_area(payload: AreaCreate, db: Session = Depends(get_db), admin: User = Depends(require_view_access("areas", "edit"))) -> Area:
     business_id = resolve_write_business_id(db, admin, requested_business_id=payload.business_id)
-    if db.query(Area).filter_by(business_id=business_id, code=payload.code).first():
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="Område med samma kod finns redan")
     data = payload.model_dump()
     data["business_id"] = business_id
+    data["code"] = _resolve_area_code(db, payload, business_id)
+    data["name"] = payload.name.strip() or data["code"]
     area = Area(**data)
     db.add(area)
     db.flush()
@@ -123,13 +152,17 @@ def update_area(
     if "business_id" in data and data["business_id"] != area.business_id:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Område kan inte flyttas mellan verksamheter")
     if "code" in data:
-        existing = (
-            db.query(Area)
-            .filter(Area.business_id == area.business_id, Area.code == data["code"], Area.id != area.id)
-            .first()
-        )
-        if existing:
-            raise HTTPException(status.HTTP_409_CONFLICT, detail="Område med samma kod finns redan")
+        if data["code"] is None:
+            data.pop("code")
+        else:
+            data["code"] = _clean_area_code(data["code"])
+            existing = (
+                db.query(Area)
+                .filter(Area.business_id == area.business_id, Area.code == data["code"], Area.id != area.id)
+                .first()
+            )
+            if existing:
+                raise HTTPException(status.HTTP_409_CONFLICT, detail="Område med samma kod finns redan")
     for key, value in data.items():
         setattr(area, key, value)
     audit_log(

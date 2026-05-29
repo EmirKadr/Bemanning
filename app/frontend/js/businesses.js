@@ -125,10 +125,10 @@ function openBusinessModal(business = null) {
   backdrop.innerHTML = `
     <div class="modal">
       <h2>${isEdit ? "Redigera verksamhet" : "Ny verksamhet"}</h2>
-      <label>Kod <input id="m-code" value="${escapeHtml(business?.code || "")}" ${isEdit ? "disabled" : ""} maxlength="20" /></label>
+      ${isEdit ? `<label>Kod <input id="m-code" value="${escapeHtml(business?.code || "")}" disabled maxlength="20" /></label>` : ""}
       <label>Namn <input id="m-name" value="${escapeHtml(business?.name || "")}" maxlength="100" /></label>
       <label>Sortering <input id="m-sort" type="number" value="${Number(business?.sort_order) || 0}" /></label>
-      <label class="table-checkbox-label"><input id="m-active" type="checkbox" ${business?.is_active !== false ? "checked" : ""} /> Aktiv</label>
+      <label class="modal-checkbox"><input id="m-active" type="checkbox" ${business?.is_active !== false ? "checked" : ""} /> Aktiv</label>
       <div class="actions">
         <button type="button" id="cancel">Avbryt</button>
         <button type="button" class="primary" id="save" data-enter-default>Spara</button>
@@ -139,17 +139,15 @@ function openBusinessModal(business = null) {
   backdrop.querySelector("#cancel").addEventListener("click", () => backdrop.remove());
   backdrop.querySelector("#save").addEventListener("click", async () => {
     const payload = {
-      code: document.getElementById("m-code").value.trim(),
       name: document.getElementById("m-name").value.trim(),
       sort_order: Number(document.getElementById("m-sort").value) || 0,
       is_active: document.getElementById("m-active").checked,
     };
-    if (!payload.code || !payload.name) {
-      showToast("Kod och namn krävs.", "warn", 3000);
+    if (!payload.name) {
+      showToast("Namn krävs.", "warn", 3000);
       return;
     }
     if (isEdit) {
-      delete payload.code;
       await api.put(`/api/businesses/${business.id}`, payload);
     } else {
       await api.post("/api/businesses", payload);
@@ -168,10 +166,10 @@ function openAreaModal(business, area = null) {
     <div class="modal">
       <h2>${isEdit ? "Redigera område" : "Nytt område"}</h2>
       <label>Verksamhet <input value="${escapeHtml(business.name)}" disabled /></label>
-      <label>Kod <input id="m-area-code" value="${escapeHtml(area?.code || "")}" maxlength="20" /></label>
+      ${isEdit ? `<label>Kod <input id="m-area-code" value="${escapeHtml(area?.code || "")}" maxlength="20" /></label>` : ""}
       <label>Namn <input id="m-area-name" value="${escapeHtml(area?.name || "")}" maxlength="100" /></label>
       <label>Sortering <input id="m-area-sort" type="number" value="${Number(area?.sort_order) || 0}" /></label>
-      <label class="table-checkbox-label"><input id="m-area-active" type="checkbox" ${area?.is_active !== false ? "checked" : ""} /> Aktiv</label>
+      <label class="modal-checkbox"><input id="m-area-active" type="checkbox" ${area?.is_active !== false ? "checked" : ""} /> Aktiv</label>
       <div class="actions">
         <button type="button" id="area-cancel">Avbryt</button>
         <button type="button" class="primary" id="area-save" data-enter-default>Spara</button>
@@ -182,13 +180,14 @@ function openAreaModal(business, area = null) {
   backdrop.querySelector("#area-cancel").addEventListener("click", () => backdrop.remove());
   backdrop.querySelector("#area-save").addEventListener("click", async () => {
     const payload = {
-      code: document.getElementById("m-area-code").value.trim().toUpperCase(),
       name: document.getElementById("m-area-name").value.trim(),
       sort_order: Number(document.getElementById("m-area-sort").value) || 0,
       is_active: document.getElementById("m-area-active").checked,
     };
-    if (!payload.code || !payload.name) {
-      showToast("Kod och namn krävs.", "warn", 3000);
+    const codeInput = document.getElementById("m-area-code");
+    if (codeInput) payload.code = codeInput.value.trim();
+    if (!payload.name) {
+      showToast("Namn krävs.", "warn", 3000);
       return;
     }
     try {

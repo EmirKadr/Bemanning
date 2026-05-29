@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import re
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..audit import log as audit_log
-from ..business_scope import normalize_business_code
+from ..code_utils import code_part
 from ..deps import get_db, require_super_user
 from ..models import Business, User
 from ..schemas import BusinessCreate, BusinessOut, BusinessUpdate
@@ -26,11 +24,31 @@ def _business_snapshot(business: Business) -> dict:
 
 
 def _clean_code(value: str) -> str:
-    code = normalize_business_code(value)
-    code = re.sub(r"[^A-Z0-9_]+", "_", code).strip("_")
+    code = code_part(value)
     if not code:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Verksamhetskod krävs")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Verksamhetskod saknar giltiga tecken")
     return code[:20]
+
+
+def _unique_business_code(db: Session, base: str) -> str:
+    base = (base or "VERKSAMHET")[:20].rstrip("_") or "VERKSAMHET"
+    candidate = base
+    suffix = 2
+    while db.query(Business).filter(Business.code == candidate).first():
+        suffix_text = f"_{suffix}"
+        candidate = f"{base[:20 - len(suffix_text)].rstrip('_')}{suffix_text}"
+        suffix += 1
+    return candidate
+
+
+def _resolve_business_code(db: Session, payload: BusinessCreate) -> str:
+    provided = (payload.code or "").strip()
+    if provided:
+        code = _clean_code(provided)
+        if db.query(Business).filter(Business.code == code).first():
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="Verksamhet med samma kod finns redan")
+        return code
+    return _unique_business_code(db, code_part(payload.name))
 
 
 @router.get("", response_model=list[BusinessOut])
@@ -51,9 +69,7 @@ def create_business(
     db: Session = Depends(get_db),
     user: User = Depends(require_super_user),
 ) -> Business:
-    code = _clean_code(payload.code)
-    if db.query(Business).filter(Business.code == code).first():
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="Verksamhet med samma kod finns redan")
+    code = _resolve_business_code(db, payload)
     business = Business(
         code=code,
         name=payload.name.strip() or code,

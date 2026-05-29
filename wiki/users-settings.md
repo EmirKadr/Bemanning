@@ -1,7 +1,7 @@
 ---
 title: Anvandare och installningar
 status: aktiv
-updated: 2026-05-26
+updated: 2026-05-29
 tags: [anvandare, settings, roller, ui]
 ---
 
@@ -86,9 +86,9 @@ Vyn finns bara for Super User och visar `code`, `name`, `sort_order` och aktiv-s
 
 Knappar:
 
-- `Ny verksamhet`: oppnar modal och skapar via `POST /api/businesses`.
+- `Ny verksamhet`: oppnar modal och skapar via `POST /api/businesses`; kod skapas automatiskt från namnet.
 - `Redigera`: uppdaterar namn, sortering eller aktiv-status via `PUT /api/businesses/{business_id}`.
-- `Nytt omrade`: skapar omrade pa vald verksamhet via `POST /api/areas` med `business_id`.
+- `Nytt omrade`: skapar omrade pa vald verksamhet via `POST /api/areas` med `business_id`; kod skapas automatiskt från namnet.
 - `Redigera` under Omraden: uppdaterar kod, namn, sortering eller aktiv-status via `PUT /api/areas/{area_id}`.
 - `Ta bort` under Omraden: anropar `DELETE /api/areas/{area_id}`. Tomma omraden tas bort; omradet inaktiveras om personer, aktiviteter eller anvandare redan ar kopplade till det.
 - `Visa inaktiva`: laddar aven inaktiva verksamheter och omraden.

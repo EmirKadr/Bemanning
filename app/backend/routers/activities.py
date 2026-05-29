@@ -1,5 +1,4 @@
 import io
-import re
 import unicodedata
 from dataclasses import dataclass
 from zipfile import BadZipFile
@@ -21,6 +20,7 @@ from ..business_scope import (
     scoped_get,
     visible_business_id,
 )
+from ..code_utils import code_part as _code_part
 from ..deps import get_current_user, get_db, require_view_access
 from ..models import Activity, Area, Person, ScheduleCell, User
 from ..schemas import (
@@ -78,12 +78,6 @@ class ImportActivityRow:
     area: str | None
     summary_activity: str | None
     sort_order: int | None
-
-
-def _code_part(value: str | None) -> str:
-    normalized = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode("ascii")
-    normalized = re.sub(r"[^A-Za-z0-9]+", "_", normalized).strip("_")
-    return normalized.upper()
 
 
 def _compact_key(value: str | None) -> str:

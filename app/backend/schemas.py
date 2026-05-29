@@ -18,7 +18,7 @@ class BusinessOut(BaseModel):
 
 
 class BusinessCreate(BaseModel):
-    code: str
+    code: str | None = None
     name: str
     sort_order: int = 0
     is_active: bool = True
@@ -43,7 +43,7 @@ class AreaOut(BaseModel):
 
 class AreaCreate(BaseModel):
     business_id: int | None = None
-    code: str
+    code: str | None = None
     name: str
     sort_order: int = 0
     is_active: bool = True

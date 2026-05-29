@@ -1,11 +1,18 @@
 ---
 title: Wiki-logg
 status: aktiv
-updated: 2026-05-26
+updated: 2026-05-29
 tags: [wiki, logg]
 ---
 
 # Wiki-logg
+
+## [2026-05-29] fix | Verksamhetskoder skapas automatiskt
+
+Verksamheter-vyn kräver inte längre att användaren fyller i kod när en ny
+verksamhet eller ett nytt område skapas. Backend skapar kod från namnet och
+lägger till suffix vid krock. Modalens aktiv-checkbox använder nu modalens
+checkboxlayout så etiketten inte glider isär från rutan.
 
 ## [2026-05-26] feature | Produktivitetsloggar sammanstalls
 

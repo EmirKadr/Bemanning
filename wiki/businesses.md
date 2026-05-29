@@ -1,7 +1,7 @@
 ---
 title: Verksamheter och isolering
 status: aktiv
-updated: 2026-05-26
+updated: 2026-05-29
 tags: [verksamheter, behorighet, isolering, super-user]
 ---
 
@@ -27,9 +27,9 @@ Kort svar: Verksamhet är isoleringsnivån ovanför område. Vanliga användare,
 | Områdestoggle | Sidebar footer | Alla inloggade | Filtrerar vyer efter synliga områden och verksamhet | `common.js`, `flow-area-focus` | Gammalt lokalt fokus migreras från områdeskod till `AREA:<id>`. |
 | `∞` | Områdestoggle | Alla, men med olika scope | Vanliga användare ser alla områden i egen verksamhet; Super User ser globalt allt | `areaFocusOptions`, business-scopeade API | En R3-användare ska inte få global `∞`. |
 | Verksamheter | Sidebar | Super User | Oppnar lista over verksamheter och deras omraden | `verksamheter.html`, `businesses.js` | Saknas korrekt for vanliga anvandare. |
-| Ny verksamhet | Verksamheter | Super User | Skapar verksamhet med kod, namn, sortering och aktiv-status | `POST /api/businesses` | Kod krävs och måste vara unik globalt. |
+| Ny verksamhet | Verksamheter | Super User | Skapar verksamhet med namn, sortering och aktiv-status. Kod skapas automatiskt från namnet | `POST /api/businesses` | Namn krävs. Om koden redan finns får den automatiskt suffix. |
 | Redigera | Verksamheter | Super User | Uppdaterar namn, sortering eller aktiv-status | `PUT /api/businesses/{business_id}` | Inaktiv verksamhet döljs i normal lista. |
-| Nytt omrade | Verksamheter, under vald verksamhet | Super User | Skapar omrade pa vald verksamhet | `POST /api/areas` med `business_id` | Omradeskod far ateranvandas i annan verksamhet men inte inom samma. |
+| Nytt omrade | Verksamheter, under vald verksamhet | Super User | Skapar omrade pa vald verksamhet. Kod skapas automatiskt från namnet | `POST /api/areas` med `business_id` | Namn krävs. Områdeskod får återanvändas i annan verksamhet men inte inom samma. |
 | Redigera omrade | Verksamheter, under Omraden | Super User | Uppdaterar kod, namn, sortering och aktiv-status | `PUT /api/areas/{area_id}` | Omrade kan inte flyttas mellan verksamheter. |
 | Ta bort omrade | Verksamheter, under Omraden | Super User | Tar bort tomt omrade eller inaktiverar om det anvands | `DELETE /api/areas/{area_id}` | Kopplade personer, aktiviteter eller anvandare gor att omradet inaktiveras i stallet. |
 | Verksamhetsfält | Personer, Aktiviteter, Användare | Super User vid create/import | Sätter explicit `business_id` eller skickar verksamhetskod i import/direkttabell | `persons.js`, `activities.js`, `users.js` | Super User får 400 om verksamhet inte kan härledas. |
@@ -38,6 +38,7 @@ Kort svar: Verksamhet är isoleringsnivån ovanför område. Vanliga användare,
 
 - `businesses` innehåller `code`, `name`, `sort_order` och `is_active`.
 - `verksamheter.html` visar varje verksamhet med en undersektion Omraden. Den hamtar `/api/businesses` och `/api/areas?include_inactive=true`, grupperar omradena pa `business_id` och uppdaterar sidebarens omradesfokus efter andringar.
+- `POST /api/businesses` och `POST /api/areas` kan ta emot kod, men Verksamheter-vyn skickar normalt bara namn/sortering/aktiv-status. Backend skapar då en sanerad versal kod från namnet och lägger till `_2`, `_3` osv vid krock.
 - `users`, `areas`, `persons`, `activities`, `audit_log` och verksamhetsspecifika `app_settings` har `business_id`.
 - `STIGAMO` är bakåtkompatibel default. Migrationen kopplar befintliga användare, områden, personer, aktiviteter, historik och settings dit när verksamhetskolumnen införs.
 - `R3` skapas av verksamhetsmigrationen. Lokal/dev-seed kan fylla R3-område och frånvaroaktiviteter, men seed körs inte och är spärrad mot production/live.
@@ -74,6 +75,7 @@ python -m tools.visual_smoke --via-desktop-proxy --roles admin,r3 --output artif
 | "Varför finns bara R3 i togglen?" | Användaren tillhör R3. R3 har bara R3-toggle. |
 | "Varför betyder `∞` olika saker?" | För vanliga användare betyder `∞` alla områden i egen verksamhet. För Super User betyder `∞` globalt allt. |
 | "Varför måste Super User välja verksamhet?" | Backend kan inte alltid härleda verksamhet från område/person/aktivitet. Då krävs ett explicit val för att undvika fel verksamhet. |
+| "Varför finns ingen kodruta när jag skapar verksamhet eller område?" | Koden skapas automatiskt från namnet när du sparar. Vid krock får den ett nummersuffix. |
 | "Varför hittas inte ett id som jag vet finns?" | Det kan tillhöra en annan verksamhet. API:t svarar då som saknad resurs för att inte avslöja annan verksamhet. |
 | "Varför påverkar vybehörigheten även den andra verksamheten?" | Vybehörigheter är globala per roll. Menyordning och vissa settings kan vara verksamhetsspecifika, men rollens vyåtkomst är samma i Stigamo och R3. |
 

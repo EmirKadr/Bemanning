@@ -861,6 +861,9 @@ def test_super_user_business_fields_are_wired_in_register_ui():
     assert 'api.get("/api/areas?include_inactive=true")' in businesses
     assert 'api.post("/api/businesses", payload)' in businesses
     assert 'api.put(`/api/businesses/${business.id}`, payload)' in businesses
+    assert 'class="modal-checkbox"><input id="m-active"' in businesses
+    assert 'class="modal-checkbox"><input id="m-area-active"' in businesses
+    assert "Kod och namn krävs." not in businesses
     assert "function renderAreasTable" in businesses
     assert "function openAreaModal" in businesses
     assert 'data-new-area="${business.id}"' in businesses

@@ -8,12 +8,13 @@ from app.backend.models import Activity, AppSetting, Area, Business, Person, Sch
 from app.backend.routers import public
 from app.backend.routers.activities import create_activity, list_activities, update_activity
 from app.backend.routers.areas import create_area, delete_area, list_areas
+from app.backend.routers.businesses import create_business
 from app.backend.routers.overview import get_overview_revision
 from app.backend.routers.persons import create_person, get_person, list_persons, update_person
 from app.backend.routers.schedule import get_schedule_revision, update_cell
 from app.backend.routers.settings import get_app_settings, update_app_settings
 from app.backend.routers.users import create_user, list_users, update_user
-from app.backend.schemas import ActivityCreate, ActivityUpdate, AreaCreate, CellUpdate, PersonCreate, PersonUpdate, UserCreate, UserUpdate
+from app.backend.schemas import ActivityCreate, ActivityUpdate, AreaCreate, BusinessCreate, CellUpdate, PersonCreate, PersonUpdate, UserCreate, UserUpdate
 from app.backend.schemas import AppSettingsUpdate
 
 
@@ -284,6 +285,31 @@ def test_super_user_can_add_r3_area_without_changing_stigamo(business_session):
     assert created.business_id == data["r3"].id
     assert {area.code for area in list_areas(db=session, user=data["r3_user"])} == {"R3", "MG"}
     assert [area.code for area in list_areas(db=session, user=data["user"])] == ["GG"]
+
+
+def test_business_and_area_codes_are_generated_from_name(business_session):
+    session, data = business_session
+
+    business = create_business(
+        BusinessCreate(name="T3", sort_order=3),
+        session,
+        data["super_user"],
+    )
+    area = create_area(
+        AreaCreate(business_id=business.id, name="AutoStore"),
+        session,
+        data["super_user"],
+    )
+    duplicate_area = create_area(
+        AreaCreate(business_id=business.id, name="AutoStore"),
+        session,
+        data["super_user"],
+    )
+
+    assert business.code == "T3"
+    assert business.name == "T3"
+    assert area.code == "AUTOSTORE"
+    assert duplicate_area.code == "AUTOSTORE_2"
 
 
 def test_delete_area_hard_deletes_empty_and_deactivates_linked_data(business_session):
