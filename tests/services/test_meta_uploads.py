@@ -22,6 +22,7 @@ from app.backend.routers import meta_uploads
 @pytest.fixture(autouse=True)
 def disable_meta_analysis_provider(monkeypatch):
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+    monkeypatch.setattr(meta_uploads, "_probe_video_duration_seconds", lambda data, filename: None)
 
 
 def make_session():
@@ -92,7 +93,8 @@ def test_meta_analysis_uses_gemini_config_and_parses_json_response(monkeypatch):
     )
 
 
-def test_public_meta_upload_route_accepts_multiple_media_without_login():
+def test_public_meta_upload_route_accepts_multiple_media_without_login(monkeypatch):
+    monkeypatch.setattr(meta_uploads, "_probe_video_duration_seconds", lambda data, filename: 42.4)
     engine, session = make_session()
 
     def override_get_db():
@@ -124,7 +126,11 @@ def test_public_meta_upload_route_accepts_multiple_media_without_login():
         assert [row.media_type for row in rows] == ["image", "video"]
         assert rows[0].data == b"image-bytes"
         assert rows[1].data == b"video-bytes"
+        assert rows[0].duration_seconds is None
+        assert rows[1].duration_seconds == 42.4
         assert len({row.batch_id for row in rows}) == 1
+        assert payload["saved"][1]["duration_seconds"] == 42.4
+        assert payload["saved"][1]["duration_label"] == "0:42"
         shipment = session.query(MetaShipmentObservation).one()
         assert shipment.media_upload_id == rows[1].id
         assert shipment.video_hash == rows[1].content_hash
@@ -208,6 +214,7 @@ def test_super_user_can_list_meta_uploads_and_stream_content():
         content_type="video/quicktime",
         media_type="video",
         size_bytes=11,
+        duration_seconds=65.1,
         data=b"hello-video",
         status="pending_analysis",
         source="public_upload",
@@ -232,6 +239,8 @@ def test_super_user_can_list_meta_uploads_and_stream_content():
         assert item["filename"] == "20260531_120102_123456Z_01.mov"
         assert item["original_filename"] == "semesterfilm.mov"
         assert item["media_type"] == "video"
+        assert item["duration_seconds"] == 65.1
+        assert item["duration_label"] == "1:05"
 
         content = client.get(f"/api/meta/uploads/{row.id}/content", headers={"Range": "bytes=0-4"})
         assert content.status_code == 206
@@ -256,6 +265,7 @@ def test_super_user_can_list_and_request_meta_shipment_analysis_without_configur
         content_type="video/quicktime",
         media_type="video",
         size_bytes=11,
+        duration_seconds=75.4,
         content_hash="b" * 64,
         data=b"hello-video",
         status="pending_analysis",
@@ -297,6 +307,9 @@ def test_super_user_can_list_and_request_meta_shipment_analysis_without_configur
         assert item["pallet_id"] == "PALL-1"
         assert item["deviations"] == ["Dåligt byggd pall"]
         assert item["video_url"] == f"/api/meta/uploads/{row.id}/content"
+        assert item["video_filename"] == "20260531_120102_123456Z_01.mov"
+        assert item["video_duration_seconds"] == 75.4
+        assert item["video_duration_label"] == "1:15"
 
         analysis = client.post(f"/api/meta/uploads/{row.id}/analyze")
         assert analysis.status_code == 200

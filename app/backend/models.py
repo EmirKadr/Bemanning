@@ -8,6 +8,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Float,
     Index,
     Integer,
     LargeBinary,
@@ -215,6 +216,7 @@ class MetaMediaUpload(Base):
     content_type: Mapped[str] = mapped_column(String(120), nullable=False)
     media_type: Mapped[str] = mapped_column(String(20), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    duration_seconds: Mapped[float | None] = mapped_column(Float)
     content_hash: Mapped[str | None] = mapped_column(String(64))
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending_analysis")

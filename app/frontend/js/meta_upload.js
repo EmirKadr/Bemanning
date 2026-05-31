@@ -12,11 +12,32 @@ const statusBox = document.getElementById("metaStatus");
 
 let selectedFiles = [];
 let uploading = false;
+const selectedVideoDurations = new WeakMap();
+let durationProbeGeneration = 0;
 
 function formatBytes(bytes) {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} kB`;
   return `${bytes} B`;
+}
+
+function formatDuration(seconds) {
+  if (seconds == null || seconds === "") return "";
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value < 0) return "";
+  const total = Math.round(value);
+  const sec = total % 60;
+  const minutesTotal = Math.floor(total / 60);
+  const min = minutesTotal % 60;
+  const hours = Math.floor(minutesTotal / 60);
+  if (hours > 0) return `${hours}:${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  return `${min}:${String(sec).padStart(2, "0")}`;
+}
+
+function isVideoFile(file) {
+  const type = String(file?.type || "").toLowerCase();
+  const name = String(file?.name || "").toLowerCase();
+  return type.startsWith("video/") || /\.(3g2|3gp|avi|m4v|mov|mp4|mpeg|mpg|webm)$/.test(name);
 }
 
 function setStatus(message, type = "") {
@@ -51,7 +72,9 @@ function renderFiles() {
 
     const size = document.createElement("div");
     size.className = "meta-file-size";
-    size.textContent = formatBytes(file.size || 0);
+    const duration = selectedVideoDurations.has(file) ? formatDuration(selectedVideoDurations.get(file)) : "";
+    size.textContent = duration ? `${formatBytes(file.size || 0)} - ${duration}` : formatBytes(file.size || 0);
+    size.dataset.fileDurationLabel = String(index);
     item.appendChild(size);
 
     const state = document.createElement("div");
@@ -66,6 +89,39 @@ function renderFiles() {
     item.appendChild(track);
 
     fileList.appendChild(item);
+  });
+}
+
+function updateFileDurationLabel(index, file) {
+  const node = fileList.querySelector(`[data-file-duration-label="${index}"]`);
+  if (!node) return;
+  const duration = selectedVideoDurations.has(file) ? formatDuration(selectedVideoDurations.get(file)) : "";
+  node.textContent = duration ? `${formatBytes(file.size || 0)} - ${duration}` : formatBytes(file.size || 0);
+}
+
+function loadSelectedVideoDurations() {
+  const generation = ++durationProbeGeneration;
+  selectedFiles.forEach((file, index) => {
+    if (!isVideoFile(file) || selectedVideoDurations.has(file)) return;
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    const cleanup = () => {
+      URL.revokeObjectURL(url);
+      video.removeAttribute("src");
+      video.load();
+    };
+    video.addEventListener("loadedmetadata", () => {
+      if (generation === durationProbeGeneration && selectedFiles[index] === file) {
+        selectedVideoDurations.set(file, video.duration);
+        updateFileDurationLabel(index, file);
+      }
+      cleanup();
+    }, { once: true });
+    video.addEventListener("error", cleanup, { once: true });
+    video.src = url;
   });
 }
 
@@ -125,6 +181,7 @@ function setFiles(files) {
   selectedFiles = Array.from(files || []).filter(Boolean);
   resetProgress();
   renderFiles();
+  loadSelectedVideoDurations();
   setStatus(selectedFiles.length ? `${selectedFiles.length} filer valda.` : "");
 }
 

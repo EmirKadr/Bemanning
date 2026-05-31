@@ -1100,6 +1100,8 @@ def test_public_meta_upload_page_is_standalone_and_mobile_focused():
     assert "FormData" in js
     assert "selectedFiles.forEach" in js
     assert "updateProgress" in js
+    assert "loadSelectedVideoDurations" in js
+    assert "data-file-duration-label" in js
     assert "skipped_count" in js
     assert "dubbletter hoppades över" in js
     assert "min-height: 100dvh" in css
@@ -1119,6 +1121,8 @@ def test_super_user_meta_view_lists_uploaded_media():
     assert "/js/common.js" in html
     assert "/js/meta.js" in html
     assert "Sändningsanalys" in html
+    assert "Längd" in html
+    assert "Rad-ID" in html
     assert 'id="metaShipmentRows"' in html
     assert 'id: "meta"' in common
     assert 'label: "Meta"' in common
@@ -1134,10 +1138,14 @@ def test_super_user_meta_view_lists_uploaded_media():
     assert "Ladda ner" in js
     assert "Radera" in js
     assert "Analysera" in js
+    assert "Video-ID" in js
+    assert "formatDuration" in js
+    assert "data-duration-for" in js
     assert "Öppna" not in js
     assert "openMediaModal" in js
     assert ".meta-admin-grid" in styles
     assert ".meta-admin-table" in styles
+    assert ".meta-icon-button" in styles
     assert ".meta-status-pill" in styles
     assert ".meta-preview-frame video" in styles
 

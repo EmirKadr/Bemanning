@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import hashlib
+import logging
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import tempfile
 from urllib.parse import quote
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..audit import log as audit_log
 from ..config import settings
@@ -25,6 +29,7 @@ from ..models import MetaMediaUpload, MetaShipmentObservation, User
 
 
 router = APIRouter(prefix="/api/meta", tags=["meta"])
+logger = logging.getLogger(__name__)
 
 MAX_META_UPLOAD_FILES = 25
 MAX_META_UPLOAD_FILE_BYTES = 256 * 1024 * 1024
@@ -85,6 +90,64 @@ def _format_size(bytes_count: int) -> str:
     return f"{bytes_count} B"
 
 
+def _format_duration(seconds: float | int | None) -> str | None:
+    if seconds is None:
+        return None
+    try:
+        total = max(0, int(round(float(seconds))))
+    except (TypeError, ValueError):
+        return None
+    minutes, sec = divmod(total, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{sec:02d}"
+    return f"{minutes}:{sec:02d}"
+
+
+def _probe_video_duration_seconds(data: bytes, original_filename: str) -> float | None:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe or not data:
+        return None
+    suffix = Path(original_filename).suffix.lower()
+    if suffix not in VIDEO_EXTENSIONS:
+        suffix = ".mp4"
+    temp_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            temp_file.write(data)
+            temp_path = temp_file.name
+        result = subprocess.run(
+            [
+                ffprobe,
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                temp_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+        if result.returncode != 0:
+            logger.info("Kunde inte läsa videolängd med ffprobe: %s", result.stderr[:200])
+            return None
+        duration = float(str(result.stdout or "").strip())
+        return duration if duration > 0 else None
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        logger.info("Kunde inte läsa videolängd för meta-video: %s", exc)
+        return None
+    finally:
+        if temp_path:
+            try:
+                Path(temp_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
 def _stored_filename(uploaded_at: datetime, index: int, original_filename: str, media_type: str) -> str:
     suffix = Path(original_filename).suffix.lower()
     if suffix not in IMAGE_EXTENSIONS and suffix not in VIDEO_EXTENSIONS:
@@ -104,6 +167,9 @@ def _media_upload_out(row: MetaMediaUpload) -> dict:
         "media_type": row.media_type,
         "size_bytes": row.size_bytes,
         "size_label": _format_size(row.size_bytes),
+        "duration_seconds": row.duration_seconds,
+        "duration_label": _format_duration(row.duration_seconds),
+        "content_hash": row.content_hash,
         "status": row.status,
         "source": row.source,
         "created_at": row.created_at.isoformat() if row.created_at else None,
@@ -118,6 +184,7 @@ def _media_upload_audit_snapshot(row: MetaMediaUpload) -> dict:
         "content_type": row.content_type,
         "media_type": row.media_type,
         "size_bytes": row.size_bytes,
+        "duration_seconds": row.duration_seconds,
         "content_hash": row.content_hash,
         "status": row.status,
         "source": row.source,
@@ -128,6 +195,7 @@ def _media_upload_audit_snapshot(row: MetaMediaUpload) -> dict:
 def _shipment_observation_out(row: MetaShipmentObservation) -> dict:
     video_id = row.media_upload_id
     label_id = row.label_image_upload_id
+    video = row.media_upload
     return {
         "id": row.id,
         "media_upload_id": video_id,
@@ -145,6 +213,11 @@ def _shipment_observation_out(row: MetaShipmentObservation) -> dict:
         "analysis_status": row.analysis_status,
         "analysis_error": row.analysis_error,
         "llm_model": row.llm_model,
+        "video_filename": (video.stored_filename or video.original_filename) if video else None,
+        "video_original_filename": video.original_filename if video else None,
+        "video_duration_seconds": video.duration_seconds if video else None,
+        "video_duration_label": _format_duration(video.duration_seconds) if video else None,
+        "video_size_label": _format_size(video.size_bytes) if video else None,
         "video_url": f"/api/meta/uploads/{video_id}/content" if video_id else None,
         "label_still_url": f"/api/meta/uploads/{label_id}/content" if label_id else None,
         "created_at": row.created_at.isoformat() if row.created_at else None,
@@ -240,6 +313,7 @@ async def upload_meta_media(
             content_type=content_type or "application/octet-stream",
             media_type=media_type,
             size_bytes=size,
+            duration_seconds=_probe_video_duration_seconds(data, filename) if media_type == "video" else None,
             content_hash=content_hash,
             data=data,
             status="pending_analysis",
@@ -256,6 +330,8 @@ async def upload_meta_media(
                 "media_type": media_type,
                 "size_bytes": size,
                 "size_label": _format_size(size),
+                "duration_seconds": row.duration_seconds,
+                "duration_label": _format_duration(row.duration_seconds),
             }
         )
 
@@ -323,7 +399,7 @@ def list_meta_shipment_observations(
     db: Session = Depends(get_db),
     _: User = Depends(require_super_user),
 ) -> dict:
-    query = db.query(MetaShipmentObservation)
+    query = db.query(MetaShipmentObservation).options(joinedload(MetaShipmentObservation.media_upload))
     if status_filter:
         query = query.filter(MetaShipmentObservation.analysis_status == status_filter)
     rows = (

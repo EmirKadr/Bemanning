@@ -58,6 +58,10 @@ Render secrets:
 - `META_ANALYSIS_AUTO_START`
 - `META_ANALYSIS_MAX_VIDEO_BYTES`
 
+Nya videos får även `duration_seconds` när servern kan läsa längden med
+`ffprobe`. Meta-vyn visar samma korta Video-ID i sändningstabellen och
+videokortet, så tabellrad och video går att matcha visuellt.
+
 ## Hämta data
 
 Datahämtningsvyn använder samma MiniMax-konfiguration, men skickar aldrig API-länkar, headernamn eller nycklar till modellen. Lägg anslutningen till den externa datakällan i miljövariabler:
