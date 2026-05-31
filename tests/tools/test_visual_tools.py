@@ -1100,6 +1100,8 @@ def test_public_meta_upload_page_is_standalone_and_mobile_focused():
     assert "FormData" in js
     assert "selectedFiles.forEach" in js
     assert "updateProgress" in js
+    assert "skipped_count" in js
+    assert "dubbletter hoppades över" in js
     assert "min-height: 100dvh" in css
     assert ".meta-progress-panel" in css
     assert ".meta-file-progress-bar" in css

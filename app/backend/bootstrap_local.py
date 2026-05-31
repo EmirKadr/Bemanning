@@ -74,6 +74,8 @@ def _sync_lightweight_sqlite_columns(target_engine=engine) -> None:
             connection.exec_driver_sql(
                 "ALTER TABLE meta_media_uploads ADD COLUMN stored_filename VARCHAR(255) NOT NULL DEFAULT 'meta_upload'"
             )
+        if meta_upload_columns and "content_hash" not in meta_upload_columns:
+            connection.exec_driver_sql("ALTER TABLE meta_media_uploads ADD COLUMN content_hash VARCHAR(64)")
 
 
 def _table_sql(connection, table_name: str) -> str:

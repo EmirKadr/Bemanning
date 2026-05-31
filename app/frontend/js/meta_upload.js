@@ -165,7 +165,15 @@ form.addEventListener("submit", async (event) => {
     input.value = "";
     selectedFiles = [];
     renderFiles();
-    setStatus(`${payload.saved_count || 0} filer uppladdade.`, "success");
+    const savedCount = Number(payload.saved_count || 0);
+    const skippedCount = Number(payload.skipped_count || 0);
+    if (skippedCount && savedCount) {
+      setStatus(`${savedCount} filer uppladdade. ${skippedCount} dubbletter hoppades över.`, "success");
+    } else if (skippedCount) {
+      setStatus(`Inga nya filer sparades. ${skippedCount} dubbletter fanns redan.`, "success");
+    } else {
+      setStatus(`${savedCount} filer uppladdade.`, "success");
+    }
   } catch (error) {
     setUploadControlsLocked(false);
     renderFiles();

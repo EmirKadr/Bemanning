@@ -64,10 +64,54 @@ def test_public_meta_upload_route_accepts_multiple_media_without_login():
         assert re.fullmatch(r"\d{8}_\d{6}_\d{6}Z_01\.jpg", rows[0].stored_filename)
         assert re.fullmatch(r"\d{8}_\d{6}_\d{6}Z_02\.mov", rows[1].stored_filename)
         assert [item["filename"] for item in payload["saved"]] == [row.stored_filename for row in rows]
+        assert all(re.fullmatch(r"[0-9a-f]{64}", row.content_hash or "") for row in rows)
+        assert len({row.content_hash for row in rows}) == 2
         assert [row.media_type for row in rows] == ["image", "video"]
         assert rows[0].data == b"image-bytes"
         assert rows[1].data == b"video-bytes"
         assert len({row.batch_id for row in rows}) == 1
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        session.close()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+def test_meta_upload_skips_duplicate_media_bytes():
+    engine, session = make_session()
+
+    def override_get_db():
+        yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        client = TestClient(app)
+        first = client.post(
+            "/api/meta/uploads",
+            files=[
+                ("files", ("film-a.mov", b"same-video", "video/quicktime")),
+                ("files", ("film-b.mov", b"same-video", "video/quicktime")),
+            ],
+        )
+
+        assert first.status_code == 201
+        first_payload = first.json()
+        assert first_payload["saved_count"] == 1
+        assert first_payload["skipped_count"] == 1
+        assert first_payload["skipped"][0]["reason"] == "duplicate"
+        assert first_payload["skipped"][0]["duplicate_of_filename"] == first_payload["saved"][0]["filename"]
+        assert session.query(MetaMediaUpload).count() == 1
+
+        second = client.post(
+            "/api/meta/uploads",
+            files=[("files", ("film-c.mov", b"same-video", "video/quicktime"))],
+        )
+        assert second.status_code == 201
+        second_payload = second.json()
+        assert second_payload["saved_count"] == 0
+        assert second_payload["skipped_count"] == 1
+        assert second_payload["skipped"][0]["duplicate_of_id"] is not None
+        assert session.query(MetaMediaUpload).count() == 1
     finally:
         app.dependency_overrides.pop(get_db, None)
         session.close()

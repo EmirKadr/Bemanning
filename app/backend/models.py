@@ -205,6 +205,7 @@ class MetaMediaUpload(Base):
         Index("ix_meta_media_uploads_batch_id", "batch_id"),
         Index("ix_meta_media_uploads_created_at", "created_at"),
         Index("ix_meta_media_uploads_status", "status"),
+        Index("ux_meta_media_uploads_content_hash", "content_hash", unique=True),
     )
 
     id: Mapped[int] = mapped_column(BigIntId, primary_key=True)
@@ -214,6 +215,7 @@ class MetaMediaUpload(Base):
     content_type: Mapped[str] = mapped_column(String(120), nullable=False)
     media_type: Mapped[str] = mapped_column(String(20), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    content_hash: Mapped[str | None] = mapped_column(String(64))
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending_analysis")
     analysis: Mapped[dict | None] = mapped_column(JsonField)

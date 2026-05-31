@@ -461,3 +461,7 @@ Lade till `/meta` och `meta-upload.html` som en fristaende publik mobilvy utan s
 ## [2026-05-31] feature | Meta-progress och Super User-vy
 
 Meta-uppladdningen visar nu total progress, kvarvarande mangd och status per fil under pagaende uppladdning. Backend sparar nya meta-filer med tidsstamplat `stored_filename`, och Super User far sidebarvyn `Meta` dar alla uppladdade bilder/videor kan listas, filtreras och visas via skyddade `/api/meta/uploads`-endpoints.
+
+## [2026-05-31] feature | Stoppa dubbletter i Meta
+
+Meta-uppladdningen beraknar nu SHA-256 `content_hash` for varje bild/video och sparar inte exakta dubbletter igen. Migrationen fyller hash for befintliga meta-rader och tar bort duplicate blobbar innan ett unikt index skapas; uppladdningssvaret visar `skipped_count` sa anvandaren ser hur manga dubbletter som hoppades over.

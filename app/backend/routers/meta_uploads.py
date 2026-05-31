@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 from pathlib import Path
 import re
 from urllib.parse import quote
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..deps import get_db, require_super_user
@@ -140,15 +142,45 @@ async def upload_meta_media(
     batch_total = 0
     rows: list[MetaMediaUpload] = []
     saved: list[dict] = []
+    skipped: list[dict] = []
+    pending_hashes: dict[str, str] = {}
 
     for index, upload in enumerate(files, start=1):
         filename = _clean_filename(upload.filename)
         content_type = str(upload.content_type or "application/octet-stream").split(";", 1)[0].strip().lower()
         media_type = _media_type(filename, content_type)
         data, size = await _read_upload_data(upload, batch_total=batch_total)
+        batch_total += size
+        content_hash = hashlib.sha256(data).hexdigest()
+        pending_duplicate = pending_hashes.get(content_hash)
+        if pending_duplicate:
+            skipped.append(
+                _duplicate_item(
+                    filename=filename,
+                    content_type=content_type or "application/octet-stream",
+                    media_type=media_type,
+                    size=size,
+                    duplicate_of_id=None,
+                    duplicate_of_filename=pending_duplicate,
+                )
+            )
+            continue
+        existing = db.query(MetaMediaUpload).filter(MetaMediaUpload.content_hash == content_hash).first()
+        if existing is not None:
+            skipped.append(
+                _duplicate_item(
+                    filename=filename,
+                    content_type=content_type or "application/octet-stream",
+                    media_type=media_type,
+                    size=size,
+                    duplicate_of_id=existing.id,
+                    duplicate_of_filename=existing.stored_filename or existing.original_filename,
+                )
+            )
+            continue
         uploaded_at = datetime.now(timezone.utc)
         stored_filename = _stored_filename(uploaded_at, index, filename, media_type)
-        batch_total += size
+        pending_hashes[content_hash] = stored_filename
         row = MetaMediaUpload(
             batch_id=batch_id,
             original_filename=filename,
@@ -156,6 +188,7 @@ async def upload_meta_media(
             content_type=content_type or "application/octet-stream",
             media_type=media_type,
             size_bytes=size,
+            content_hash=content_hash,
             data=data,
             status="pending_analysis",
             source="public_upload",
@@ -174,21 +207,30 @@ async def upload_meta_media(
             }
         )
 
-    try:
-        db.add_all(rows)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
+    if rows:
+        try:
+            db.add_all(rows)
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail="En eller flera filer fanns redan och sparades inte dubbelt. Försök ladda upp igen om andra filer saknas.",
+            )
+        except Exception:
+            db.rollback()
+            raise
 
-    for row, item in zip(rows, saved):
-        db.refresh(row)
-        item["id"] = row.id
+        for row, item in zip(rows, saved):
+            db.refresh(row)
+            item["id"] = row.id
 
     return {
         "batch_id": batch_id,
         "saved_count": len(saved),
+        "skipped_count": len(skipped),
         "saved": saved,
+        "skipped": skipped,
         "status": "pending_analysis",
     }
 
@@ -217,6 +259,28 @@ def list_meta_media_uploads(
 def _content_disposition(filename: str) -> str:
     safe_filename = _clean_filename(filename)
     return f"inline; filename*=UTF-8''{quote(safe_filename)}"
+
+
+def _duplicate_item(
+    *,
+    filename: str,
+    content_type: str,
+    media_type: str,
+    size: int,
+    duplicate_of_id: int | None,
+    duplicate_of_filename: str,
+) -> dict:
+    return {
+        "filename": filename,
+        "original_filename": filename,
+        "content_type": content_type,
+        "media_type": media_type,
+        "size_bytes": size,
+        "size_label": _format_size(size),
+        "reason": "duplicate",
+        "duplicate_of_id": duplicate_of_id,
+        "duplicate_of_filename": duplicate_of_filename,
+    }
 
 
 def _media_response(row: MetaMediaUpload, request: Request) -> Response:
