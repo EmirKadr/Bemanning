@@ -1,7 +1,7 @@
 ---
 title: Verksamheter och isolering
 status: aktiv
-updated: 2026-05-29
+updated: 2026-05-31
 tags: [verksamheter, behorighet, isolering, super-user]
 ---
 
@@ -16,6 +16,7 @@ Kort svar: Verksamhet är isoleringsnivån ovanför område. Vanliga användare,
    - Stigamo visar Stigamos områden plus `∞`, där `∞` betyder alla Stigamo-områden.
    - R3 visar bara R3-toggle.
    - Super User kan använda `∞` som globalt allt.
+   - Hogerklick pa togglen oppnar en direktmeny med samma scope: vanliga anvandare far omradena i egen verksamhet och Super User far alla aktiva omraden.
 3. När en vanlig användare skapar person, aktivitet, användare, schemacell eller settingsrad väljer användaren inte verksamhet. Backend använder användarens verksamhet.
 4. När Super User skapar eller importerar något som inte kan härledas från område, person eller aktivitet måste Super User välja verksamhet.
 5. Vanliga användare ska inte se att andra verksamheter finns. Främmande id ska ge nekad eller saknad resurs utan att visa data från den andra verksamheten.
@@ -24,7 +25,7 @@ Kort svar: Verksamhet är isoleringsnivån ovanför område. Vanliga användare,
 
 | Kontroll | Var | Vem får | Vad händer | API/kod | Vanliga fel |
 | --- | --- | --- | --- | --- | --- |
-| Områdestoggle | Sidebar footer | Alla inloggade | Filtrerar vyer efter synliga områden och verksamhet | `common.js`, `flow-area-focus` | Gammalt lokalt fokus migreras från områdeskod till `AREA:<id>`. |
+| Områdestoggle | Sidebar footer | Alla inloggade | Vanligt klick stegar mellan fokuslagen; hogerklick oppnar omradesmenyn. Filtrerar vyer efter synliga områden och verksamhet | `common.js`, `flow-area-focus`, `/api/areas` | Gammalt lokalt fokus migreras från områdeskod till `AREA:<id>`. |
 | `∞` | Områdestoggle | Alla, men med olika scope | Vanliga användare ser alla områden i egen verksamhet; Super User ser globalt allt | `areaFocusOptions`, business-scopeade API | En R3-användare ska inte få global `∞`. |
 | Verksamheter | Sidebar | Super User | Oppnar lista over verksamheter och deras omraden | `verksamheter.html`, `businesses.js` | Saknas korrekt for vanliga anvandare. |
 | Ny verksamhet | Verksamheter | Super User | Skapar verksamhet med namn, sortering och aktiv-status. Kod skapas automatiskt från namnet | `POST /api/businesses` | Namn krävs. Om koden redan finns får den automatiskt suffix. |

@@ -81,3 +81,57 @@ def test_sidebar_log_persists_across_view_navigation(local_sidebar_server, chrom
         expect(page.locator("#log-sidebar")).to_contain_text("Ingen logg")
     finally:
         context.close()
+
+
+def test_area_focus_context_menu_respects_business_scope(local_sidebar_server, chromium_browser):
+    admin_context = chromium_browser.new_context(locale="sv-SE")
+    admin_page = admin_context.new_page()
+    try:
+        admin_page.goto(f"{local_sidebar_server}/login.html", wait_until="networkidle")
+        admin_page.fill("#username", "admin")
+        admin_page.fill("#password", "admin123")
+        admin_page.click("button.primary")
+        admin_page.wait_for_url("**/index.html", timeout=15000)
+        admin_page.wait_for_selector("#area-focus-toggle", timeout=15000)
+        admin_page.locator("#area-focus-toggle").click(button="right")
+        expect(admin_page.locator(".area-focus-menu")).to_be_visible()
+        expect(admin_page.locator(".area-focus-menu button").first).to_be_visible()
+
+        admin_items = admin_page.locator(".area-focus-menu button").evaluate_all(
+            """(nodes) => nodes.map((node) => ({ value: node.dataset.value, text: node.innerText }))"""
+        )
+        admin_text = "\n".join(item["text"] for item in admin_items)
+        assert "Granngården" in admin_text
+        assert "Mestergruppen" in admin_text
+        assert "Autostore" in admin_text
+        assert "E-Handel" in admin_text
+        assert "R3" in admin_text
+        assert "Alla områden" in admin_text
+
+        admin_page.locator(".area-focus-menu button", has_text="Mestergruppen").click()
+        expect(admin_page.locator("#area-focus-toggle")).to_have_text("MG")
+        assert str(admin_page.evaluate("() => localStorage.getItem('flow-area-focus')")).startswith("AREA:")
+    finally:
+        admin_context.close()
+
+    r3_context = chromium_browser.new_context(locale="sv-SE")
+    r3_page = r3_context.new_page()
+    try:
+        r3_page.goto(f"{local_sidebar_server}/login.html", wait_until="networkidle")
+        r3_page.fill("#username", "visual_r3_admin")
+        r3_page.fill("#password", visual_smoke.VISUAL_PASSWORD)
+        r3_page.click("button.primary")
+        r3_page.wait_for_url("**/index.html", timeout=15000)
+        expect(r3_page.locator("#area-focus-toggle")).to_have_text("R3")
+
+        r3_page.locator("#area-focus-toggle").click(button="right")
+        expect(r3_page.locator(".area-focus-menu")).to_be_visible()
+        expect(r3_page.locator(".area-focus-menu button").first).to_be_visible()
+        r3_items = r3_page.locator(".area-focus-menu button").evaluate_all(
+            """(nodes) => nodes.map((node) => ({ value: node.dataset.value, text: node.innerText }))"""
+        )
+        assert len(r3_items) == 1
+        assert "R3" in r3_items[0]["text"]
+        assert r3_items[0]["value"].startswith("AREA:")
+    finally:
+        r3_context.close()

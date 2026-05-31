@@ -449,3 +449,7 @@ Webben anvander nu SVG for favicon och brandlogga, med PNG/ICO kvar som fallback
 ## [2026-05-26] fix | Ogiltigt omradesfokus faller tillbaka
 
 Bemanning och Oversikt friskar nu upp den gemensamma omradestogglen fran sidans egna `/api/areas`-svar och validerar sparade `AREA:<id>` mot aktuella aktiva omraden. Om ett omrade raderats medan en browserflik hade det valt faller fokus tillbaka till Alla i stallet for att skicka dod `area_id` och visa 404/tom vy.
+
+## [2026-05-31] polish | Hogerklicksmeny for omradesfokus
+
+Sidebarens omradestoggle har nu en hogerklicksmeny for direkt val av omrade. Menyn anvander samma `/api/areas`-scope som ovriga vyer: vanliga anvandare ser omraden i egen verksamhet, medan Super User ser alla aktiva omraden och globalt `∞`.

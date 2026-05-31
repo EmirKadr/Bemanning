@@ -673,6 +673,10 @@ def test_area_focus_toggle_is_wired_to_views():
     assert 'label: "∞"' in common
     assert "function nextAreaFocus" in common
     assert 'toggle.addEventListener("click", () => writeAreaFocus(nextAreaFocus()))' in common
+    assert 'toggle.addEventListener("contextmenu", (event) => openAreaFocusMenu(event, user))' in common
+    assert 'menu.className = "area-focus-menu"' in common
+    assert "areaFocusMenuOptions" in common
+    assert 'loadAreaFocusAreas(user)' in common
     assert "preferredAreaIdFromFocus" in common
     assert "function areaFocusValueForArea" in common
     assert 'writeAreaFocus("ALLT")' in common
@@ -688,6 +692,8 @@ def test_area_focus_toggle_is_wired_to_views():
     assert "compareActivitiesForAreaFocus" in common
     assert "comparePersonsForAreaFocus" in common
     assert ".area-focus-toggle" in styles
+    assert ".area-focus-menu" in styles
+    assert ".area-focus-menu button[aria-checked=\"true\"]" in styles
 
     assert 'const CALC_AREA_FALLBACK_KEYS = ["GG", "MG", "AS", "EH"]' in schedule
     assert "function calcAreaKeys" in schedule

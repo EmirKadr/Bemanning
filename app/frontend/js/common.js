@@ -88,6 +88,7 @@ const AREA_FOCUS_FALLBACK_NAMES = {
   EH: "E-Handel",
 };
 let dynamicAreaFocusOptions = null;
+let areaFocusAreasRequest = null;
 const appLogEntries = readStoredAppLogEntries();
 let waitMetricQueue = [];
 let waitMetricFlushTimer = null;
@@ -351,6 +352,20 @@ function setAreaFocusAreas(areas = [], user = null) {
   return dynamicAreaFocusOptions;
 }
 
+function loadAreaFocusAreas(user = null) {
+  if (areaFocusAreasRequest) return areaFocusAreasRequest;
+  areaFocusAreasRequest = api.get("/api/areas")
+    .then((areas) => setAreaFocusAreas(areas, user))
+    .finally(() => {
+      areaFocusAreasRequest = null;
+    });
+  return areaFocusAreasRequest;
+}
+
+function areaFocusMenuOptions() {
+  return Array.isArray(dynamicAreaFocusOptions) ? dynamicAreaFocusOptions : [];
+}
+
 function normalizeAreaFocus(value) {
   const normalized = String(value || "").trim().toUpperCase();
   const options = areaFocusOptions();
@@ -503,14 +518,129 @@ function updateAreaFocusToggle(value = readAreaFocus()) {
   toggle.setAttribute("aria-pressed", normalized === "ALLT" ? "false" : "true");
 }
 
+function closeAreaFocusMenu() {
+  document.querySelector(".area-focus-menu")?.remove();
+  document.removeEventListener("keydown", handleAreaFocusMenuKeydown);
+  window.removeEventListener("resize", closeAreaFocusMenu);
+  window.removeEventListener("scroll", closeAreaFocusMenu, true);
+}
+
+function handleAreaFocusMenuKeydown(event) {
+  if (event.key === "Escape") closeAreaFocusMenu();
+}
+
+function positionAreaFocusMenu(menu, event, anchor) {
+  const rect = anchor?.getBoundingClientRect?.();
+  const fallbackX = rect ? rect.right + 8 : 8;
+  const fallbackY = rect ? rect.top : 8;
+  const x = Number(event?.clientX) || fallbackX;
+  const y = Number(event?.clientY) || fallbackY;
+  const left = Math.min(x, window.innerWidth - menu.offsetWidth - 8);
+  const top = Math.min(y, window.innerHeight - menu.offsetHeight - 8);
+  menu.style.left = `${Math.max(8, left)}px`;
+  menu.style.top = `${Math.max(8, top)}px`;
+}
+
+function renderAreaFocusMenuItems(menu, options = [], state = "ready") {
+  menu.textContent = "";
+  if (state === "loading") {
+    const item = document.createElement("div");
+    item.className = "area-focus-menu-empty";
+    item.textContent = "Läser områden...";
+    menu.appendChild(item);
+    return;
+  }
+  if (state === "error") {
+    const item = document.createElement("div");
+    item.className = "area-focus-menu-empty error";
+    item.textContent = "Kunde inte läsa områden.";
+    menu.appendChild(item);
+    return;
+  }
+  if (!options.length) {
+    const item = document.createElement("div");
+    item.className = "area-focus-menu-empty";
+    item.textContent = "Inga områden";
+    menu.appendChild(item);
+    return;
+  }
+
+  const current = readAreaFocus();
+  options.forEach((option) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("role", "menuitemradio");
+    button.setAttribute("aria-checked", option.value === current ? "true" : "false");
+    button.dataset.value = option.value;
+
+    const code = document.createElement("span");
+    code.className = "area-focus-menu-code";
+    code.textContent = option.value === "ALLT" ? "∞" : option.label;
+    button.appendChild(code);
+
+    const name = document.createElement("span");
+    name.className = "area-focus-menu-name";
+    name.textContent = option.value === "ALLT" ? "Alla områden" : (option.title || option.label);
+    button.appendChild(name);
+
+    button.addEventListener("click", () => {
+      writeAreaFocus(option.value);
+      closeAreaFocusMenu();
+    });
+    menu.appendChild(button);
+  });
+}
+
+function openAreaFocusMenu(event, user = null) {
+  event.preventDefault();
+  event.stopPropagation();
+  const anchor = event.currentTarget || document.getElementById("area-focus-toggle");
+  closeAreaFocusMenu();
+
+  const menu = document.createElement("div");
+  menu.className = "area-focus-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", "Välj områdesfokus");
+  document.body.appendChild(menu);
+
+  const options = areaFocusMenuOptions();
+  renderAreaFocusMenuItems(menu, options, options.length ? "ready" : "loading");
+  positionAreaFocusMenu(menu, event, anchor);
+
+  if (!options.length) {
+    loadAreaFocusAreas(user)
+      .then((loadedOptions) => {
+        if (!menu.isConnected) return;
+        renderAreaFocusMenuItems(menu, loadedOptions || areaFocusMenuOptions());
+        positionAreaFocusMenu(menu, event, anchor);
+      })
+      .catch(() => {
+        if (!menu.isConnected) return;
+        renderAreaFocusMenuItems(menu, [], "error");
+        positionAreaFocusMenu(menu, event, anchor);
+      });
+  }
+
+  setTimeout(() => {
+    document.addEventListener("click", closeAreaFocusMenu, { once: true });
+    document.addEventListener("keydown", handleAreaFocusMenuKeydown);
+    window.addEventListener("resize", closeAreaFocusMenu);
+    window.addEventListener("scroll", closeAreaFocusMenu, true);
+  });
+}
+
 function initAreaFocusToggle(user = null) {
   const toggle = document.getElementById("area-focus-toggle");
   if (!toggle) return;
   updateAreaFocusToggle(readAreaFocus());
-  api.get("/api/areas")
-    .then((areas) => setAreaFocusAreas(areas, user))
-    .catch(() => {});
+  loadAreaFocusAreas(user).catch(() => {});
+  toggle.setAttribute("aria-haspopup", "menu");
   toggle.addEventListener("click", () => writeAreaFocus(nextAreaFocus()));
+  toggle.addEventListener("contextmenu", (event) => openAreaFocusMenu(event, user));
+  toggle.addEventListener("keydown", (event) => {
+    if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+    openAreaFocusMenu(event, user);
+  });
 }
 
 window.addEventListener("storage", (event) => {
