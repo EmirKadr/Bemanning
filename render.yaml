@@ -39,6 +39,18 @@ services:
         sync: false
       - key: MINIMAX_MODEL
         value: MiniMax-M2.7
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-pro
+      - key: GEMINI_API_BASE_URL
+        value: https://generativelanguage.googleapis.com
+      - key: META_ANALYSIS_TIMEOUT_SECONDS
+        value: "120"
+      - key: META_ANALYSIS_AUTO_START
+        value: "true"
+      - key: META_ANALYSIS_MAX_VIDEO_BYTES
+        value: "268435456"
       - key: DATA_SOURCE_API_BASE_URL
         sync: false
       - key: DATA_SOURCE_API_KEY

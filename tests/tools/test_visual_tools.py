@@ -1118,20 +1118,27 @@ def test_super_user_meta_view_lists_uploaded_media():
     assert '<body class="with-sidebar">' in html
     assert "/js/common.js" in html
     assert "/js/meta.js" in html
+    assert "Sändningsanalys" in html
+    assert 'id="metaShipmentRows"' in html
     assert 'id: "meta"' in common
     assert 'label: "Meta"' in common
     assert 'href: "/meta.html"' in common
     assert 'visible: Boolean(user?.is_super_user)' in common
     assert 'initPage("meta", { requireSuperUser: true })' in js
     assert 'api.get(`/api/meta/uploads?${params.toString()}`' in js
+    assert 'api.get("/api/meta/shipment-observations?limit=200"' in js
     assert "/api/meta/uploads/${encodeURIComponent(item.id)}/content" in js
+    assert "/api/meta/uploads/${encodeURIComponent(item.media_upload_id)}/analyze" in js
     assert "api.download(mediaUrl(item)" in js
     assert "api.del(`/api/meta/uploads/${encodeURIComponent(item.id)}`" in js
     assert "Ladda ner" in js
     assert "Radera" in js
+    assert "Analysera" in js
     assert "Öppna" not in js
     assert "openMediaModal" in js
     assert ".meta-admin-grid" in styles
+    assert ".meta-admin-table" in styles
+    assert ".meta-status-pill" in styles
     assert ".meta-preview-frame video" in styles
 
 

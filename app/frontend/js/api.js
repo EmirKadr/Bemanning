@@ -314,6 +314,8 @@ function apiActionLabel(path, method = "GET") {
   if (safePath.startsWith("/api/productivity/files")) return "Produktivitetsfil";
   if (safePath.startsWith("/api/productivity/report")) return "Produktivitet";
   if (safePath === "/api/meta/uploads") return verb === "POST" ? "Meta-uppladdning" : "Meta";
+  if (safePath.startsWith("/api/meta/shipment-observations")) return "Meta-sändningsanalys";
+  if (/^\/api\/meta\/uploads\/\d+\/analyze$/.test(safePath)) return "Meta-analys";
   if (/^\/api\/meta\/uploads\/\d+\/content$/.test(safePath)) return "Meta-fil";
   if (/^\/api\/meta\/uploads\/\d+$/.test(safePath)) return verb === "DELETE" ? "Meta-fil borttagen" : "Meta-fil";
   if (safePath.startsWith("/api/schedule/cells")) return "Bemanning: flera celler";

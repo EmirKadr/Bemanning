@@ -3,18 +3,25 @@ import io
 import re
 
 import pytest
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from starlette.datastructures import Headers, UploadFile
 
+from app.backend.config import settings
 from app.backend.database import Base
 from app.backend.deps import get_current_user, get_db
 from app.backend.main import app
-from app.backend.models import AuditLog, MetaMediaUpload, User
+from app.backend.models import AuditLog, MetaMediaUpload, MetaShipmentObservation, User
+from app.backend import meta_analysis_service
 from app.backend.routers import meta_uploads
+
+
+@pytest.fixture(autouse=True)
+def disable_meta_analysis_provider(monkeypatch):
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
 
 
 def make_session():
@@ -34,6 +41,54 @@ def make_upload(filename: str, content: bytes, content_type: str) -> UploadFile:
         file=io.BytesIO(content),
         filename=filename,
         headers=Headers({"content-type": content_type}),
+    )
+
+
+def test_meta_analysis_uses_gemini_config_and_parses_json_response(monkeypatch):
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "gemini-key")
+    monkeypatch.setattr(settings, "GEMINI_MODEL", "gemini-2.5-pro")
+
+    assert meta_analysis_service.meta_analysis_configured()
+    assert meta_analysis_service.gemini_model_name() == "gemini-2.5-pro"
+
+    extracted = meta_analysis_service._extract_json_candidate(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": (
+                                    '{"order_number":"12345","username":"lots1","customer_name":"Kund AB",'
+                                    '"pallet_id":"PALL-1","deviations":["Dåligt byggd pall"],'
+                                    '"uncertainty_notes":"Kontrollera kundnamn","label_frame_time_seconds":2.5}'
+                                )
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    )
+    fields = meta_analysis_service.normalize_meta_analysis(extracted)
+
+    assert fields["order_number"] == "12345"
+    assert fields["username"] == "lots1"
+    assert fields["customer_name"] == "Kund AB"
+    assert fields["pallet_id"] == "PALL-1"
+    assert fields["deviations"] == ["Dåligt byggd pall"]
+    assert fields["uncertainty_notes"] == "Kontrollera kundnamn"
+    assert fields["label_frame_time_seconds"] == "2.5"
+    assert re.fullmatch(
+        r"[0-9a-f]{64}",
+        meta_analysis_service.calculate_record_hash(
+            video_hash="b" * 64,
+            order_number=fields["order_number"],
+            username=fields["username"],
+            customer_name=fields["customer_name"],
+            pallet_id=fields["pallet_id"],
+            deviations=fields["deviations"],
+        ),
     )
 
 
@@ -70,6 +125,11 @@ def test_public_meta_upload_route_accepts_multiple_media_without_login():
         assert rows[0].data == b"image-bytes"
         assert rows[1].data == b"video-bytes"
         assert len({row.batch_id for row in rows}) == 1
+        shipment = session.query(MetaShipmentObservation).one()
+        assert shipment.media_upload_id == rows[1].id
+        assert shipment.video_hash == rows[1].content_hash
+        assert re.fullmatch(r"[0-9a-f]{64}", shipment.record_hash)
+        assert shipment.analysis_status == "needs_configuration"
     finally:
         app.dependency_overrides.pop(get_db, None)
         session.close()
@@ -125,6 +185,7 @@ def test_meta_upload_rejects_non_media_files():
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(
                 meta_uploads.upload_meta_media(
+                    background_tasks=BackgroundTasks(),
                     files=[make_upload("anteckning.txt", b"text", "text/plain")],
                     db=session,
                 )
@@ -177,6 +238,69 @@ def test_super_user_can_list_meta_uploads_and_stream_content():
         assert content.content == b"hello"
         assert content.headers["content-range"] == "bytes 0-4/11"
         assert "20260531_120102_123456Z_01.mov" in content.headers["content-disposition"]
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_current_user, None)
+        session.close()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+def test_super_user_can_list_and_request_meta_shipment_analysis_without_configuration(monkeypatch):
+    monkeypatch.setattr(meta_uploads, "meta_analysis_configured", lambda: False)
+    engine, session = make_session()
+    row = MetaMediaUpload(
+        batch_id="batch",
+        original_filename="etikettfilm.mov",
+        stored_filename="20260531_120102_123456Z_01.mov",
+        content_type="video/quicktime",
+        media_type="video",
+        size_bytes=11,
+        content_hash="b" * 64,
+        data=b"hello-video",
+        status="pending_analysis",
+        source="public_upload",
+    )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    shipment = MetaShipmentObservation(
+        media_upload_id=row.id,
+        video_hash=row.content_hash,
+        record_hash="c" * 64,
+        order_number="12345",
+        username="lots1",
+        customer_name="Kund AB",
+        pallet_id="PALL-1",
+        deviations=["Dåligt byggd pall"],
+        analysis_status="manual_review",
+    )
+    session.add(shipment)
+    session.commit()
+
+    def override_get_db():
+        yield session
+
+    def super_user():
+        return User(id=99, username="root", role="super_user", roles=["super_user"], is_active=True)
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = super_user
+    try:
+        client = TestClient(app)
+        response = client.get("/api/meta/shipment-observations")
+        assert response.status_code == 200
+        item = response.json()["items"][0]
+        assert item["order_number"] == "12345"
+        assert item["username"] == "lots1"
+        assert item["customer_name"] == "Kund AB"
+        assert item["pallet_id"] == "PALL-1"
+        assert item["deviations"] == ["Dåligt byggd pall"]
+        assert item["video_url"] == f"/api/meta/uploads/{row.id}/content"
+
+        analysis = client.post(f"/api/meta/uploads/{row.id}/analyze")
+        assert analysis.status_code == 200
+        assert analysis.json()["status"] == "needs_configuration"
     finally:
         app.dependency_overrides.pop(get_db, None)
         app.dependency_overrides.pop(get_current_user, None)

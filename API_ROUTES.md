@@ -158,5 +158,7 @@ verksamheter.
 | `public.summary_week` | `GET` | `/api/public/summary/week` | Publik CSV-summering för vecka |
 | `meta.uploads` | `POST` | `/api/meta/uploads` | Publik meta-uppladdning av bilder och videor |
 | `meta.list_uploads` | `GET` | `/api/meta/uploads` | Super User-lista över meta-uppladdningar |
+| `meta.shipment_observations` | `GET` | `/api/meta/shipment-observations` | Sändningsanalys för Meta-videor |
+| `meta.analyze` | `POST` | `/api/meta/uploads/{upload_id}/analyze` | Analysera Meta-video |
 | `meta.content` | `GET` | `/api/meta/uploads/{upload_id}/content` | Visa eller spela upp meta-uppladdning |
 | `meta.delete` | `DELETE` | `/api/meta/uploads/{upload_id}` | Radera meta-uppladdning |

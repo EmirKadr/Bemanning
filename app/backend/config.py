@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     MINIMAX_MODEL: str = "MiniMax-M2.7"
     MINIMAX_MAX_TOKENS: int = 700
     MINIMAX_TIMEOUT_SECONDS: int = 30
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-pro"
+    GEMINI_API_BASE_URL: str = "https://generativelanguage.googleapis.com"
+    META_ANALYSIS_TIMEOUT_SECONDS: int = 120
+    META_ANALYSIS_AUTO_START: bool = True
+    META_ANALYSIS_MAX_VIDEO_BYTES: int = 256 * 1024 * 1024
     DATA_SOURCE_API_BASE_URL: str = ""
     DATA_SOURCE_API_KEY: str = ""
     DATA_SOURCE_API_CLIENT: str = ""

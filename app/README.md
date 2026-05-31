@@ -43,6 +43,21 @@ Render-miljon.
 
 Chattknappen i sidomenyn fungerar när backend har en MiniMax-nyckel. Sätt `MINIMAX_API_KEY` i `.env` lokalt eller som hemlig miljövariabel på Render. Standardmodellen är `MiniMax-M2.7` och endpointen är `https://api.minimax.io/v1/chat/completions`.
 
+## Meta-analys / Gemini
+
+Meta-vyn kan skapa sändningsrader för uppladdade videor och skicka dem till
+Gemini. Analysen använder både video och ljud och förväntar JSON med
+ordernummer, användarnamn, kund, pall-id, avvikelser, osäkerheter och eventuell
+tidpunkt för en tydlig etikettbild. Lägg Gemini-nyckeln i `.env` lokalt eller i
+Render secrets:
+
+- `GEMINI_API_KEY`
+- `GEMINI_MODEL` (standard `gemini-2.5-pro`)
+- `GEMINI_API_BASE_URL`
+- `META_ANALYSIS_TIMEOUT_SECONDS`
+- `META_ANALYSIS_AUTO_START`
+- `META_ANALYSIS_MAX_VIDEO_BYTES`
+
 ## Hämta data
 
 Datahämtningsvyn använder samma MiniMax-konfiguration, men skickar aldrig API-länkar, headernamn eller nycklar till modellen. Lägg anslutningen till den externa datakällan i miljövariabler:

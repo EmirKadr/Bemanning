@@ -143,6 +143,8 @@ ROUTES: tuple[ApiRoute, ...] = (
     ApiRoute("public.summary_week", "GET", "/api/public/summary/week", "Publik CSV-summering för vecka"),
     ApiRoute("meta.uploads", "POST", "/api/meta/uploads", "Publik meta-uppladdning av bilder och videor"),
     ApiRoute("meta.list_uploads", "GET", "/api/meta/uploads", "Super User-lista över meta-uppladdningar"),
+    ApiRoute("meta.shipment_observations", "GET", "/api/meta/shipment-observations", "Sändningsanalys för Meta-videor"),
+    ApiRoute("meta.analyze", "POST", "/api/meta/uploads/{upload_id}/analyze", "Analysera Meta-video"),
     ApiRoute("meta.content", "GET", "/api/meta/uploads/{upload_id}/content", "Visa eller spela upp meta-uppladdning"),
     ApiRoute("meta.delete", "DELETE", "/api/meta/uploads/{upload_id}", "Radera meta-uppladdning"),
 )

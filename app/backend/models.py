@@ -223,6 +223,41 @@ class MetaMediaUpload(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class MetaShipmentObservation(Base):
+    __tablename__ = "meta_shipment_observations"
+    __table_args__ = (
+        UniqueConstraint("media_upload_id", name="uq_meta_shipment_observations_media_upload"),
+        Index("ix_meta_shipment_observations_status", "analysis_status"),
+        Index("ix_meta_shipment_observations_video_hash", "video_hash"),
+        Index("ux_meta_shipment_observations_record_hash", "record_hash", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(BigIntId, primary_key=True)
+    media_upload_id: Mapped[int] = mapped_column(ForeignKey("meta_media_uploads.id"), nullable=False)
+    label_image_upload_id: Mapped[int | None] = mapped_column(ForeignKey("meta_media_uploads.id"))
+    video_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    label_image_hash: Mapped[str | None] = mapped_column(String(64))
+    record_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    order_number: Mapped[str | None] = mapped_column(String(80))
+    username: Mapped[str | None] = mapped_column(String(120))
+    customer_name: Mapped[str | None] = mapped_column(String(200))
+    pallet_id: Mapped[str | None] = mapped_column(String(120))
+    deviations: Mapped[list | None] = mapped_column(JsonField)
+    uncertainty_notes: Mapped[str | None] = mapped_column(Text)
+    label_frame_time_seconds: Mapped[str | None] = mapped_column(String(40))
+    analysis_status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending_analysis")
+    analysis_error: Mapped[str | None] = mapped_column(Text)
+    llm_model: Mapped[str | None] = mapped_column(String(120))
+    llm_raw_response: Mapped[dict | None] = mapped_column(JsonField)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    media_upload: Mapped[MetaMediaUpload] = relationship(foreign_keys=[media_upload_id])
+    label_image_upload: Mapped[MetaMediaUpload | None] = relationship(foreign_keys=[label_image_upload_id])
+
+
 class AppSetting(Base):
     __tablename__ = "app_settings"
     __table_args__ = (

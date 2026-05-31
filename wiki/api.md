@@ -76,6 +76,7 @@ eller skapa/importera med explicit verksamhet.
 - `GET /api/public/...` - publika text/CSV-summeringar for timmar/personer. Queryparametern `business` defaultar till `STIGAMO`; publika endpoints summerar inte globalt.
 - `POST /api/meta/uploads` - publik multipart-uppladdning for flera bilder/videor utan inloggning. Sparar filer i `meta_media_uploads` med tidsstamplat `stored_filename`, `content_hash` och status `pending_analysis`. Exakta dubbletter hoppas over och returneras i `skipped`.
 - `GET /api/meta/uploads`, `GET /api/meta/uploads/{upload_id}/content`, `DELETE /api/meta/uploads/{upload_id}` - Super User-endpoints for Meta-vyn. Listan returnerar metadata utan blobbinnehall; content-endpointen kan visa/ladda ner bild/video och stoder byte-range for videospelning. Delete-endpointen raderar raden och blobben.
+- `GET /api/meta/shipment-observations`, `POST /api/meta/uploads/{upload_id}/analyze` - Super User-endpoints for sändningsanalys av Meta-videor. Analysen använder Gemini när `GEMINI_API_KEY` finns och ska väga ihop både video och ljud.
 
 ## Agentkommandon
 

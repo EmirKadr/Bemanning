@@ -469,3 +469,7 @@ Meta-uppladdningen beraknar nu SHA-256 `content_hash` for varje bild/video och s
 ## [2026-05-31] feature | Meta-nedladdning och radering
 
 Super User-vyn `Meta` visar nu knappen `Ladda ner` i stallet for `Oppna` och har en ny `Radera`-knapp per mediafil. Radering gar via `DELETE /api/meta/uploads/{upload_id}`, tar bort raden/blobben och audit-loggar metadata utan filinnehall.
+
+## [2026-05-31] feature | Gemini-analys for Meta-videor
+
+Meta skapar nu sändningsrader for uppladdade videor i `meta_shipment_observations` med video-hash, radhash, ordernummer, användarnamn, kund, pall-id, avvikelser, videolank och eventuell etikettstillbild. Backend kan använda `GEMINI_API_KEY` och standardmodellen `gemini-2.5-pro` for att analysera både video och ljud; osäkra svar hamnar i manuell kontroll i Meta-vyn.

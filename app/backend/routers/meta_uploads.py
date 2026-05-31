@@ -7,13 +7,21 @@ import re
 from urllib.parse import quote
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..audit import log as audit_log
+from ..config import settings
 from ..deps import get_db, require_super_user
-from ..models import MetaMediaUpload, User
+from ..meta_analysis_service import (
+    analyze_meta_upload,
+    ensure_shipment_observations,
+    meta_analysis_configured,
+    refresh_record_hash,
+    run_meta_analysis_background,
+)
+from ..models import MetaMediaUpload, MetaShipmentObservation, User
 
 
 router = APIRouter(prefix="/api/meta", tags=["meta"])
@@ -117,6 +125,33 @@ def _media_upload_audit_snapshot(row: MetaMediaUpload) -> dict:
     }
 
 
+def _shipment_observation_out(row: MetaShipmentObservation) -> dict:
+    video_id = row.media_upload_id
+    label_id = row.label_image_upload_id
+    return {
+        "id": row.id,
+        "media_upload_id": video_id,
+        "label_image_upload_id": label_id,
+        "video_hash": row.video_hash,
+        "label_image_hash": row.label_image_hash,
+        "record_hash": row.record_hash,
+        "order_number": row.order_number,
+        "username": row.username,
+        "customer_name": row.customer_name,
+        "pallet_id": row.pallet_id,
+        "deviations": row.deviations or [],
+        "uncertainty_notes": row.uncertainty_notes,
+        "label_frame_time_seconds": row.label_frame_time_seconds,
+        "analysis_status": row.analysis_status,
+        "analysis_error": row.analysis_error,
+        "llm_model": row.llm_model,
+        "video_url": f"/api/meta/uploads/{video_id}/content" if video_id else None,
+        "label_still_url": f"/api/meta/uploads/{label_id}/content" if label_id else None,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
 async def _read_upload_data(upload: UploadFile, *, batch_total: int) -> tuple[bytes, int]:
     chunks: list[bytes] = []
     size = 0
@@ -143,6 +178,7 @@ async def _read_upload_data(upload: UploadFile, *, batch_total: int) -> tuple[by
 
 @router.post("/uploads", status_code=status.HTTP_201_CREATED)
 async def upload_meta_media(
+    background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -240,11 +276,19 @@ async def upload_meta_media(
         for row, item in zip(rows, saved):
             db.refresh(row)
             item["id"] = row.id
+        shipment_rows = ensure_shipment_observations(db, rows)
+        db.commit()
+        if shipment_rows and meta_analysis_configured() and settings.META_ANALYSIS_AUTO_START:
+            background_tasks.add_task(run_meta_analysis_background, [row.media_upload_id for row in shipment_rows])
+    else:
+        shipment_rows = []
 
     return {
         "batch_id": batch_id,
         "saved_count": len(saved),
         "skipped_count": len(skipped),
+        "shipment_count": len(shipment_rows),
+        "analysis_status": "queued" if shipment_rows and meta_analysis_configured() else "needs_configuration" if shipment_rows else None,
         "saved": saved,
         "skipped": skipped,
         "status": "pending_analysis",
@@ -272,6 +316,46 @@ def list_meta_media_uploads(
     }
 
 
+@router.get("/shipment-observations")
+def list_meta_shipment_observations(
+    limit: int = Query(200, ge=1, le=500),
+    status_filter: str | None = Query(None, alias="status", max_length=40),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_user),
+) -> dict:
+    query = db.query(MetaShipmentObservation)
+    if status_filter:
+        query = query.filter(MetaShipmentObservation.analysis_status == status_filter)
+    rows = (
+        query.order_by(MetaShipmentObservation.updated_at.desc(), MetaShipmentObservation.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return {
+        "count": len(rows),
+        "items": [_shipment_observation_out(row) for row in rows],
+    }
+
+
+@router.post("/uploads/{upload_id}/analyze")
+def analyze_meta_media_upload(
+    upload_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_user),
+) -> dict:
+    upload = db.get(MetaMediaUpload, upload_id)
+    if upload is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Uppladdningen hittades inte.")
+    if upload.media_type != "video":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Bara videor kan analyseras.")
+    row = analyze_meta_upload(db, upload_id)
+    return {
+        "item": _shipment_observation_out(row),
+        "status": row.analysis_status,
+        "message": row.analysis_error,
+    }
+
+
 @router.delete("/uploads/{upload_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_meta_media_upload(
     upload_id: int,
@@ -282,6 +366,14 @@ def delete_meta_media_upload(
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Uppladdningen hittades inte.")
     before = _media_upload_audit_snapshot(row)
+    db.query(MetaShipmentObservation).filter(MetaShipmentObservation.media_upload_id == upload_id).delete(
+        synchronize_session=False
+    )
+    label_refs = db.query(MetaShipmentObservation).filter(MetaShipmentObservation.label_image_upload_id == upload_id).all()
+    for observation in label_refs:
+        observation.label_image_upload_id = None
+        observation.label_image_hash = None
+        refresh_record_hash(observation)
     db.delete(row)
     audit_log(
         db,
