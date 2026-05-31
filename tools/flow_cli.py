@@ -144,6 +144,7 @@ ROUTES: tuple[ApiRoute, ...] = (
     ApiRoute("meta.uploads", "POST", "/api/meta/uploads", "Publik meta-uppladdning av bilder och videor"),
     ApiRoute("meta.list_uploads", "GET", "/api/meta/uploads", "Super User-lista över meta-uppladdningar"),
     ApiRoute("meta.content", "GET", "/api/meta/uploads/{upload_id}/content", "Visa eller spela upp meta-uppladdning"),
+    ApiRoute("meta.delete", "DELETE", "/api/meta/uploads/{upload_id}", "Radera meta-uppladdning"),
 )
 
 ROUTES_BY_NAME = {route.name: route for route in ROUTES}

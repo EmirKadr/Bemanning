@@ -70,6 +70,7 @@ Viktiga settings:
 - `original_filename` ar namnet fran anvandarens telefon/dator. `stored_filename` ar det namn som visas i Meta och byggs av serverns uppladdningsdatum/timestamp plus originalandelse, till exempel `20260531_120102_123456Z_01.mov`.
 - `content_hash` ar SHA-256 av filens bytes. Backend anvander ett unikt index for att inte spara samma bild/video flera ganger.
 - `data` innehaller sjalva bilden/videon som blob. List-endpointen returnerar inte blobben; Super User hamtar/visar en fil via separat content-endpoint.
+- Super User kan radera en meta-rad via Meta-vyn. Da tas blobben bort och audit-loggen sparar bara metadata, inte filens bytes.
 - `status=pending_analysis` betyder att filen finns redo for ett senare LLM-flode. `analysis` ar reserverat for analysresultat.
 
 ## Kallor

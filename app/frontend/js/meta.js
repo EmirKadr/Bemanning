@@ -32,6 +32,33 @@ function mediaUrl(item) {
   return `/api/meta/uploads/${encodeURIComponent(item.id)}/content`;
 }
 
+async function downloadMetaItem(item) {
+  if (!item) return;
+  try {
+    await api.download(mediaUrl(item), item.filename || "meta-upload");
+  } catch (error) {
+    showToast(error.message || "Kunde inte ladda ner filen.", "error", 7000);
+  }
+}
+
+async function deleteMetaItem(item, button = null) {
+  if (!item) return;
+  const filename = item.filename || item.original_filename || "filen";
+  if (!confirm(`Radera ${filename}? Det går inte att ångra.`)) return;
+  if (button) button.disabled = true;
+  try {
+    await api.del(`/api/meta/uploads/${encodeURIComponent(item.id)}`, {
+      logLabel: "Meta-fil borttagen",
+    });
+    metaItems = metaItems.filter((entry) => Number(entry.id) !== Number(item.id));
+    renderMetaItems();
+    showToast("Meta-fil raderad.", "success", 2500);
+  } catch (error) {
+    if (button) button.disabled = false;
+    showToast(error.message || "Kunde inte radera filen.", "error", 7000);
+  }
+}
+
 function renderSummary() {
   const total = metaItems.length;
   const videos = metaItems.filter((item) => item.media_type === "video").length;
@@ -62,7 +89,8 @@ function renderMetaItems() {
         </dl>
         <div class="meta-admin-actions">
           <button type="button" class="primary" data-open-media="${item.id}">Visa</button>
-          <a class="button-link" href="${mediaUrl(item)}" target="_blank" rel="noopener">Öppna</a>
+          <button type="button" data-download-media="${item.id}">Ladda ner</button>
+          <button type="button" class="danger" data-delete-media="${item.id}">Radera</button>
         </div>
       </div>
     </article>
@@ -72,6 +100,18 @@ function renderMetaItems() {
     button.addEventListener("click", () => {
       const item = metaItems.find((entry) => Number(entry.id) === Number(button.dataset.openMedia));
       if (item) openMediaModal(item);
+    });
+  });
+  grid.querySelectorAll("[data-download-media]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = metaItems.find((entry) => Number(entry.id) === Number(button.dataset.downloadMedia));
+      void downloadMetaItem(item);
+    });
+  });
+  grid.querySelectorAll("[data-delete-media]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = metaItems.find((entry) => Number(entry.id) === Number(button.dataset.deleteMedia));
+      void deleteMetaItem(item, button);
     });
   });
 }
@@ -89,12 +129,15 @@ function openMediaModal(item) {
           : `<img src="${mediaUrl(item)}" alt="${escapeHtml(item.filename)}" />`}
       </div>
       <div class="actions">
-        <a class="button-link" href="${mediaUrl(item)}" target="_blank" rel="noopener">Öppna i ny flik</a>
+        <button type="button" data-download-media="${item.id}">Ladda ner</button>
         <button type="button" class="primary" id="metaPreviewClose">Stäng</button>
       </div>
     </div>
   `;
   document.body.appendChild(backdrop);
+  backdrop.querySelector("[data-download-media]")?.addEventListener("click", () => {
+    void downloadMetaItem(item);
+  });
   backdrop.querySelector("#metaPreviewClose").addEventListener("click", () => backdrop.remove());
   backdrop.addEventListener("click", (event) => {
     if (event.target === backdrop) backdrop.remove();

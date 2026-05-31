@@ -465,3 +465,7 @@ Meta-uppladdningen visar nu total progress, kvarvarande mangd och status per fil
 ## [2026-05-31] feature | Stoppa dubbletter i Meta
 
 Meta-uppladdningen beraknar nu SHA-256 `content_hash` for varje bild/video och sparar inte exakta dubbletter igen. Migrationen fyller hash for befintliga meta-rader och tar bort duplicate blobbar innan ett unikt index skapas; uppladdningssvaret visar `skipped_count` sa anvandaren ser hur manga dubbletter som hoppades over.
+
+## [2026-05-31] feature | Meta-nedladdning och radering
+
+Super User-vyn `Meta` visar nu knappen `Ladda ner` i stallet for `Oppna` och har en ny `Radera`-knapp per mediafil. Radering gar via `DELETE /api/meta/uploads/{upload_id}`, tar bort raden/blobben och audit-loggar metadata utan filinnehall.

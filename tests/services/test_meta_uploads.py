@@ -13,7 +13,7 @@ from starlette.datastructures import Headers, UploadFile
 from app.backend.database import Base
 from app.backend.deps import get_current_user, get_db
 from app.backend.main import app
-from app.backend.models import MetaMediaUpload, User
+from app.backend.models import AuditLog, MetaMediaUpload, User
 from app.backend.routers import meta_uploads
 
 
@@ -185,6 +185,52 @@ def test_super_user_can_list_meta_uploads_and_stream_content():
         engine.dispose()
 
 
+def test_super_user_can_delete_meta_uploads_and_audit_without_blob():
+    engine, session = make_session()
+    row = MetaMediaUpload(
+        batch_id="batch-delete",
+        original_filename="lagerbild.jpg",
+        stored_filename="20260531_120102_123456Z_01.jpg",
+        content_type="image/jpeg",
+        media_type="image",
+        size_bytes=10,
+        content_hash="a" * 64,
+        data=b"image-data",
+        status="pending_analysis",
+        source="public_upload",
+    )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    upload_id = row.id
+
+    def override_get_db():
+        yield session
+
+    def super_user():
+        return User(id=99, username="root", role="super_user", roles=["super_user"], is_active=True)
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = super_user
+    try:
+        client = TestClient(app)
+        response = client.delete(f"/api/meta/uploads/{upload_id}")
+
+        assert response.status_code == 204
+        assert session.get(MetaMediaUpload, upload_id) is None
+        audit = session.query(AuditLog).filter_by(entity_type="meta_media_upload", action="delete").one()
+        assert audit.entity_id == upload_id
+        assert audit.old_value["filename"] == "20260531_120102_123456Z_01.jpg"
+        assert audit.old_value["content_hash"] == "a" * 64
+        assert "data" not in audit.old_value
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_current_user, None)
+        session.close()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
 def test_non_super_user_cannot_list_meta_uploads():
     engine, session = make_session()
 
@@ -200,6 +246,8 @@ def test_non_super_user_cannot_list_meta_uploads():
         client = TestClient(app)
         response = client.get("/api/meta/uploads")
         assert response.status_code == 403
+        delete_response = client.delete("/api/meta/uploads/1")
+        assert delete_response.status_code == 403
     finally:
         app.dependency_overrides.pop(get_db, None)
         app.dependency_overrides.pop(get_current_user, None)

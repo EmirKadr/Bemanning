@@ -159,3 +159,4 @@ verksamheter.
 | `meta.uploads` | `POST` | `/api/meta/uploads` | Publik meta-uppladdning av bilder och videor |
 | `meta.list_uploads` | `GET` | `/api/meta/uploads` | Super User-lista över meta-uppladdningar |
 | `meta.content` | `GET` | `/api/meta/uploads/{upload_id}/content` | Visa eller spela upp meta-uppladdning |
+| `meta.delete` | `DELETE` | `/api/meta/uploads/{upload_id}` | Radera meta-uppladdning |

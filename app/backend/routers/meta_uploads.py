@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Res
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..audit import log as audit_log
 from ..deps import get_db, require_super_user
 from ..models import MetaMediaUpload, User
 
@@ -95,6 +96,21 @@ def _media_upload_out(row: MetaMediaUpload) -> dict:
         "media_type": row.media_type,
         "size_bytes": row.size_bytes,
         "size_label": _format_size(row.size_bytes),
+        "status": row.status,
+        "source": row.source,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
+def _media_upload_audit_snapshot(row: MetaMediaUpload) -> dict:
+    return {
+        "batch_id": row.batch_id,
+        "filename": row.stored_filename or row.original_filename,
+        "original_filename": row.original_filename,
+        "content_type": row.content_type,
+        "media_type": row.media_type,
+        "size_bytes": row.size_bytes,
+        "content_hash": row.content_hash,
         "status": row.status,
         "source": row.source,
         "created_at": row.created_at.isoformat() if row.created_at else None,
@@ -254,6 +270,30 @@ def list_meta_media_uploads(
         "count": len(rows),
         "items": [_media_upload_out(row) for row in rows],
     }
+
+
+@router.delete("/uploads/{upload_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+def delete_meta_media_upload(
+    upload_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_super_user),
+) -> None:
+    row = db.get(MetaMediaUpload, upload_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Uppladdningen hittades inte.")
+    before = _media_upload_audit_snapshot(row)
+    db.delete(row)
+    audit_log(
+        db,
+        entity_type="meta_media_upload",
+        entity_id=row.id,
+        action="delete",
+        old_value=before,
+        new_value=None,
+        user_id=user.id,
+        business_id=None,
+    )
+    db.commit()
 
 
 def _content_disposition(filename: str) -> str:
