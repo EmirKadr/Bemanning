@@ -1,7 +1,7 @@
 ---
 title: flow wiki-index
 status: aktiv
-updated: 2026-05-26
+updated: 2026-05-31
 tags: [wiki, index]
 ---
 
@@ -30,6 +30,7 @@ Kort svar: flow ar en FastAPI/vanilla-JS webbapp och PyQt-baserad Windows-app fo
 - [Demo-läge](demo-mode.md) - Demo-konto med privat sandbox-DB och guidad rundtur för säljpresentationer.
 - [Historik och audit](history-audit.md) - filter, statistik, auditlogg, felkoder, vantetider och Halsa.
 - [Hämta data](data-fetch.md) - MiniMax-tolkad extern data-export med publicerbar katalog och Excel-export.
+- [Meta-uppladdning](meta-upload.md) - publik fristaende mobilvy for att ladda upp bilder och videor till senare LLM-analys.
 - [Produktivitet](productivity.md) - lokala loggfiler, KPI-mal, berakningar och vanliga stopp.
 - [Lagerverktyg](warehouse-tools.md) - Uppladdningar, Bearbeta, Dela och allokeringsfloden.
 

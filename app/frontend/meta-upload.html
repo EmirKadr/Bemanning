@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Meta-uppladdning</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="alternate icon" href="/favicon.ico" />
+  <link rel="stylesheet" href="/css/meta-upload.css" />
+</head>
+<body>
+  <main class="meta-shell">
+    <section class="meta-panel" aria-labelledby="meta-title">
+      <div class="meta-brand">
+        <img src="/flow-logo.svg" alt="" />
+        <span>flow</span>
+      </div>
+      <h1 id="meta-title">Meta-uppladdning</h1>
+
+      <form id="metaUploadForm" class="meta-upload-form">
+        <label class="meta-dropzone" id="metaDropzone">
+          <input id="metaFiles" name="files" type="file" accept="image/*,video/*" multiple />
+          <span class="meta-dropzone-title">Välj bilder eller videor</span>
+          <span class="meta-dropzone-subtitle">Flera filer går bra</span>
+        </label>
+
+        <div id="metaFileList" class="meta-file-list" aria-live="polite"></div>
+
+        <button id="metaUploadButton" class="meta-upload-button" type="submit" disabled>
+          Ladda upp
+        </button>
+      </form>
+
+      <div id="metaStatus" class="meta-status" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script src="/js/meta_upload.js"></script>
+</body>
+</html>

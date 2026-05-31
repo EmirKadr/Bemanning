@@ -21,6 +21,7 @@ from .routers import (
     coredata,
     data_fetch,
     healthcheck,
+    meta_uploads,
     overview,
     person_schedules,
     persons,
@@ -82,6 +83,16 @@ def legacy_activities_page_redirect() -> RedirectResponse:
     )
 
 
+@app.get("/meta", include_in_schema=False)
+@app.get("/meta-upload", include_in_schema=False)
+def public_meta_upload_page_redirect() -> RedirectResponse:
+    return RedirectResponse(
+        url="/meta-upload.html",
+        status_code=308,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 def _sync_allocation_observations_background() -> None:
     try:
         engine_module, _flows_module = allocation_bridge.require_available()
@@ -122,6 +133,7 @@ app.include_router(bulk.router)
 app.include_router(coredata.router)
 app.include_router(data_fetch.router)
 app.include_router(healthcheck.router)
+app.include_router(meta_uploads.router)
 app.include_router(overview.router)
 app.include_router(productivity.router)
 app.include_router(app_settings.router)

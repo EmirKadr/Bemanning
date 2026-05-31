@@ -141,6 +141,7 @@ ROUTES: tuple[ApiRoute, ...] = (
     ApiRoute("public.persons_week", "GET", "/api/public/persons/week", "Publika FTE för vecka"),
     ApiRoute("public.summary", "GET", "/api/public/summary", "Publik CSV-summering för dag"),
     ApiRoute("public.summary_week", "GET", "/api/public/summary/week", "Publik CSV-summering för vecka"),
+    ApiRoute("meta.uploads", "POST", "/api/meta/uploads", "Publik meta-uppladdning av bilder och videor"),
 )
 
 ROUTES_BY_NAME = {route.name: route for route in ROUTES}

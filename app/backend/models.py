@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     SmallInteger,
     String,
     Text,
@@ -195,6 +196,27 @@ class UserWaitMetric(Base):
     duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="ok")
     detail: Mapped[dict | None] = mapped_column(JsonField)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MetaMediaUpload(Base):
+    __tablename__ = "meta_media_uploads"
+    __table_args__ = (
+        Index("ix_meta_media_uploads_batch_id", "batch_id"),
+        Index("ix_meta_media_uploads_created_at", "created_at"),
+        Index("ix_meta_media_uploads_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigIntId, primary_key=True)
+    batch_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending_analysis")
+    analysis: Mapped[dict | None] = mapped_column(JsonField)
+    source: Mapped[str] = mapped_column(String(80), nullable=False, default="public_upload")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

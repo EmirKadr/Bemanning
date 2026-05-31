@@ -156,3 +156,4 @@ verksamheter.
 | `public.persons_week` | `GET` | `/api/public/persons/week` | Publika FTE för vecka |
 | `public.summary` | `GET` | `/api/public/summary` | Publik CSV-summering för dag |
 | `public.summary_week` | `GET` | `/api/public/summary/week` | Publik CSV-summering för vecka |
+| `meta.uploads` | `POST` | `/api/meta/uploads` | Publik meta-uppladdning av bilder och videor |

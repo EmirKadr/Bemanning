@@ -7,7 +7,7 @@ tags: [ui, knappar, funktioner, chat-stod]
 
 # UI-karta och alla kontroller
 
-Kort svar: de flesta sidor delar sidebar, omradesfokus, tema, logg och auth-guard fran `common.js`. Varje funktionssida har egna kontroller som ar dokumenterade mer detaljerat pa respektive sida.
+Kort svar: de flesta skyddade sidor delar sidebar, omradesfokus, tema, logg och auth-guard fran `common.js`. Publika specialvyer, som Meta-uppladdning, kan vara fristaende utan sidebar. Varje funktionssida har egna kontroller som ar dokumenterade mer detaljerat pa respektive sida.
 
 Sidebaren ar fast i vansterkanten och byter inte position nar sidans innehall skrollas. Om det finns manga menyval skrollar bara menylistan inne i sidebaren; footer med omradesfokus, hjalp/logg/tema och utloggning ligger kvar.
 
@@ -45,6 +45,7 @@ Sidebaren ar fast i vansterkanten och byter inte position nar sidans innehall sk
 | Uppladdningar | `uppladdningar.html` | Valj filer, Rensa alla, per-slot Valj/rensa, drag-drop | [Lagerverktyg](warehouse-tools.md) |
 | Bearbeta | `bearbeta.html` | Valj filer, flodesknappar, info, resultat, Excel/CSV | [Lagerverktyg](warehouse-tools.md) |
 | Dela | `dela.html` | Textfil/textarea, antal per kolumn, Dela varden | [Lagerverktyg](warehouse-tools.md) |
+| Meta-uppladdning | `meta-upload.html` | Valj flera bilder/videor, Ladda upp | [Meta-uppladdning](meta-upload.md) |
 
 ## Generella UI-regler
 

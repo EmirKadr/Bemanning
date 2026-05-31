@@ -1,7 +1,7 @@
 ---
 title: API-karta
 status: aktiv
-updated: 2026-05-26
+updated: 2026-05-31
 tags: [api, backend]
 ---
 
@@ -74,6 +74,7 @@ eller skapa/importera med explicit verksamhet.
 - `POST /api/coredata/files/raw` - laddar upp en coredata-karnfil eller sammanstalld datafil till anvandarens verksamhet och ersatter aldre fil med samma prefix, kraver `allocationUploads=edit`.
 - `GET /api/allokering/health`, `/flows`, `/pool`, `GET/PUT /process-matrix`, `POST /detect`, `POST /flow/{flow_id}`, `POST /open-excel`, `GET /table-column/...`, `GET /download/...` - lagerverktyg.
 - `GET /api/public/...` - publika text/CSV-summeringar for timmar/personer. Queryparametern `business` defaultar till `STIGAMO`; publika endpoints summerar inte globalt.
+- `POST /api/meta/uploads` - publik multipart-uppladdning for flera bilder/videor utan inloggning. Sparar filer i `meta_media_uploads` med status `pending_analysis`.
 
 ## Agentkommandon
 

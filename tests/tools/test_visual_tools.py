@@ -1064,7 +1064,7 @@ def test_api_fetch_failures_get_clear_swedish_message():
 
 def test_sidebar_pages_reserve_layout_before_auth_finishes():
     frontend = ROOT / "app" / "frontend"
-    public_pages = {"login.html", "set-password.html", "stallen.html"}
+    public_pages = {"login.html", "set-password.html", "stallen.html", "meta-upload.html"}
 
     for html_path in frontend.glob("*.html"):
         html = html_path.read_text(encoding="utf-8")
@@ -1082,6 +1082,22 @@ def test_sidebar_pages_reserve_layout_before_auth_finishes():
     assert "sessionStorage.getItem(SIDEBAR_USER_CACHE_KEY) || localStorage.getItem(SIDEBAR_USER_CACHE_KEY)" in common
     assert "body.with-sidebar:not(.sidebar-hydrated)" in styles
     assert "grid-template-columns: var(--sidebar-w) minmax(0, 1fr)" in styles
+
+
+def test_public_meta_upload_page_is_standalone_and_mobile_focused():
+    frontend = ROOT / "app" / "frontend"
+    html = (frontend / "meta-upload.html").read_text(encoding="utf-8")
+    js = (frontend / "js" / "meta_upload.js").read_text(encoding="utf-8")
+    css = (frontend / "css" / "meta-upload.css").read_text(encoding="utf-8")
+
+    assert '<body class="with-sidebar">' not in html
+    assert "/js/common.js" not in html
+    assert 'type="file" accept="image/*,video/*" multiple' in html
+    assert 'fetch("/api/meta/uploads"' in js
+    assert "FormData" in js
+    assert "selectedFiles.forEach" in js
+    assert "min-height: 100dvh" in css
+    assert "@media (max-width: 520px)" in css
 
 
 def test_allocation_pages_are_wired_to_shared_tool_shell():

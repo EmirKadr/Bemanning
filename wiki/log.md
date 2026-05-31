@@ -453,3 +453,7 @@ Bemanning och Oversikt friskar nu upp den gemensamma omradestogglen fran sidans 
 ## [2026-05-31] polish | Hogerklicksmeny for omradesfokus
 
 Sidebarens omradestoggle har nu en hogerklicksmeny for direkt val av omrade. Menyn anvander samma `/api/areas`-scope som ovriga vyer: vanliga anvandare ser omraden i egen verksamhet, medan Super User ser alla aktiva omraden och globalt `∞`.
+
+## [2026-05-31] feature | Publik meta-uppladdning
+
+Lade till `/meta` och `meta-upload.html` som en fristaende publik mobilvy utan sidebar och utan inloggning. Anvandaren kan valja flera bilder/videor pa Android, iPhone eller desktop och ladda upp dem till `POST /api/meta/uploads`; backend sparar varje fil i `meta_media_uploads` med gemensamt batch-id och status `pending_analysis` for senare LLM-analys.
