@@ -26,6 +26,17 @@
 
         <div id="metaFileList" class="meta-file-list" aria-live="polite"></div>
 
+        <div id="metaProgress" class="meta-progress-panel" hidden>
+          <div class="meta-progress-head">
+            <span id="metaProgressLabel">Laddar upp</span>
+            <strong id="metaProgressPercent">0%</strong>
+          </div>
+          <div class="meta-progress-track" aria-hidden="true">
+            <div id="metaProgressBar" class="meta-progress-bar"></div>
+          </div>
+          <div id="metaProgressRemaining" class="meta-progress-remaining"></div>
+        </div>
+
         <button id="metaUploadButton" class="meta-upload-button" type="submit" disabled>
           Ladda upp
         </button>

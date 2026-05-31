@@ -41,6 +41,7 @@ ROLE_VIEW_IDS = {
     "activityImport",
     "areas",
     "analytics",
+    "meta",
     "businesses",
     "users",
     "userImport",

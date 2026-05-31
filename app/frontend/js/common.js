@@ -164,6 +164,7 @@ const SIDEBAR_DEFAULT_LAYOUT = [
   { id: "persons" },
   { id: "activities" },
   { id: "analytics" },
+  { id: "meta" },
   { id: "users" },
   { id: "businesses" },
 ];
@@ -189,6 +190,7 @@ const ROLE_VIEW_IDS = [
   "activityImport",
   "areas",
   "analytics",
+  "meta",
   "users",
   "userImport",
   "businesses",
@@ -1323,6 +1325,14 @@ function sidebarPageDefinitions(user, activePage) {
       active: activePage === "analytics",
     },
     {
+      id: "meta",
+      label: "Meta",
+      href: "/meta.html",
+      icon: "M",
+      visible: Boolean(user?.is_super_user),
+      active: activePage === "meta",
+    },
+    {
       id: "users",
       label: "Användare",
       href: "/anvandare.html",
@@ -2055,7 +2065,7 @@ function pageAccessAllowed(user, activePage, options = {}) {
   if (!user || user.must_change_password) return false;
   if (activePage && activePage !== "passwordSetup" && !canViewPage(user, activePage)) return false;
   if (options.requireAdmin && !isAdminUser(user)) return false;
-  if (options.requireSuperUser && !canViewPage(user, activePage)) return false;
+  if (options.requireSuperUser && !user?.is_super_user) return false;
   if (options.requirePlanningView && !canViewPage(user, activePage || "schedule")) return false;
   if (options.requireEditor && !canEditPage(user, activePage)) return false;
   if (options.requireAllocationTools && !canViewPage(user, activePage)) return false;
@@ -2992,6 +3002,9 @@ function enqueueVisiblePagePrefetches(user, activePage) {
     enqueueBackgroundPrefetch("/api/activities?include_inactive=true", 30 * 1000);
     enqueueBackgroundPrefetch("/api/areas?include_inactive=true", 30 * 1000);
   }
+  if (user?.is_super_user) {
+    enqueueBackgroundPrefetch("/api/meta/uploads", 30 * 1000);
+  }
   if (canViewPage(user, "users")) {
     enqueueBackgroundPrefetch("/api/users", 30 * 1000);
     enqueueBackgroundPrefetch("/api/settings", 60 * 1000);
@@ -3058,7 +3071,7 @@ async function initPage(activePage, options = {}) {
     redirectAfterDeniedAccess(user, "Sidan kräver behörighet", activePage);
     return null;
   }
-  if (options.requireSuperUser && !canViewPage(user, activePage)) {
+  if (options.requireSuperUser && !user?.is_super_user) {
     queueToast("Sidan kräver Super User-behörighet", "error");
     window.location.href = "/index.html";
     return null;

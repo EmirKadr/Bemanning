@@ -457,3 +457,7 @@ Sidebarens omradestoggle har nu en hogerklicksmeny for direkt val av omrade. Men
 ## [2026-05-31] feature | Publik meta-uppladdning
 
 Lade till `/meta` och `meta-upload.html` som en fristaende publik mobilvy utan sidebar och utan inloggning. Anvandaren kan valja flera bilder/videor pa Android, iPhone eller desktop och ladda upp dem till `POST /api/meta/uploads`; backend sparar varje fil i `meta_media_uploads` med gemensamt batch-id och status `pending_analysis` for senare LLM-analys.
+
+## [2026-05-31] feature | Meta-progress och Super User-vy
+
+Meta-uppladdningen visar nu total progress, kvarvarande mangd och status per fil under pagaende uppladdning. Backend sparar nya meta-filer med tidsstamplat `stored_filename`, och Super User far sidebarvyn `Meta` dar alla uppladdade bilder/videor kan listas, filtreras och visas via skyddade `/api/meta/uploads`-endpoints.

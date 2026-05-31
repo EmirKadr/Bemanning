@@ -1,5 +1,6 @@
 import asyncio
 import io
+import re
 
 import pytest
 from fastapi import HTTPException
@@ -10,9 +11,9 @@ from sqlalchemy.pool import StaticPool
 from starlette.datastructures import Headers, UploadFile
 
 from app.backend.database import Base
-from app.backend.deps import get_db
+from app.backend.deps import get_current_user, get_db
 from app.backend.main import app
-from app.backend.models import MetaMediaUpload
+from app.backend.models import MetaMediaUpload, User
 from app.backend.routers import meta_uploads
 
 
@@ -60,6 +61,9 @@ def test_public_meta_upload_route_accepts_multiple_media_without_login():
 
         rows = session.query(MetaMediaUpload).order_by(MetaMediaUpload.id).all()
         assert [row.original_filename for row in rows] == ["bild.jpg", "film.mov"]
+        assert re.fullmatch(r"\d{8}_\d{6}_\d{6}Z_01\.jpg", rows[0].stored_filename)
+        assert re.fullmatch(r"\d{8}_\d{6}_\d{6}Z_02\.mov", rows[1].stored_filename)
+        assert [item["filename"] for item in payload["saved"]] == [row.stored_filename for row in rows]
         assert [row.media_type for row in rows] == ["image", "video"]
         assert rows[0].data == b"image-bytes"
         assert rows[1].data == b"video-bytes"
@@ -85,6 +89,76 @@ def test_meta_upload_rejects_non_media_files():
         assert exc_info.value.status_code == 400
         assert session.query(MetaMediaUpload).count() == 0
     finally:
+        session.close()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+def test_super_user_can_list_meta_uploads_and_stream_content():
+    engine, session = make_session()
+    row = MetaMediaUpload(
+        batch_id="batch",
+        original_filename="semesterfilm.mov",
+        stored_filename="20260531_120102_123456Z_01.mov",
+        content_type="video/quicktime",
+        media_type="video",
+        size_bytes=11,
+        data=b"hello-video",
+        status="pending_analysis",
+        source="public_upload",
+    )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+
+    def override_get_db():
+        yield session
+
+    def super_user():
+        return User(id=99, username="root", role="super_user", roles=["super_user"], is_active=True)
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = super_user
+    try:
+        client = TestClient(app)
+        response = client.get("/api/meta/uploads")
+        assert response.status_code == 200
+        item = response.json()["items"][0]
+        assert item["filename"] == "20260531_120102_123456Z_01.mov"
+        assert item["original_filename"] == "semesterfilm.mov"
+        assert item["media_type"] == "video"
+
+        content = client.get(f"/api/meta/uploads/{row.id}/content", headers={"Range": "bytes=0-4"})
+        assert content.status_code == 206
+        assert content.content == b"hello"
+        assert content.headers["content-range"] == "bytes 0-4/11"
+        assert "20260531_120102_123456Z_01.mov" in content.headers["content-disposition"]
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_current_user, None)
+        session.close()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+def test_non_super_user_cannot_list_meta_uploads():
+    engine, session = make_session()
+
+    def override_get_db():
+        yield session
+
+    def admin_user():
+        return User(id=100, username="admin", role="admin", roles=["admin"], is_active=True)
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = admin_user
+    try:
+        client = TestClient(app)
+        response = client.get("/api/meta/uploads")
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_current_user, None)
         session.close()
         Base.metadata.drop_all(engine)
         engine.dispose()

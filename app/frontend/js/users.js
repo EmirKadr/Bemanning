@@ -40,6 +40,7 @@ const VIEW_ACCESS_OPTIONS = [
   { id: "activityImport", label: "Aktivitetsimport" },
   { id: "areas", label: "Områden" },
   { id: "analytics", label: "Historik" },
+  { id: "meta", label: "Meta" },
   { id: "users", label: "Användare" },
   { id: "userImport", label: "Användarimport" },
   { id: "businesses", label: "Verksamheter" },

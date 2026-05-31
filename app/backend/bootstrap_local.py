@@ -38,6 +38,7 @@ def _sync_lightweight_sqlite_columns(target_engine=engine) -> None:
     activity_columns = columns_for("activities")
     audit_columns = columns_for("audit_log")
     settings_columns = columns_for("app_settings")
+    meta_upload_columns = columns_for("meta_media_uploads")
     Base.metadata.create_all(bind=target_engine)
     with target_engine.begin() as connection:
         if user_columns and "business_id" not in user_columns:
@@ -69,6 +70,10 @@ def _sync_lightweight_sqlite_columns(target_engine=engine) -> None:
             connection.exec_driver_sql("UPDATE activities SET is_active = 1 WHERE is_active IS NOT 1")
         if user_columns and "is_active" in user_columns:
             connection.exec_driver_sql("UPDATE users SET is_active = 1 WHERE is_active IS NOT 1")
+        if meta_upload_columns and "stored_filename" not in meta_upload_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE meta_media_uploads ADD COLUMN stored_filename VARCHAR(255) NOT NULL DEFAULT 'meta_upload'"
+            )
 
 
 def _table_sql(connection, table_name: str) -> str:

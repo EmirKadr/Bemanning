@@ -210,6 +210,7 @@ class MetaMediaUpload(Base):
     id: Mapped[int] = mapped_column(BigIntId, primary_key=True)
     batch_id: Mapped[str] = mapped_column(String(36), nullable=False)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    stored_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     content_type: Mapped[str] = mapped_column(String(120), nullable=False)
     media_type: Mapped[str] = mapped_column(String(20), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)

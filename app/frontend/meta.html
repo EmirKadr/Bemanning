@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meta - flow</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="alternate icon" href="/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/app-icon-192.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body class="with-sidebar">
+  <header class="topbar"></header>
+
+  <section class="controls">
+    <label>Typ
+      <select id="metaMediaType">
+        <option value="">Alla</option>
+        <option value="video">Videor</option>
+        <option value="image">Bilder</option>
+      </select>
+    </label>
+    <button id="metaRefresh">Uppdatera</button>
+  </section>
+
+  <main>
+    <div class="section-title-with-action">
+      <div class="section-title">Meta</div>
+      <div id="metaSummary" class="meta-admin-summary"></div>
+    </div>
+
+    <section id="metaGrid" class="meta-admin-grid" aria-live="polite"></section>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/meta.js"></script>
+</body>
+</html>

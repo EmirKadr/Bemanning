@@ -1,7 +1,7 @@
 ---
 title: Datamodell
 status: aktiv
-updated: 2026-05-26
+updated: 2026-05-31
 tags: [databas, modeller]
 ---
 
@@ -23,6 +23,7 @@ Kort svar: bemanningen bygger pa verksamheter, personer, aktiviteter, omraden, s
 | `audit_log` | `AuditLog` | Historik over muterande handelser | `business_id`, `entity_type`, `entity_id`, `action`, `old_value`, `new_value`, `user_id`, `created_at` |
 | `user_wait_metrics` | `UserWaitMetric` | Tyst vantetids- och klientprestanda for Historik/Halsa | `business_id`, `user_id`, `event_type`, `view_id`, `target`, `duration_ms`, `status`, `detail`, `created_at` |
 | `app_settings` | `AppSetting` | Verksamhetsspecifika settings JSON/text | `business_id`, `key`, `value`, `updated_by` |
+| `meta_media_uploads` | `MetaMediaUpload` | Publikt uppladdade bilder/videor for senare LLM-analys | `batch_id`, `original_filename`, `stored_filename`, `content_type`, `media_type`, `size_bytes`, `data`, `status`, `analysis`, `source`, `created_at` |
 
 ## Verksamheter
 
@@ -62,6 +63,13 @@ Viktiga settings:
 - `lock_foreign_schedule_cells`: ledare far inte andra celler som annan anvandare fyllt, admin/super user kan passera.
 - sidebar-layout: menyordning/rubrik/undervyer per verksamhet.
 - role-view-access: matris per verksamhet for rollernas vyatkomst (`none`, `view`, `edit`).
+
+## Meta-media
+
+- `meta_media_uploads` ar inte verksamhetsscopead i forsta versionen. Den publika uppladdningssidan saknar login och sparar alla media i samma meta-tabell.
+- `original_filename` ar namnet fran anvandarens telefon/dator. `stored_filename` ar det namn som visas i Meta och byggs av serverns uppladdningsdatum/timestamp plus originalandelse, till exempel `20260531_120102_123456Z_01.mov`.
+- `data` innehaller sjalva bilden/videon som blob. List-endpointen returnerar inte blobben; Super User hamtar/visar en fil via separat content-endpoint.
+- `status=pending_analysis` betyder att filen finns redo for ett senare LLM-flode. `analysis` ar reserverat for analysresultat.
 
 ## Kallor
 

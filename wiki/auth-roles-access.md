@@ -1,7 +1,7 @@
 ---
 title: Roller och behorighet
 status: aktiv
-updated: 2026-05-25
+updated: 2026-05-31
 tags: [auth, roller, behorighet]
 ---
 
@@ -35,7 +35,7 @@ Kort svar: inloggning ar sessionsbaserad. Roller styr vad anvandaren ser och far
 | `leader` | Arbetsledare | Redigera Bemanning/Oversikt och normalt Personer/Aktiviteter |
 | `staffing_manager` | Bemanningsansvarig | Liknar arbetsledare med planeringsansvar |
 | `admin` | Administrator | Register, anvandare och settings, men inte automatiskt super user |
-| `super_user` | Super User | Kravs for historik, verksamheter och vissa kodandringar; kan alltid redigera vyer |
+| `super_user` | Super User | Kravs for historik, Meta, verksamheter och vissa kodandringar; kan alltid redigera vyer |
 | `warehouse_clerk` | Lagerkontorist | Lagerverktyg, framfor allt uppladdning och Dela |
 | `article_placer` | Artikelplacerare | Lagerverktyg med liknande sjalvservicebehov |
 | `viewer` | Visning | Laslage for Bemanning/Oversikt |
@@ -56,7 +56,7 @@ Vyer som kan styras:
 - `allocationUploads`, `allocationProcess`, `allocationProcessMatrix`, `allocationSplit`
 - `persons`, `personSortOrder`, `personImport`
 - `activities`, `activityImport`, `areas`
-- `analytics`, `users`, `userImport`
+- `analytics`, `meta`, `users`, `userImport`
 - `appSettings`, `sidebarLayout`, `roleAccess`, `businesses`
 
 ## Read-only-lage
@@ -74,7 +74,7 @@ Om anvandaren bara har `view`:
 - Knappen syns men fungerar inte: anvandaren har `view`, inte `edit`.
 - Importknapp ar dold: importvyn saknar edit-atkomst.
 - Drag-sortering av personnamn i Bemanning/Oversikt fungerar inte: rollen saknar `personSortOrder=edit`, personfiltret ar aktivt, eller listan har andrats. Bemanningsansvarig/admin ar begransade till eget omrade; Super User och demo kan sortera alla synliga personer.
-- Historik nekas: kraver Super User. Produktivitet nekas: rollen saknar `productivity` i vyatkomst.
+- Historik eller Meta nekas: kraver Super User. Produktivitet nekas: rollen saknar `productivity` i vyatkomst.
 - Hamta data saknas eller nekas: `dataFetch` saknas i vyatkomst. Eftersom vyn kan hamta data fran extern datakalla har inga basroller standardatkomst; Super User kan oppna den.
 - Bearbeta saknas eller nekas: rollen saknar `allocationProcess=edit` i vyatkomst. Lagerroller har som standard Uppladdningar och Dela, men kan fa Bearbeta via Vybehorigheter.
 - Matris-knappen i Bearbeta saknas: rollen saknar `allocationProcessMatrix=view`. Knappen visas lasande med `view` och kan spara forst med `allocationProcessMatrix=edit`; admin har `edit` som standard och Super User har alltid full atkomst.

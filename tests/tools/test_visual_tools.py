@@ -1093,11 +1093,39 @@ def test_public_meta_upload_page_is_standalone_and_mobile_focused():
     assert '<body class="with-sidebar">' not in html
     assert "/js/common.js" not in html
     assert 'type="file" accept="image/*,video/*" multiple' in html
-    assert 'fetch("/api/meta/uploads"' in js
+    assert 'id="metaProgress"' in html
+    assert 'XMLHttpRequest' in js
+    assert 'xhr.upload.addEventListener("progress"' in js
+    assert 'xhr.open("POST", "/api/meta/uploads")' in js
     assert "FormData" in js
     assert "selectedFiles.forEach" in js
+    assert "updateProgress" in js
     assert "min-height: 100dvh" in css
+    assert ".meta-progress-panel" in css
+    assert ".meta-file-progress-bar" in css
     assert "@media (max-width: 520px)" in css
+
+
+def test_super_user_meta_view_lists_uploaded_media():
+    frontend = ROOT / "app" / "frontend"
+    html = (frontend / "meta.html").read_text(encoding="utf-8")
+    js = (frontend / "js" / "meta.js").read_text(encoding="utf-8")
+    common = (frontend / "js" / "common.js").read_text(encoding="utf-8")
+    styles = (frontend / "css" / "styles.css").read_text(encoding="utf-8")
+
+    assert '<body class="with-sidebar">' in html
+    assert "/js/common.js" in html
+    assert "/js/meta.js" in html
+    assert 'id: "meta"' in common
+    assert 'label: "Meta"' in common
+    assert 'href: "/meta.html"' in common
+    assert 'visible: Boolean(user?.is_super_user)' in common
+    assert 'initPage("meta", { requireSuperUser: true })' in js
+    assert 'api.get(`/api/meta/uploads?${params.toString()}`' in js
+    assert "/api/meta/uploads/${encodeURIComponent(item.id)}/content" in js
+    assert "openMediaModal" in js
+    assert ".meta-admin-grid" in styles
+    assert ".meta-preview-frame video" in styles
 
 
 def test_allocation_pages_are_wired_to_shared_tool_shell():

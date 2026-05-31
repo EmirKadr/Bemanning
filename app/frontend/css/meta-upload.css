@@ -97,6 +97,11 @@ h1 {
   background: var(--accent-soft);
 }
 
+.meta-dropzone.uploading {
+  cursor: wait;
+  opacity: .72;
+}
+
 .meta-dropzone input {
   position: absolute;
   width: 1px;
@@ -144,6 +149,61 @@ h1 {
   color: var(--muted);
   font-size: 13px;
   white-space: nowrap;
+}
+
+.meta-file-state {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.meta-file-progress,
+.meta-progress-track {
+  grid-column: 1 / -1;
+  height: 8px;
+  border-radius: 999px;
+  background: #dce6ef;
+  overflow: hidden;
+}
+
+.meta-file-progress-bar,
+.meta-progress-bar {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width .16s ease;
+}
+
+.meta-progress-panel {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.meta-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.meta-progress-head span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.meta-progress-remaining {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .meta-upload-button {

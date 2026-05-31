@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 import re
+from urllib.parse import quote
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
-from ..deps import get_db
-from ..models import MetaMediaUpload
+from ..deps import get_db, require_super_user
+from ..models import MetaMediaUpload, User
 
 
 router = APIRouter(prefix="/api/meta", tags=["meta"])
@@ -72,6 +74,31 @@ def _format_size(bytes_count: int) -> str:
     return f"{bytes_count} B"
 
 
+def _stored_filename(uploaded_at: datetime, index: int, original_filename: str, media_type: str) -> str:
+    suffix = Path(original_filename).suffix.lower()
+    if suffix not in IMAGE_EXTENSIONS and suffix not in VIDEO_EXTENSIONS:
+        suffix = ".mp4" if media_type == "video" else ".jpg"
+    timestamp = uploaded_at.astimezone(timezone.utc).strftime("%Y%m%d_%H%M%S_%fZ")
+    return f"{timestamp}_{index:02d}{suffix}"[:255]
+
+
+def _media_upload_out(row: MetaMediaUpload) -> dict:
+    return {
+        "id": row.id,
+        "batch_id": row.batch_id,
+        "filename": row.stored_filename or row.original_filename,
+        "stored_filename": row.stored_filename or row.original_filename,
+        "original_filename": row.original_filename,
+        "content_type": row.content_type,
+        "media_type": row.media_type,
+        "size_bytes": row.size_bytes,
+        "size_label": _format_size(row.size_bytes),
+        "status": row.status,
+        "source": row.source,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
 async def _read_upload_data(upload: UploadFile, *, batch_total: int) -> tuple[bytes, int]:
     chunks: list[bytes] = []
     size = 0
@@ -114,26 +141,32 @@ async def upload_meta_media(
     rows: list[MetaMediaUpload] = []
     saved: list[dict] = []
 
-    for upload in files:
+    for index, upload in enumerate(files, start=1):
         filename = _clean_filename(upload.filename)
         content_type = str(upload.content_type or "application/octet-stream").split(";", 1)[0].strip().lower()
         media_type = _media_type(filename, content_type)
         data, size = await _read_upload_data(upload, batch_total=batch_total)
+        uploaded_at = datetime.now(timezone.utc)
+        stored_filename = _stored_filename(uploaded_at, index, filename, media_type)
         batch_total += size
         row = MetaMediaUpload(
             batch_id=batch_id,
             original_filename=filename,
+            stored_filename=stored_filename,
             content_type=content_type or "application/octet-stream",
             media_type=media_type,
             size_bytes=size,
             data=data,
             status="pending_analysis",
             source="public_upload",
+            created_at=uploaded_at,
         )
         rows.append(row)
         saved.append(
             {
-                "filename": filename,
+                "filename": stored_filename,
+                "stored_filename": stored_filename,
+                "original_filename": filename,
                 "content_type": row.content_type,
                 "media_type": media_type,
                 "size_bytes": size,
@@ -158,3 +191,82 @@ async def upload_meta_media(
         "saved": saved,
         "status": "pending_analysis",
     }
+
+
+@router.get("/uploads")
+def list_meta_media_uploads(
+    limit: int = Query(200, ge=1, le=500),
+    media_type: str | None = Query(None, pattern="^(image|video)$"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_user),
+) -> dict:
+    query = db.query(MetaMediaUpload)
+    if media_type:
+        query = query.filter(MetaMediaUpload.media_type == media_type)
+    rows = (
+        query.order_by(MetaMediaUpload.created_at.desc(), MetaMediaUpload.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return {
+        "count": len(rows),
+        "items": [_media_upload_out(row) for row in rows],
+    }
+
+
+def _content_disposition(filename: str) -> str:
+    safe_filename = _clean_filename(filename)
+    return f"inline; filename*=UTF-8''{quote(safe_filename)}"
+
+
+def _media_response(row: MetaMediaUpload, request: Request) -> Response:
+    data = row.data or b""
+    total = len(data)
+    filename = row.stored_filename or row.original_filename
+    base_headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": _content_disposition(filename),
+    }
+    range_header = request.headers.get("range") or request.headers.get("Range") or ""
+    match = re.match(r"bytes=(\d*)-(\d*)$", range_header.strip())
+    if match and total:
+        start_text, end_text = match.groups()
+        if not start_text and end_text:
+            length = min(int(end_text), total)
+            start = total - length
+            end = total - 1
+        else:
+            start = int(start_text or 0)
+            end = int(end_text) if end_text else total - 1
+            end = min(end, total - 1)
+        if start > end or start >= total:
+            return Response(
+                status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+                headers={**base_headers, "Content-Range": f"bytes */{total}"},
+            )
+        chunk = data[start : end + 1]
+        headers = {
+            **base_headers,
+            "Content-Range": f"bytes {start}-{end}/{total}",
+            "Content-Length": str(len(chunk)),
+        }
+        return Response(content=chunk, status_code=status.HTTP_206_PARTIAL_CONTENT, media_type=row.content_type, headers=headers)
+
+    return Response(
+        content=data,
+        media_type=row.content_type,
+        headers={**base_headers, "Content-Length": str(total)},
+    )
+
+
+@router.get("/uploads/{upload_id}/content")
+def get_meta_media_content(
+    upload_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_user),
+) -> Response:
+    row = db.get(MetaMediaUpload, upload_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Uppladdningen hittades inte.")
+    return _media_response(row, request)

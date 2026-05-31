@@ -157,3 +157,5 @@ verksamheter.
 | `public.summary` | `GET` | `/api/public/summary` | Publik CSV-summering för dag |
 | `public.summary_week` | `GET` | `/api/public/summary/week` | Publik CSV-summering för vecka |
 | `meta.uploads` | `POST` | `/api/meta/uploads` | Publik meta-uppladdning av bilder och videor |
+| `meta.list_uploads` | `GET` | `/api/meta/uploads` | Super User-lista över meta-uppladdningar |
+| `meta.content` | `GET` | `/api/meta/uploads/{upload_id}/content` | Visa eller spela upp meta-uppladdning |
