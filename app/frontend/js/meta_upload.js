@@ -7,7 +7,6 @@ const progressLabel = document.getElementById("metaProgressLabel");
 const progressPercent = document.getElementById("metaProgressPercent");
 const progressBar = document.getElementById("metaProgressBar");
 const progressRemaining = document.getElementById("metaProgressRemaining");
-const uploadButton = document.getElementById("metaUploadButton");
 const statusBox = document.getElementById("metaStatus");
 
 let selectedFiles = [];
@@ -60,7 +59,6 @@ function fileOffsets() {
 
 function renderFiles() {
   fileList.textContent = "";
-  uploadButton.disabled = uploading || selectedFiles.length === 0;
   selectedFiles.forEach((file, index) => {
     const item = document.createElement("div");
     item.className = "meta-file-item";
@@ -128,7 +126,6 @@ function loadSelectedVideoDurations() {
 function setUploadControlsLocked(locked) {
   uploading = locked;
   input.disabled = locked;
-  uploadButton.disabled = locked || selectedFiles.length === 0;
   dropzone.classList.toggle("uploading", locked);
   dropzone.setAttribute("aria-busy", locked ? "true" : "false");
 }
@@ -182,7 +179,8 @@ function setFiles(files) {
   resetProgress();
   renderFiles();
   loadSelectedVideoDurations();
-  setStatus(selectedFiles.length ? `${selectedFiles.length} filer valda.` : "");
+  setStatus(selectedFiles.length ? `${selectedFiles.length} filer valda. Startar uppladdning...` : "");
+  if (selectedFiles.length) void startUpload();
 }
 
 input.addEventListener("change", () => setFiles(input.files));
@@ -205,8 +203,7 @@ dropzone.addEventListener("drop", (event) => {
   setFiles(event.dataTransfer?.files);
 });
 
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
+async function startUpload() {
   if (!selectedFiles.length || uploading) return;
 
   const body = new FormData();
@@ -233,11 +230,17 @@ form.addEventListener("submit", async (event) => {
     }
   } catch (error) {
     setUploadControlsLocked(false);
+    input.value = "";
     renderFiles();
     setStatus(error.message || "Uppladdningen misslyckades.", "error");
     return;
   }
   setUploadControlsLocked(false);
+}
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void startUpload();
 });
 
 function uploadWithProgress(body) {

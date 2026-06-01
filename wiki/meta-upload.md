@@ -15,7 +15,7 @@ Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och u
 2. Sidan visar bara en enkel uppladdningsyta, ingen sidebar och ingen inloggningskontroll.
 3. Anvandaren trycker `Valj bilder eller videor` och kan markera flera bilder/videor i mobilens fil- eller bildvaljare.
 4. Valda filer listas med namn, storlek och videolangd nar browsern kan lasa metadata.
-5. `Ladda upp` skickar alla filer till `/api/meta/uploads`.
+5. Uppladdningen startar automatiskt direkt efter filval eller drag/drop och skickar alla filer till `/api/meta/uploads`.
 6. Under uppladdningen visas total progress, kvarvarande mangd och status per fil.
 7. Vid lyckad uppladdning visas hur manga filer som sparades och hur manga dubbletter som hoppades over. Vid fel visas ett kort felmeddelande pa sidan.
 8. For varje ny video skapas en sändningsrad med video-hash och radhash.
@@ -27,7 +27,7 @@ Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och u
 | Kontroll | Var | Vem far | Vad hander | API/kod | Vanliga fel |
 | --- | --- | --- | --- | --- | --- |
 | Valj bilder eller videor | `meta-upload.html` | Alla med lank | Oppnar enhetens filvaljare med `accept="image/*,video/*"` och `multiple` | `meta-upload.html`, `meta_upload.js` | Vissa mobiler kan visa olika valjare beroende pa browser. |
-| Ladda upp | `meta-upload.html` | Alla med lank | Skickar valda filer som multipart till backend och visar progress via `XMLHttpRequest.upload` | `POST /api/meta/uploads` | Nekas om inga filer skickas, om filtypen inte ar bild/video eller om maxstorlek passeras. Exakta dubbletter sparas inte igen utan visas som overhoppade. |
+| Automatisk uppladdning | `meta-upload.html` | Alla med lank | Startar direkt efter filval/drag-drop, skickar valda filer som multipart till backend och visar progress via `XMLHttpRequest.upload` | `POST /api/meta/uploads`, `meta_upload.js` | Nekas om inga filer skickas, om filtypen inte ar bild/video eller om maxstorlek passeras. Exakta dubbletter sparas inte igen utan visas som overhoppade. |
 | Typ | `meta.html` | Super User | Filtrerar Meta-listan pa alla, videor eller bilder | `GET /api/meta/uploads?media_type=...` | Visar tomt lage om urvalet saknar uppladdningar. |
 | Uppdatera | `meta.html` | Super User | Laddar om listan och visar toast nar det ar klart | `meta.js`, `api.get` | API-fel visas via standardlogg/toast. |
 | Visa | `meta.html` | Super User | Oppnar modal med video eller bild via ikonknapp | `GET /api/meta/uploads/{upload_id}/content` | Stora videor strommas med byte-range men hamtas fran databasen. |
@@ -41,7 +41,7 @@ Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och u
 - `app/frontend/meta-upload.html` laddar bara `css/meta-upload.css` och `js/meta_upload.js`; den laddar inte `common.js` och far darfor ingen sidebar/auth-guard.
 - `app/backend/routers/meta_uploads.py` accepterar flera `UploadFile` i faltet `files`.
 - Backend tillater bild- och videofiler via MIME-typ eller kand filandelse.
-- `meta_upload.js` anvander `XMLHttpRequest` i stallet for `fetch` for att kunna visa upload-progress. Filraderna far individuella progressbarer beraknade fran filernas storlek och total `loaded`; for valda videor forsoker browsern ocksa lasa videolangd fran metadata.
+- `meta_upload.js` anvander `XMLHttpRequest` i stallet for `fetch` for att kunna visa upload-progress. Filraderna far individuella progressbarer beraknade fran filernas storlek och total `loaded`; for valda videor forsoker browsern ocksa lasa videolangd fran metadata. Det finns ingen separat uppladdningsknapp: `setFiles` startar `startUpload` direkt nar minst en fil valts.
 - Varje uppladdning far ett gemensamt `batch_id`. Varje fil sparas som egen rad i `meta_media_uploads`.
 - Tabellen sparar `original_filename`, `stored_filename`, `content_type`, `media_type`, `size_bytes`, eventuell `duration_seconds`, `content_hash`, binar `data`, `status`, `analysis`, `source` och `created_at`.
 - `stored_filename` byggs av serverns UTC-datum/timestamp och filens ordning i batchen, till exempel `20260531_120102_123456Z_01.mov`.
@@ -60,6 +60,7 @@ Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och u
 | --- | --- |
 | "Varfor ser jag ingen meny?" | Meta-uppladdningen ar en fristaende publik sida utan sidebar. Det ar avsiktligt. |
 | "Kan jag valja flera filer pa mobilen?" | Ja, inputen har `multiple` och `accept="image/*,video/*"`. Exakt valjarvy beror pa iOS/Android och browser. |
+| "Behöver jag trycka Ladda upp?" | Nej. Uppladdningen startar automatiskt direkt nar du har valt en eller flera filer. |
 | "Hur vet jag att det laddar upp?" | Sidan visar total progress, kvarvarande mangd och status per fil medan uppladdningen pagar. |
 | "Varfor heter videon datum och siffror?" | Backend doper sparade filer med uppladdningsdatum och timestamp sa varje fil blir unik och latt att sortera i Meta. Originalnamnet sparas separat. |
 | "Hur ser jag vilken tabellrad som hor till vilken video?" | Jamfor Video-ID i sändningstabellen med Video-ID i videokortet. Bada bygger pa samma `video_hash`, och tabellen visar ocksa videons filnamn och langd. |
@@ -69,7 +70,7 @@ Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och u
 | "Varför saknas stillbild?" | Gemini behöver ange en tydlig tidpunkt för etiketten och servern behöver kunna extrahera frame med `ffmpeg`. |
 | "Varfor sparades inte alla filer?" | Om en fil ar exakt samma som en redan sparad fil hoppas den over som dubblett for att inte ta onodigt databas-utrymme. Sidan visar hur manga som hoppades over. |
 | "Varfor gick inte filen upp?" | Sidan accepterar bara bilder och videor. Backend kan ocksa neka tomma filer eller for stora batchar. |
-| "Analyseras filerna direkt?" | Nej. De sparas med status `pending_analysis` sa ett senare LLM-flode kan analysera dem. |
+| "Analyseras filerna direkt?" | Nya videor koas automatiskt till Gemini-analys nar `GEMINI_API_KEY` finns och `META_ANALYSIS_AUTO_START=true`. Bilder sparas bara som media. |
 
 ## Kallor
 

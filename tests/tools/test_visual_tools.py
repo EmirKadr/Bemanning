@@ -1093,6 +1093,8 @@ def test_public_meta_upload_page_is_standalone_and_mobile_focused():
     assert '<body class="with-sidebar">' not in html
     assert "/js/common.js" not in html
     assert 'type="file" accept="image/*,video/*" multiple' in html
+    assert "uppladdning startar direkt" in html
+    assert "metaUploadButton" not in html
     assert 'id="metaProgress"' in html
     assert 'XMLHttpRequest' in js
     assert 'xhr.upload.addEventListener("progress"' in js
@@ -1101,12 +1103,16 @@ def test_public_meta_upload_page_is_standalone_and_mobile_focused():
     assert "selectedFiles.forEach" in js
     assert "updateProgress" in js
     assert "loadSelectedVideoDurations" in js
+    assert "startUpload" in js
+    assert "void startUpload()" in js
+    assert "metaUploadButton" not in js
     assert "data-file-duration-label" in js
     assert "skipped_count" in js
     assert "dubbletter hoppades över" in js
     assert "min-height: 100dvh" in css
     assert ".meta-progress-panel" in css
     assert ".meta-file-progress-bar" in css
+    assert ".meta-upload-button" not in css
     assert "@media (max-width: 520px)" in css
 
 

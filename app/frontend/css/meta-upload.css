@@ -206,26 +206,6 @@ h1 {
   font-size: 12px;
 }
 
-.meta-upload-button {
-  min-height: 48px;
-  width: 100%;
-  border: 0;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.meta-upload-button:hover:not(:disabled) {
-  background: var(--accent-strong);
-}
-
-.meta-upload-button:disabled {
-  cursor: not-allowed;
-  opacity: .48;
-}
-
 .meta-status {
   min-height: 22px;
   margin-top: 14px;

@@ -477,3 +477,7 @@ Meta skapar nu sändningsrader for uppladdade videor i `meta_shipment_observatio
 ## [2026-05-31] feature | Meta Video-ID och videolangd
 
 Meta-vyn visar nu samma korta Video-ID i sändningstabellen och i videokorten, plus videons langd i tabellen, korten och den publika filväljaren nar metadata kan lasas. Backend sparar `duration_seconds` for nya videos nar `ffprobe` finns, och frontenden kan fylla i langden via browserns videometadata for befintliga uppladdningar. Media-korten har kompakta ikonknappar sa Visa, Ladda ner och Radera far plats pa samma rad.
+
+## [2026-06-01] feature | Automatisk Meta-uppladdning
+
+Den publika Meta-uppladdningen startar nu direkt nar anvandaren valt eller dragit in filer. Den separata `Ladda upp`-knappen ar borttagen, medan progress, kvarvarande mangd, per-filstatus, dubblettbesked och felmeddelanden fortsatter visas pa samma sida.

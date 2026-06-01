@@ -46,7 +46,7 @@ Sidebaren ar fast i vansterkanten och byter inte position nar sidans innehall sk
 | Bearbeta | `bearbeta.html` | Valj filer, flodesknappar, info, resultat, Excel/CSV | [Lagerverktyg](warehouse-tools.md) |
 | Dela | `dela.html` | Textfil/textarea, antal per kolumn, Dela varden | [Lagerverktyg](warehouse-tools.md) |
 | Meta | `meta.html` | Typfilter, Uppdatera, Sändningsanalys med Video-ID/längd, Analysera, Visa, Ladda ner och Radera media | [Meta-uppladdning](meta-upload.md) |
-| Meta-uppladdning | `meta-upload.html` | Valj flera bilder/videor, visa vald videolangd nar metadata finns, Ladda upp | [Meta-uppladdning](meta-upload.md) |
+| Meta-uppladdning | `meta-upload.html` | Valj flera bilder/videor, visa vald videolangd nar metadata finns, automatisk uppladdning | [Meta-uppladdning](meta-upload.md) |
 
 ## Generella UI-regler
 
