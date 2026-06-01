@@ -368,7 +368,8 @@ def test_super_user_can_delete_meta_uploads_and_audit_without_blob():
         engine.dispose()
 
 
-def test_non_super_user_cannot_list_meta_uploads():
+def test_non_super_user_cannot_list_meta_uploads(monkeypatch):
+    monkeypatch.setattr(settings, "SUPER_USER_USERNAMES", "admin,emikad")
     engine, session = make_session()
 
     def override_get_db():

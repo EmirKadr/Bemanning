@@ -1106,6 +1106,10 @@ def test_public_meta_upload_page_is_standalone_and_mobile_focused():
 
     assert '<body class="with-sidebar">' not in html
     assert "/js/common.js" not in html
+    assert '<link rel="icon" href="/favicon.svg" type="image/svg+xml" />' in html
+    assert '<link rel="alternate icon" href="/favicon.ico" sizes="any" />' in html
+    assert '<link rel="apple-touch-icon" href="/app-icon-192.png" />' in html
+    assert '<link rel="manifest" href="/manifest.webmanifest" />' in html
     assert 'type="file" accept="image/*,video/*" multiple' in html
     assert "uppladdning startar direkt" in html
     assert "metaUploadButton" not in html
