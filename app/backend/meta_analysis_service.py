@@ -29,14 +29,27 @@ META_ANALYSIS_INSTRUCTIONS = """
 Analysera videon som en lotsvard har spelat in med Meta-glasogon.
 
 Du ska anvanda bade videobilden och ljudet:
-- Las etiketten i videon for ordernummer, anvandarnamn, kund och pall-id.
+- Las etiketten i videon for ordernummer, sandningsnummer, anvandarnamn, kund och pall-id.
+- Det kan finnas tva olika referensetiketter pa pallen: transportetikett och innehallsforteckning.
+- Transportetiketten har ofta mottagaren hogt upp efter "Till:". Det ar customer_name.
+  I informationsblocket till vanster finns "Sandnings-ID" eller "Sändnings-ID".
+  shipment_number/sandningsnummer ska vara exakt vardet pa raden efter/vid detta falt,
+  ofta ett langt varde med bokstaver, bindestreck och siffror. Blanda inte ihop det
+  med streckkoder, avsandarreferens, godsmärke, rutt-rubriken hogst upp eller mottagarens namn.
+  "Avs. ref." ar ofta order_number. "Godsmärks"/"Godsmärke" kan vara pallet_id.
+  "Användare" ar username.
+- Innehallsforteckningen kan ha customer_name som stor rubrik, "Box ID" hogt upp till hoger
+  och en lista med "Ordernummer". Box ID kan vara pallet_id. Anvand ordernummer-listan for
+  order_number om den syns tydligare an transportetiketten. Om flera ordernummer syns,
+  returnera dem kommaseparerade. Blanda inte ihop "Customer Reference" med "Ordernummer".
+- Om en etikett ar suddig men den andra ar tydlig ska du anvanda den tydligaste kallan.
 - Lyssna pa vad lotsvarden sager om avvikelser pa sandningen.
 - Om ett falt ar osakert ska du jamfora etikettbilden, andra videoframes och ljudet.
 - Gissa inte. Lamna falt tomma eller skriv osakerhetsanteckning nar underlaget inte racker.
 - Om etiketten syns tydligt, returnera ungefarlig tid i sekunder for basta label-frame.
 
 Returnera ett JSON-objekt med dessa falt:
-order_number, username, customer_name, pallet_id, deviations, uncertainty_notes,
+order_number, shipment_number, username, customer_name, pallet_id, deviations, uncertainty_notes,
 label_frame_time_seconds, confidence.
 """.strip()
 
@@ -59,6 +72,8 @@ def gemini_model_name() -> str:
 
 
 def _clean_text(value: Any, max_length: int) -> str | None:
+    if isinstance(value, list):
+        value = ", ".join(str(item).strip() for item in value if str(item or "").strip())
     text = str(value or "").strip()
     if not text:
         return None
@@ -92,6 +107,7 @@ def calculate_record_hash(
     *,
     video_hash: str,
     order_number: str | None = None,
+    shipment_number: str | None = None,
     username: str | None = None,
     customer_name: str | None = None,
     pallet_id: str | None = None,
@@ -103,6 +119,7 @@ def calculate_record_hash(
         "video_hash": _clean_hash(video_hash),
         "label_image_hash": _clean_hash(label_image_hash),
         "order_number": str(order_number or "").strip().casefold(),
+        "shipment_number": str(shipment_number or "").strip().casefold(),
         "username": str(username or "").strip().casefold(),
         "customer_name": str(customer_name or "").strip().casefold(),
         "pallet_id": str(pallet_id or "").strip().casefold(),
@@ -116,6 +133,7 @@ def refresh_record_hash(row: MetaShipmentObservation) -> None:
     row.record_hash = calculate_record_hash(
         video_hash=row.video_hash,
         order_number=row.order_number,
+        shipment_number=row.shipment_number,
         username=row.username,
         customer_name=row.customer_name,
         pallet_id=row.pallet_id,
@@ -340,7 +358,37 @@ def _field(payload: dict, *names: str) -> Any:
 
 def normalize_meta_analysis(payload: dict) -> dict:
     return {
-        "order_number": _clean_text(_field(payload, "order_number", "ordernummer", "order"), 80),
+        "order_number": _clean_text(
+            _field(
+                payload,
+                "order_number",
+                "order_numbers",
+                "ordernummer",
+                "order",
+                "avs_ref",
+                "avsandarreferens",
+                "avsändarreferens",
+            ),
+            80,
+        ),
+        "shipment_number": _clean_text(
+            _field(
+                payload,
+                "shipment_number",
+                "shipment_id",
+                "consignment_number",
+                "consignment_id",
+                "sandningsnummer",
+                "sändningsnummer",
+                "sandnings_id",
+                "sändnings_id",
+                "sandnings-id",
+                "sändnings-id",
+                "sandningsid",
+                "sändningsid",
+            ),
+            120,
+        ),
         "username": _clean_text(_field(payload, "username", "user_name", "anvandarnamn", "användarnamn"), 120),
         "customer_name": _clean_text(_field(payload, "customer_name", "customer", "kund"), 200),
         "pallet_id": _clean_text(_field(payload, "pallet_id", "pallid", "pallet"), 120),
@@ -351,7 +399,7 @@ def normalize_meta_analysis(payload: dict) -> dict:
 
 
 def _status_for_analysis(fields: dict, label_image_upload_id: int | None) -> str:
-    required = ["order_number", "username", "customer_name", "pallet_id"]
+    required = ["order_number", "shipment_number", "username", "customer_name", "pallet_id"]
     if fields.get("uncertainty_notes") or any(not fields.get(key) for key in required):
         return "manual_review"
     if not fields.get("deviations"):
@@ -454,6 +502,7 @@ def analyze_meta_upload(db: Session, upload_id: int) -> MetaShipmentObservation:
         raw_response = _call_meta_analysis_provider(upload)
         fields = normalize_meta_analysis(raw_response)
         observation.order_number = fields["order_number"]
+        observation.shipment_number = fields["shipment_number"]
         observation.username = fields["username"]
         observation.customer_name = fields["customer_name"]
         observation.pallet_id = fields["pallet_id"]

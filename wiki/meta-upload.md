@@ -1,13 +1,13 @@
 ---
 title: Meta-uppladdning
 status: aktiv
-updated: 2026-05-31
+updated: 2026-06-01
 tags: [meta, media, publik, uppladdning]
 ---
 
 # Meta-uppladdning
 
-Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och utan inloggning. Den ar till for att snabbt ladda upp flera bilder och videor fran Android, iPhone eller desktop. Filerna sparas i databastabellen `meta_media_uploads` med tidsstamplat `stored_filename`, SHA-256-baserat `content_hash`, eventuell `duration_seconds` och status `pending_analysis` for senare Gemini-analys. Exakta dubbletter sparas inte igen. Super User ser en skyddad sidebarvy `meta.html` med alla uppladdningar och en sändningsanalystabell.
+Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och utan inloggning. Den ar till for att snabbt ladda upp flera bilder och videor fran Android, iPhone eller desktop. Filerna sparas i databastabellen `meta_media_uploads` med tidsstamplat `stored_filename`, SHA-256-baserat `content_hash`, eventuell `duration_seconds` och status `pending_analysis` for senare Gemini-analys. Exakta dubbletter sparas inte igen. Super User ser en skyddad sidebarvy `meta.html` med alla uppladdningar och en sändningsanalystabell med ordernummer, sändningsnummer, video och eventuell etikettstillbild.
 
 ## Anvandarflode
 
@@ -19,7 +19,7 @@ Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och u
 6. Under uppladdningen visas total progress, kvarvarande mangd och status per fil.
 7. Vid lyckad uppladdning visas hur manga filer som sparades och hur manga dubbletter som hoppades over. Vid fel visas ett kort felmeddelande pa sidan.
 8. For varje ny video skapas en sändningsrad med video-hash och radhash.
-9. Om `GEMINI_API_KEY` finns koas videon for analys. Gemini ska analysera både videobild och ljud: etiketten i bilden ger ordernummer/användarnamn/kund/pall-id, och ljudet ger lotsvärdens avvikelser.
+9. Om `GEMINI_API_KEY` finns koas videon for analys. Gemini ska analysera både videobild och ljud: transportetiketten kan ge Sändnings-ID/sändningsnummer, avsändarreferens, användarnamn, kund och godsmärks/pall-id; innehållsförteckningen kan ge ordernummer, kund och Box ID/pall-id. Ljudet ger lotsvärdens avvikelser.
 10. Super User kan oppna `Meta` i sidebaren, filtrera pa alla/videor/bilder, följa sändningstabellen och klicka ikonknappar for `Visa`, `Ladda ner`, `Analysera` eller `Radera`.
 
 ## Knappar och kontroller
@@ -33,8 +33,8 @@ Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och u
 | Visa | `meta.html` | Super User | Oppnar modal med video eller bild via ikonknapp | `GET /api/meta/uploads/{upload_id}/content` | Stora videor strommas med byte-range men hamtas fran databasen. |
 | Ladda ner | `meta.html` | Super User | Laddar ner mediafilen med serverns tidsstamplade filnamn via ikonknapp | `GET /api/meta/uploads/{upload_id}/content`, `api.download` | 403 om anvandaren inte ar Super User. |
 | Radera | `meta.html` | Super User | Bekraftar och raderar media-raden inklusive blobben via ikonknapp | `DELETE /api/meta/uploads/{upload_id}` | Gar inte att angra. 404 om filen redan ar borttagen. |
-| Sändningsanalys | `meta.html` | Super User | Visar ordernummer, användarnamn, kund, pall-id, avvikelser, status, video, videolangd, stillbild och hash | `GET /api/meta/shipment-observations` | Tom eller `LLM saknas` om Gemini inte ar konfigurerad. |
-| Analysera | `meta.html` | Super User | Skickar videon till Gemini for multimodal analys av video och ljud | `POST /api/meta/uploads/{upload_id}/analyze` | Kräver `GEMINI_API_KEY`. Osäkra svar hamnar i `Kontrollera`. |
+| Sändningsanalys | `meta.html` | Super User | Visar ordernummer, sändningsnummer, användarnamn, kund, pall-id, avvikelser, status, video, videolangd, stillbild och hash | `GET /api/meta/shipment-observations` | Tom eller `LLM saknas` om Gemini inte ar konfigurerad. |
+| Analysera | `meta.html` | Super User | Skickar videon till Gemini for multimodal analys av video och ljud. Prompten ber modellen väga ihop transportetikett och innehållsförteckning när båda syns. | `POST /api/meta/uploads/{upload_id}/analyze` | Kräver `GEMINI_API_KEY`. Osäkra svar hamnar i `Kontrollera`. |
 
 ## Tekniskt flode
 
@@ -48,9 +48,9 @@ Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och u
 - `content_hash` ar SHA-256 av filens bytes. Backend kollar bade redan sparade filer och filer i samma batch. Om hash finns sedan tidigare sparas inte blobben igen, och svaret far `skipped_count` samt poster med `reason=duplicate`.
 - Ny media far status `pending_analysis`. For videor skapas `meta_shipment_observations` med `video_hash` och `record_hash`. Meta-vyn visar samma korta Video-ID i videokortet och i sändningstabellen sa Super User kan se vilken rad som tillhor vilken video.
 - Gemini-konfigurationen ligger i `GEMINI_API_KEY`, `GEMINI_MODEL` och `GEMINI_API_BASE_URL`. Standardmodell ar `gemini-2.5-pro`. Videon skickas via Gemini Files API och sedan till `generateContent`.
-- Analys-prompten kräver att Gemini använder både video och ljud. Vid osäkerhet ska modellen jämföra etiketten i videon, andra frames och ljudet, och hellre lämna fält tomma/skriva osäkerhetsanteckning än gissa.
+- Analys-prompten kräver att Gemini använder både video och ljud. Den beskriver två vanliga referenser: transportetikett, där `Sändnings-ID` blir `shipment_number` och `Avs. ref.` ofta blir ordernummer, samt innehållsförteckning, där `Ordernummer` kan vara en lista och `Box ID` kan vara pall-id. Vid osäkerhet ska modellen jämföra etiketten i videon, andra frames och ljudet, och hellre lämna fält tomma/skriva osäkerhetsanteckning än gissa.
 - Om Gemini returnerar en tidpunkt för tydlig etikettbild försöker backend ta ut en stillbild med `ffmpeg`. Om `ffmpeg` saknas eller bilden inte kan extraheras ligger raden kvar för manuell kontroll.
-- `record_hash` räknas på video-hash, eventuell label-still-hash och de normaliserade tabellfälten så raden kan kopplas till exakt rätt video och tabellinnehåll.
+- `record_hash` räknas på video-hash, eventuell label-still-hash och de normaliserade tabellfälten inklusive `shipment_number`, så raden kan kopplas till exakt rätt video och tabellinnehåll.
 - `GET /api/meta/uploads`, `GET /api/meta/uploads/{upload_id}/content`, `GET /api/meta/shipment-observations`, `POST /api/meta/uploads/{upload_id}/analyze` och `DELETE /api/meta/uploads/{upload_id}` kraver Super User. `meta.html` anvander `initPage("meta", { requireSuperUser: true })` och visas bara for Super User i sidebaren.
 - Radering audit-loggas som `entity_type=meta_media_upload` utan blobbinnehall i audit-vardet.
 
@@ -64,6 +64,8 @@ Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och u
 | "Hur vet jag att det laddar upp?" | Sidan visar total progress, kvarvarande mangd och status per fil medan uppladdningen pagar. |
 | "Varfor heter videon datum och siffror?" | Backend doper sparade filer med uppladdningsdatum och timestamp sa varje fil blir unik och latt att sortera i Meta. Originalnamnet sparas separat. |
 | "Hur ser jag vilken tabellrad som hor till vilken video?" | Jamfor Video-ID i sändningstabellen med Video-ID i videokortet. Bada bygger pa samma `video_hash`, och tabellen visar ocksa videons filnamn och langd. |
+| "Vad är sändningsnummer?" | Det är värdet vid `Sändnings-ID` på transportetiketten. Det är inte streckkodsvärdet, kundnamnet eller ordernumret. |
+| "Varför saknas sändningsnummer?" | Gemini hittade troligen ingen tydlig transportetikett i videon. Om bara innehållsförteckningen syns kan ordernummer och Box ID fyllas, men sändningsnummer lämnas tomt och raden hamnar för kontroll. |
 | "Var hittar Super User uppladdade videos?" | I sidebarvyn `Meta`. Dar kan Super User filtrera pa videor, visa, ladda ner eller radera varje fil. |
 | "Varför står analysen som LLM saknas?" | Servern saknar `GEMINI_API_KEY`. Lägg Gemini-nyckeln i `.env` lokalt eller Render secrets. |
 | "Vad händer om Gemini är osäker?" | Raden får status `Kontrollera` och visar osäkerhetsanteckning. Appen ska inte gissa när video och ljud inte räcker. |
@@ -87,3 +89,4 @@ Kort svar: `meta-upload.html` ar en fristaende publik mobilvy utan sidebar och u
 - `../app/alembic/versions/0024_meta_upload_content_hash.py`
 - `../app/alembic/versions/0025_meta_shipment_observations.py`
 - `../app/alembic/versions/0026_meta_media_duration.py`
+- `../app/alembic/versions/0027_meta_shipment_number.py`

@@ -1145,6 +1145,7 @@ def test_super_user_meta_view_lists_uploaded_media():
     assert "/js/common.js" in html
     assert "/js/meta.js" in html
     assert "Sändningsanalys" in html
+    assert "Sändningsnummer" in html
     assert "Längd" in html
     assert "Rad-ID" in html
     assert 'id="metaShipmentRows"' in html
@@ -1162,6 +1163,7 @@ def test_super_user_meta_view_lists_uploaded_media():
     assert "Ladda ner" in js
     assert "Radera" in js
     assert "Analysera" in js
+    assert "shipment_number" in js
     assert "Video-ID" in js
     assert "formatDuration" in js
     assert "data-duration-for" in js

@@ -204,6 +204,7 @@ def _shipment_observation_out(row: MetaShipmentObservation) -> dict:
         "label_image_hash": row.label_image_hash,
         "record_hash": row.record_hash,
         "order_number": row.order_number,
+        "shipment_number": row.shipment_number,
         "username": row.username,
         "customer_name": row.customer_name,
         "pallet_id": row.pallet_id,

@@ -493,3 +493,7 @@ Personregistret visar nu kolumnen `Verksamhet` mellan NoMan och Hemomrade. Kolum
 ## [2026-06-01] feature | Per-verksamhet infinity och inline Verksamheter
 
 Verksamheters `∞`-lage styrs nu av ett aktivt omrade med kod `ANNAT` i respektive verksamhet, i stallet for en hardkodad Stigamo-regel. Verksamheter-vyn har fatt `Lagg till ∞`, klickbara celler for kod/namn/sortering/aktiv-status och rubriksortering for bade verksamheter och omraden.
+
+## [2026-06-01] feature | Meta sändningsnummer från etiketter
+
+Meta-analysen har fått `shipment_number`/sändningsnummer i `meta_shipment_observations`, API-svaret och Super User-tabellen. Gemini-prompten beskriver nu både transportetikett och innehållsförteckning: `Sändnings-ID` på transportetiketten blir sändningsnummer, `Avs. ref.` kan bli ordernummer, `Godsmärks`/`Box ID` kan bli pall-id och innehållsförteckningens ordernummerlista kan användas när den är tydligare. `record_hash` räknas om med sändningsnummer så tabellraden fortsatt kopplas till rätt video och etikettdata.

@@ -61,6 +61,7 @@ def test_meta_analysis_uses_gemini_config_and_parses_json_response(monkeypatch):
                             {
                                 "text": (
                                     '{"order_number":"12345","username":"lots1","customer_name":"Kund AB",'
+                                    '"shipment_number":"RIG-REF-260601-0000000-0",'
                                     '"pallet_id":"PALL-1","deviations":["Dåligt byggd pall"],'
                                     '"uncertainty_notes":"Kontrollera kundnamn","label_frame_time_seconds":2.5}'
                                 )
@@ -74,6 +75,7 @@ def test_meta_analysis_uses_gemini_config_and_parses_json_response(monkeypatch):
     fields = meta_analysis_service.normalize_meta_analysis(extracted)
 
     assert fields["order_number"] == "12345"
+    assert fields["shipment_number"] == "RIG-REF-260601-0000000-0"
     assert fields["username"] == "lots1"
     assert fields["customer_name"] == "Kund AB"
     assert fields["pallet_id"] == "PALL-1"
@@ -85,12 +87,51 @@ def test_meta_analysis_uses_gemini_config_and_parses_json_response(monkeypatch):
         meta_analysis_service.calculate_record_hash(
             video_hash="b" * 64,
             order_number=fields["order_number"],
+            shipment_number=fields["shipment_number"],
             username=fields["username"],
             customer_name=fields["customer_name"],
             pallet_id=fields["pallet_id"],
             deviations=fields["deviations"],
         ),
     )
+
+
+def test_meta_analysis_normalizes_reference_label_fields():
+    fields = meta_analysis_service.normalize_meta_analysis(
+        {
+            "order_numbers": ["100001", "100002"],
+            "sändnings-id": "RIG-REF-260601-0000000-0",
+            "användarnamn": "LOTS01",
+            "kund": "Kund AB",
+            "pallid": "BOX-001",
+            "avvikelser": [{"description": "Pall behöver plastas"}],
+        }
+    )
+
+    assert fields["order_number"] == "100001, 100002"
+    assert fields["shipment_number"] == "RIG-REF-260601-0000000-0"
+    assert fields["username"] == "LOTS01"
+    assert fields["customer_name"] == "Kund AB"
+    assert fields["pallet_id"] == "BOX-001"
+    assert fields["deviations"] == ["Pall behöver plastas"]
+
+
+def test_meta_record_hash_includes_shipment_number():
+    base = {
+        "video_hash": "b" * 64,
+        "order_number": "100001",
+        "username": "LOTS01",
+        "customer_name": "Kund AB",
+        "pallet_id": "BOX-001",
+        "deviations": ["Pall behöver plastas"],
+    }
+
+    first = meta_analysis_service.calculate_record_hash(**base, shipment_number="RIG-REF-260601-0000000-0")
+    second = meta_analysis_service.calculate_record_hash(**base, shipment_number="RIG-REF-260601-0000001-0")
+
+    assert re.fullmatch(r"[0-9a-f]{64}", first)
+    assert re.fullmatch(r"[0-9a-f]{64}", second)
+    assert first != second
 
 
 def test_public_meta_upload_route_accepts_multiple_media_without_login(monkeypatch):
@@ -279,6 +320,7 @@ def test_super_user_can_list_and_request_meta_shipment_analysis_without_configur
         video_hash=row.content_hash,
         record_hash="c" * 64,
         order_number="12345",
+        shipment_number="RIG-REF-260601-0000000-0",
         username="lots1",
         customer_name="Kund AB",
         pallet_id="PALL-1",
@@ -302,6 +344,7 @@ def test_super_user_can_list_and_request_meta_shipment_analysis_without_configur
         assert response.status_code == 200
         item = response.json()["items"][0]
         assert item["order_number"] == "12345"
+        assert item["shipment_number"] == "RIG-REF-260601-0000000-0"
         assert item["username"] == "lots1"
         assert item["customer_name"] == "Kund AB"
         assert item["pallet_id"] == "PALL-1"

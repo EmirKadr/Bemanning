@@ -241,6 +241,7 @@ class MetaShipmentObservation(Base):
     label_image_hash: Mapped[str | None] = mapped_column(String(64))
     record_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     order_number: Mapped[str | None] = mapped_column(String(80))
+    shipment_number: Mapped[str | None] = mapped_column(String(120))
     username: Mapped[str | None] = mapped_column(String(120))
     customer_name: Mapped[str | None] = mapped_column(String(200))
     pallet_id: Mapped[str | None] = mapped_column(String(120))
