@@ -375,7 +375,7 @@ def test_non_super_user_cannot_list_meta_uploads():
         yield session
 
     def admin_user():
-        return User(id=100, username="admin", role="admin", roles=["admin"], is_active=True)
+        return User(id=100, username="regular-admin", role="admin", roles=["admin"], is_active=True)
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = admin_user

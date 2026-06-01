@@ -624,7 +624,10 @@ def test_frontend_theme_toggle_is_wired_globally():
     assert ".date-display-wrap" in styles
     assert "refreshProductivityBtn" not in productivity_html
 
+    public_standalone_pages = {"meta-upload.html"}
     for html_path in frontend.glob("*.html"):
+        if html_path.name in public_standalone_pages:
+            continue
         html = html_path.read_text(encoding="utf-8")
         assert "/js/common.js" in html
 
