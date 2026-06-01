@@ -1616,6 +1616,29 @@ thead th {
   text-transform: uppercase;
 }
 
+.table-sort-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.table-sort-button:hover,
+.table-sort-button:focus-visible {
+  color: var(--text);
+}
+.sort-ind {
+  min-width: 10px;
+  color: var(--accent);
+}
+
 tbody tr:hover td { background: #fafbfd; }
 tbody tr:last-child td { border-bottom: none; }
 
@@ -1639,6 +1662,28 @@ tbody tr:last-child td { border-bottom: none; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.business-areas-header-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.business-areas-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 5px 10px;
+  background: var(--surface);
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.business-infinity-mark {
+  color: var(--accent);
+  font-weight: 800;
+}
 .business-areas-table-wrap {
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -1659,6 +1704,42 @@ tbody tr:last-child td { border-bottom: none; }
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+}
+.editable-cell {
+  cursor: text;
+  min-width: 82px;
+}
+.editable-cell:hover,
+.editable-cell:focus-visible {
+  background: var(--accent-soft);
+  outline: 2px solid transparent;
+}
+.editable-cell.is-editing,
+.editable-cell.is-saving {
+  padding: 5px 8px;
+}
+.inline-table-input {
+  width: 100%;
+  min-width: 70px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  padding: 6px 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.inline-active-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.inline-active-toggle input {
+  width: 16px;
+  height: 16px;
+}
+.all-areas-marker-row td {
+  background: var(--accent-soft);
 }
 .business-areas-empty {
   border: 1px dashed var(--border-2);
@@ -1703,7 +1784,6 @@ tbody tr:last-child td { border-bottom: none; }
   .businesses-table > tbody > tr.business-row > td:nth-child(2)::before { content: "Namn"; }
   .businesses-table > tbody > tr.business-row > td:nth-child(3)::before { content: "Sortering"; }
   .businesses-table > tbody > tr.business-row > td:nth-child(4)::before { content: "Aktiv"; }
-  .businesses-table > tbody > tr.business-row > td:nth-child(5)::before { content: ""; }
   .businesses-table > tbody > tr.business-areas-row > td {
     padding: 12px 14px 16px;
   }
@@ -1765,8 +1845,8 @@ table.data td:last-child > button {
 table.data td:last-child > button:first-child { margin-left: 0; }
 
 /* Personer-tabellen: smalare sortering så åtgärdskolumnen får mer plats */
-table#persons-table th:nth-child(5),
-table#persons-table td:nth-child(5) {
+table#persons-table th:nth-child(6),
+table#persons-table td:nth-child(6) {
   width: 90px;
 }
 

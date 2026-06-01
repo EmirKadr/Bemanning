@@ -8,7 +8,7 @@ let persons = [];
 let currentUser = null;
 let sortKey = "sort_order";
 let sortAsc = true;
-const filters = { name: "", noman: "", home_area: "", home_activity: "", sort_order: "" };
+const filters = { name: "", noman: "", business: "", home_area: "", home_activity: "", sort_order: "" };
 const personUndoStack = [];
 const PERSON_UNDO_LIMIT = 50;
 let personUndoBusy = false;
@@ -38,6 +38,16 @@ function activityLabel(id) {
 function activityColor(id) {
   const a = activities.find((x) => x.id === id);
   return a ? a.color : "transparent";
+}
+
+function businessName(id) {
+  if (id == null) return "Utan verksamhet";
+  const business = businesses.find((item) => Number(item.id) === Number(id));
+  if (business) return business.name;
+  if (Number(currentUser?.business_id) === Number(id)) {
+    return currentUser?.business_name || currentUser?.business_code || "";
+  }
+  return `Verksamhet #${id}`;
 }
 
 function businessOptions(selectedId, disabled = false) {
@@ -91,6 +101,7 @@ function passesFilter(p) {
   const match = (val, q) => !q || String(val ?? "").toLowerCase().includes(q.toLowerCase());
   if (!match(p.name, filters.name)) return false;
   if (!match(p.noman, filters.noman)) return false;
+  if (!match(businessName(p.business_id), filters.business)) return false;
   if (!match(areaName(p.home_area_id), filters.home_area)) return false;
   if (!match(activityLabel(p.home_activity_id), filters.home_activity)) return false;
   if (!match(p.sort_order, filters.sort_order)) return false;
@@ -101,6 +112,7 @@ function sortKeyValue(p) {
   switch (sortKey) {
     case "name": return (p.name || "").toLowerCase();
     case "noman": return (p.noman || "").toLowerCase();
+    case "business": return businessName(p.business_id).toLowerCase();
     case "home_area": return areaName(p.home_area_id).toLowerCase();
     case "home_activity": return activityLabel(p.home_activity_id).toLowerCase();
     case "sort_order": return p.sort_order;
@@ -199,9 +211,14 @@ function editText(td, person, field, currentValue, label = field) {
     td.classList.remove("editing");
     const newValue = input.value.trim();
     if (commit && newValue !== (currentValue || "")) {
+      if (field === "noman" && !newValue) {
+        showToast("NoMan krävs", "error");
+        await loadPersons();
+        return;
+      }
       try {
         const before = snapshotPerson(person);
-        const value = field === "noman" && !newValue ? null : newValue;
+        const value = newValue;
         await savePersonField(person.id, { [field]: value });
         pushPersonUndo(label, before);
         person[field] = value;
@@ -318,6 +335,11 @@ function renderRows() {
     tdNoman.textContent = p.noman || "";
     if (canEditPersons) tdNoman.addEventListener("click", () => editText(tdNoman, p, "noman", p.noman || "", "NoMan"));
     tr.appendChild(tdNoman);
+
+    // Verksamhet
+    const tdBusiness = document.createElement("td");
+    tdBusiness.textContent = businessName(p.business_id);
+    tr.appendChild(tdBusiness);
 
     // Hemområde
     const tdArea = document.createElement("td");
@@ -479,7 +501,7 @@ function openBulkPersonsModal() {
     columns: [
       ...businessColumn,
       { key: "name", label: "Namn", required: true },
-      { key: "noman", label: "NoMan", required: false },
+      { key: "noman", label: "NoMan", required: true },
       { key: "home_area", label: "Hemområde", required: false, type: "select", options: areas.map((area) => ({ value: area.name, label: area.name })) },
       { key: "home_activity", label: "Huvudaktivitet", required: false, type: "select", options: activitiesActive.map((activity) => ({ value: activity.label, label: activity.label })) },
       { key: "sort_order", label: "Sortering", required: false, type: "number" },
@@ -542,7 +564,7 @@ function openModal(person) {
       <label>Namn</label>
       <input id="m-name" value="${escapeHtml(person?.name || "")}" />
       <label>NoMan</label>
-      <input id="m-noman" value="${escapeHtml(person?.noman || "")}" />
+      <input id="m-noman" value="${escapeHtml(person?.noman || "")}" required />
       <label>Hemområde</label>
       <select id="m-area">
         <option value="">(inget)</option>
@@ -566,7 +588,7 @@ function openModal(person) {
   document.getElementById("m-save").addEventListener("click", async () => {
     const payload = {
       name: document.getElementById("m-name").value.trim(),
-      noman: document.getElementById("m-noman").value.trim() || null,
+      noman: document.getElementById("m-noman").value.trim(),
       home_area_id: document.getElementById("m-area").value ? Number(document.getElementById("m-area").value) : null,
       home_activity_id: document.getElementById("m-activity").value ? Number(document.getElementById("m-activity").value) : null,
       sort_order: Number(document.getElementById("m-sort").value) || 0,
@@ -575,6 +597,7 @@ function openModal(person) {
       payload.business_id = document.getElementById("m-business").value ? Number(document.getElementById("m-business").value) : null;
     }
     if (!payload.name) { showToast("Namn krävs", "error"); return; }
+    if (!payload.noman) { showToast("NoMan krävs", "error"); return; }
     try {
       if (isEdit) {
         const before = snapshotPerson(person);

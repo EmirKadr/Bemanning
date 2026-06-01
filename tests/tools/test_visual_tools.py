@@ -682,8 +682,10 @@ def test_area_focus_toggle_is_wired_to_views():
     assert 'writeAreaFocus("ALLT")' in common
     assert "visibleAreas.some((area) => Number(area?.id) === areaId)" in common
     assert "buildAreaFocusOptions" in common
-    assert 'business_code || "").toUpperCase() === "STIGAMO"' in common
-    assert 'code || "").trim().toUpperCase() !== "ANNAT"' in common
+    assert "function isAllAreasMarker" in common
+    assert "function hasAllAreasMarker" in common
+    assert ".filter((area) => !isAllAreasMarker(area))" in common
+    assert "hasAllAreasMarker(activeAreas)" in common
     assert 'code: null, areaId: null' in common
     assert 'value: "ALLT"' in common
     assert 'window.areaFocusAreaId = areaFocusAreaId' in common
@@ -866,16 +868,25 @@ def test_super_user_business_fields_are_wired_in_register_ui():
     assert 'api.get(`/api/businesses?include_inactive=${includeInactive}`)' in businesses
     assert 'api.get("/api/areas?include_inactive=true")' in businesses
     assert 'api.post("/api/businesses", payload)' in businesses
-    assert 'api.put(`/api/businesses/${business.id}`, payload)' in businesses
+    assert 'api.put(`/api/businesses/${record.id}`, payload)' in businesses
     assert 'class="modal-checkbox"><input id="m-active"' in businesses
     assert 'class="modal-checkbox"><input id="m-area-active"' in businesses
     assert "Kod och namn krävs." not in businesses
     assert "function renderAreasTable" in businesses
     assert "function openAreaModal" in businesses
+    assert "function startInlineEdit" in businesses
+    assert "function ensureAllAreasMarker" in businesses
+    assert 'data-inline-edit="${entityType}"' in businesses
+    assert 'data-add-all-areas="${business.id}"' in businesses
+    assert 'data-${scope}-sort="${key}"' in businesses
+    assert 'data-business-sort="code"' in businesses_html
+    assert 'data-business-sort="name"' in businesses_html
     assert 'data-new-area="${business.id}"' in businesses
     assert 'api.post("/api/areas", payload)' in businesses
-    assert 'api.put(`/api/areas/${area.id}`, payload)' in businesses
+    assert 'api.put(`/api/areas/${record.id}`, payload)' in businesses
     assert 'api.del(`/api/areas/${area.id}`)' in businesses
+    assert "data-edit-business" not in businesses
+    assert "data-edit-area" not in businesses
     assert "setAreaFocusAreas(loadedAreas, currentUser)" in businesses
     assert 'id="businesses-body"' in businesses_html
     assert 'id="new-business"' in businesses_html
@@ -973,7 +984,7 @@ def test_import_views_have_templates_and_help_buttons():
     assert "/api/persons/import-rows" in persons_js
     assert "openBulkPersonsModal" in persons_js
     assert re.search(r'key:\s*"name",\s*label:\s*"Namn",\s*required:\s*true', persons_js)
-    assert re.search(r'key:\s*"noman",\s*label:\s*"NoMan",\s*required:\s*false', persons_js)
+    assert re.search(r'key:\s*"noman",\s*label:\s*"NoMan",\s*required:\s*true', persons_js)
     assert re.search(r'key:\s*"home_area",\s*label:\s*"[^"]+",\s*required:\s*false', persons_js)
     assert 'setupImportHelpButton("person-import-help", "Importera personer")' in persons_js
     assert 'api.download("/api/persons/import-template", "personer-importmall.xlsx")' in persons_js

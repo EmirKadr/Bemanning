@@ -199,7 +199,7 @@ def test_create_defaults_to_actor_business_and_rejects_foreign_ids(business_sess
     session, data = business_session
 
     created_person = create_person(
-        PersonCreate(name="Ny Stigamo", home_area_id=data["stigamo_person"].home_area_id),
+        PersonCreate(name="Ny Stigamo", noman="NYS01", home_area_id=data["stigamo_person"].home_area_id),
         session,
         data["user"],
     )
@@ -229,7 +229,7 @@ def test_create_defaults_to_actor_business_and_rejects_foreign_ids(business_sess
 def test_super_user_must_choose_business_when_create_cannot_infer(business_session):
     session, data = business_session
 
-    assert_http_status(400, create_person, PersonCreate(name="Saknar verksamhet"), session, data["super_user"])
+    assert_http_status(400, create_person, PersonCreate(name="Saknar verksamhet", noman="SAK01"), session, data["super_user"])
     assert_http_status(400, create_activity, ActivityCreate(label="Saknar verksamhet"), session, data["super_user"])
     assert_http_status(400, create_area, AreaCreate(code="X", name="Saknar verksamhet"), session, data["super_user"])
     assert_http_status(400, create_user, UserCreate(username="missing-business", roles=["leader"]), session, data["super_user"])
@@ -246,7 +246,7 @@ def test_duplicate_names_and_codes_are_scoped_per_business(business_session):
     session, data = business_session
 
     r3_person = create_person(
-        PersonCreate(name="Stigamo Person", business_id=data["r3"].id, home_area_id=data["r3_person"].home_area_id),
+        PersonCreate(name="Stigamo Person", noman="R3S01", business_id=data["r3"].id, home_area_id=data["r3_person"].home_area_id),
         session,
         data["super_user"],
     )
@@ -267,7 +267,7 @@ def test_duplicate_names_and_codes_are_scoped_per_business(business_session):
     assert_http_status(
         409,
         create_person,
-        PersonCreate(name="Stigamo Person", home_area_id=data["stigamo_person"].home_area_id),
+        PersonCreate(name="Stigamo Person", noman="STI02", home_area_id=data["stigamo_person"].home_area_id),
         session,
         data["user"],
     )
@@ -285,6 +285,33 @@ def test_super_user_can_add_r3_area_without_changing_stigamo(business_session):
     assert created.business_id == data["r3"].id
     assert {area.code for area in list_areas(db=session, user=data["r3_user"])} == {"R3", "MG"}
     assert [area.code for area in list_areas(db=session, user=data["user"])] == ["GG"]
+
+
+def test_all_areas_marker_can_exist_in_each_business(business_session):
+    session, data = business_session
+
+    stigamo_marker = create_area(
+        AreaCreate(business_id=data["stigamo"].id, code="ANNAT", name="Annat", sort_order=99),
+        session,
+        data["super_user"],
+    )
+    r3_marker = create_area(
+        AreaCreate(business_id=data["r3"].id, code="ANNAT", name="Annat", sort_order=99),
+        session,
+        data["super_user"],
+    )
+
+    assert stigamo_marker.business_id == data["stigamo"].id
+    assert r3_marker.business_id == data["r3"].id
+    assert {area.code for area in list_areas(db=session, user=data["user"])} == {"GG", "ANNAT"}
+    assert {area.code for area in list_areas(db=session, user=data["r3_user"])} == {"R3", "ANNAT"}
+    assert_http_status(
+        409,
+        create_area,
+        AreaCreate(business_id=data["r3"].id, code="ANNAT", name="Dubblett"),
+        session,
+        data["super_user"],
+    )
 
 
 def test_business_and_area_codes_are_generated_from_name(business_session):

@@ -1,7 +1,7 @@
 ---
 title: API-karta
 status: aktiv
-updated: 2026-05-31
+updated: 2026-06-01
 tags: [api, backend]
 ---
 
@@ -46,7 +46,7 @@ Kort svar: `API_ROUTES.md` ar kontraktslistan och testas mot FastAPI-appen via `
 
 ## Register och settings
 
-- `GET/POST/PUT/DELETE /api/persons...`, `POST /api/persons/import-rows`, `PUT /api/persons/sort-order` - personregister med frivilligt `NoMan`-falt, Excelimport, direktimport fran tabellrader och begransad sortering fran planeringsvyerna.
+- `GET/POST/PUT/DELETE /api/persons...`, `POST /api/persons/import-rows`, `PUT /api/persons/sort-order` - personregister med obligatoriskt `NoMan` for nya personer och import, Excelimport, direktimport fran tabellrader och begransad sortering fran planeringsvyerna.
 - `GET/PUT /api/persons/{id}/schedule` - veckomall.
 - `GET/POST/PUT/DELETE /api/activities...`, `POST /api/activities/import-rows` - aktivitetsregister, Excelimport och direktimport fran tabellrader.
 - `GET/POST/PUT/DELETE /api/areas...` - omraden. Delete tar bort tomma omraden men inaktiverar omradet om personer, aktiviteter eller anvandare redan pekar pa det.

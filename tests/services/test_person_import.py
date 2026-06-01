@@ -36,14 +36,14 @@ def test_build_person_import_template_excel_has_expected_headers():
     assert [sheet.cell(1, column).value for column in range(1, 7)] == [
         "verksamhet (frivillig)",
         "namn (obligatorisk)",
-        "NoMan (frivillig)",
+        "NoMan (obligatorisk)",
         "hemomr\u00e5de (frivillig)",
         "huvudaktivitet (frivillig)",
         "sortering (frivillig)",
     ]
 
 
-def test_parse_person_import_excel_accepts_name_only():
+def test_parse_person_import_excel_requires_noman():
     rows, errors = parse_person_import_excel(
         workbook_bytes(
             [
@@ -53,19 +53,17 @@ def test_parse_person_import_excel_accepts_name_only():
         )
     )
 
-    assert errors == []
-    assert len(rows) == 1
-    assert rows[0].name == "Anna Andersson"
-    assert rows[0].home_area is None
-    assert rows[0].home_activity is None
-    assert rows[0].sort_order is None
+    assert rows == []
+    assert len(errors) == 1
+    assert errors[0].name == "Anna Andersson"
+    assert errors[0].error == "NoMan saknas"
 
 
 def test_parse_person_import_excel_accepts_optional_fields():
     rows, errors = parse_person_import_excel(
         workbook_bytes(
             [
-                ["namn (obligatorisk)", "NoMan (frivillig)", "hemomr\u00e5de (frivillig)", "huvudst\u00e4lle (frivillig)", "sortering (frivillig)"],
+                ["namn (obligatorisk)", "NoMan (obligatorisk)", "hemomr\u00e5de (frivillig)", "huvudst\u00e4lle (frivillig)", "sortering (frivillig)"],
                 ["Bo Berg", "BOB01", "GG", "GG VM", 12],
             ]
         )
@@ -83,9 +81,9 @@ def test_parse_person_import_excel_collects_row_errors():
     rows, errors = parse_person_import_excel(
         workbook_bytes(
             [
-                ["namn", "sortering"],
-                [None, 1],
-                ["Cecilia", "1,5"],
+                ["namn", "NoMan", "sortering"],
+                [None, "ROW02", 1],
+                ["Cecilia", "CEC01", "1,5"],
             ]
         )
     )
@@ -122,7 +120,7 @@ def test_create_person_rejects_duplicate_name(person_db):
     person_db.flush()
 
     with pytest.raises(HTTPException) as exc:
-        create_person(PersonCreate(name=" anna andersson "), db=person_db, user=admin)
+        create_person(PersonCreate(name=" anna andersson ", noman="ANN01"), db=person_db, user=admin)
 
     assert exc.value.status_code == 409
 
@@ -148,7 +146,7 @@ def test_import_person_rows_creates_from_direct_table(person_db):
         PersonImportRowsRequest(
             rows=[
                 PersonImportRowInput(name="Mira Multi", noman="MIR01", home_area="GG", home_activity="GG Plock", sort_order="7"),
-                PersonImportRowInput(name="Mira Multi", home_area="GG"),
+                PersonImportRowInput(name="Mira Multi", noman="MIR02", home_area="GG"),
             ]
         ),
         db=person_db,
@@ -166,7 +164,36 @@ def test_import_person_rows_creates_from_direct_table(person_db):
     assert person.sort_order == 7
 
 
-def test_create_and_update_person_persists_optional_noman(person_db):
+def test_import_person_rows_requires_noman(person_db):
+    admin = User(username="admin", role="admin", roles=["admin"], is_active=True)
+    person_db.add(admin)
+    person_db.flush()
+
+    result = import_person_rows(
+        PersonImportRowsRequest(rows=[PersonImportRowInput(name="Mira Multi")]),
+        db=person_db,
+        user=admin,
+    )
+
+    assert result.created == 0
+    assert result.skipped == 1
+    assert result.errors[0].name == "Mira Multi"
+    assert result.errors[0].error == "NoMan saknas"
+
+
+def test_create_person_requires_noman(person_db):
+    admin = User(username="admin", role="admin", roles=["admin"], is_active=True)
+    person_db.add(admin)
+    person_db.flush()
+
+    with pytest.raises(HTTPException) as exc:
+        create_person(PersonCreate(name="NoMan Person"), db=person_db, user=admin)
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "NoMan krävs"
+
+
+def test_create_and_update_person_persists_required_noman(person_db):
     admin = User(username="admin", role="admin", roles=["admin"], is_active=True)
     person_db.add(admin)
     person_db.flush()
@@ -174,9 +201,15 @@ def test_create_and_update_person_persists_optional_noman(person_db):
     person = create_person(PersonCreate(name="NoMan Person", noman="NMP01"), db=person_db, user=admin)
     assert person.noman == "NMP01"
 
-    updated = update_person(person.id, PersonUpdate(noman=None), db=person_db, user=admin)
+    updated = update_person(person.id, PersonUpdate(noman="NMP02"), db=person_db, user=admin)
 
-    assert updated.noman is None
+    assert updated.noman == "NMP02"
+
+    with pytest.raises(HTTPException) as exc:
+        update_person(person.id, PersonUpdate(noman=None), db=person_db, user=admin)
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "NoMan krävs"
 
 
 def test_create_person_rejects_inactive_duplicate_name(person_db):
@@ -186,7 +219,7 @@ def test_create_person_rejects_inactive_duplicate_name(person_db):
     person_db.flush()
 
     with pytest.raises(HTTPException) as exc:
-        create_person(PersonCreate(name="Anton Holmqvist", sort_order=3), db=person_db, user=admin)
+        create_person(PersonCreate(name="Anton Holmqvist", noman="ANT01", sort_order=3), db=person_db, user=admin)
 
     assert exc.value.status_code == 409
     assert inactive.is_active is False
