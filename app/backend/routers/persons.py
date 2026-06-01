@@ -72,6 +72,23 @@ class ImportPersonRow:
     sort_order: int | None
 
 
+def _required_noman(value: str | None) -> str:
+    noman = (value or "").strip()
+    if not noman:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="NoMan krävs")
+    if len(noman) > 120:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="NoMan får vara max 120 tecken")
+    return noman
+
+
+def _noman_for_update(value: str | None, current_value: str | None) -> str | None:
+    if value is None:
+        if current_value:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="NoMan krävs")
+        return None
+    return _required_noman(value)
+
+
 def _person_snapshot(person: Person) -> dict:
     return {
         "id": person.id,
@@ -158,6 +175,9 @@ def _parse_person_import_values(raw_rows: list[tuple[int, dict[str, object]]]) -
             continue
 
         noman = values.get("noman", "").strip()
+        if not noman:
+            errors.append(PersonImportError(row=row_number, name=name, error="NoMan saknas"))
+            continue
         if len(noman) > 120:
             errors.append(PersonImportError(row=row_number, name=name, error="NoMan får vara max 120 tecken"))
             continue
@@ -172,7 +192,7 @@ def _parse_person_import_values(raw_rows: list[tuple[int, dict[str, object]]]) -
                 row_number=row_number,
                 business=values.get("business") or None,
                 name=name,
-                noman=noman or None,
+                noman=noman,
                 home_area=values.get("home_area") or None,
                 home_activity=values.get("home_activity") or None,
                 sort_order=sort_order,
@@ -186,7 +206,7 @@ def build_person_import_template_excel() -> bytes:
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Personer"
-    sheet.append(["verksamhet (frivillig)", "namn (obligatorisk)", "NoMan (frivillig)", "hemområde (frivillig)", "huvudaktivitet (frivillig)", "sortering (frivillig)"])
+    sheet.append(["verksamhet (frivillig)", "namn (obligatorisk)", "NoMan (obligatorisk)", "hemområde (frivillig)", "huvudaktivitet (frivillig)", "sortering (frivillig)"])
     sheet.column_dimensions["A"].width = 22
     sheet.column_dimensions["B"].width = 28
     sheet.column_dimensions["C"].width = 20
@@ -554,6 +574,7 @@ def create_person(
     db: Session = Depends(get_db),
     user: User = Depends(require_view_access("persons", "edit")),
 ) -> Person:
+    noman = _required_noman(payload.noman)
     area = db.get(Area, payload.home_area_id) if payload.home_area_id is not None else None
     if payload.home_area_id is not None:
         assert_scoped_object(db, user, area, detail="Hemområde hittades inte")
@@ -579,6 +600,7 @@ def create_person(
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Huvudaktivitet tillhör annan verksamhet")
 
     data = payload.model_dump()
+    data["noman"] = noman
     data["business_id"] = business_id
     data["is_active"] = True
     person = Person(**data)
@@ -621,6 +643,8 @@ def update_person(
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Person med samma namn finns redan")
     before = _person_snapshot(person)
     data = payload.model_dump(exclude_unset=True, exclude={"is_active"})
+    if "noman" in data:
+        data["noman"] = _noman_for_update(data["noman"], person.noman)
     if "business_id" in data and data["business_id"] != person.business_id:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Person kan inte flyttas mellan verksamheter")
     if "home_area_id" in data and data["home_area_id"] is not None:

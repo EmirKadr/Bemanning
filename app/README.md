@@ -47,8 +47,11 @@ Chattknappen i sidomenyn fungerar när backend har en MiniMax-nyckel. Sätt `MIN
 
 Meta-vyn kan skapa sändningsrader för uppladdade videor och skicka dem till
 Gemini. Analysen använder både video och ljud och förväntar JSON med
-ordernummer, användarnamn, kund, pall-id, avvikelser, osäkerheter och eventuell
-tidpunkt för en tydlig etikettbild. Lägg Gemini-nyckeln i `.env` lokalt eller i
+ordernummer, sändningsnummer, användarnamn, kund, pall-id, avvikelser,
+osäkerheter och eventuell tidpunkt för en tydlig etikettbild. Sändningsnummer
+hämtas från `Sändnings-ID` på transportetiketten; innehållsförteckningen kan
+hjälpa med ordernummer, kund och Box ID/pall-id när transportetiketten är otydlig.
+Lägg Gemini-nyckeln i `.env` lokalt eller i
 Render secrets:
 
 - `GEMINI_API_KEY`

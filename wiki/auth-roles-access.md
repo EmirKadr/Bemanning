@@ -1,7 +1,7 @@
 ---
 title: Roller och behorighet
 status: aktiv
-updated: 2026-05-31
+updated: 2026-06-01
 tags: [auth, roller, behorighet]
 ---
 
@@ -22,8 +22,8 @@ Kort svar: inloggning ar sessionsbaserad. Roller styr vad anvandaren ser och far
 ## Verksamhetsscope
 
 - Alla icke-Super Users, aven admins, ar lasta till sin egen verksamhet.
-- Stigamo-anvandare ser Stigamo-data och far omradestoggle for Stigamos omraden plus `∞` som betyder alla Stigamo-omraden.
-- R3-anvandare ser bara R3 och far bara R3-toggle.
+- Vanliga anvandare ser sin verksamhets data och omraden. Om verksamheten har aktivt omrade med kod `ANNAT` far anvandaren `∞`, som betyder alla omraden i den verksamheten.
+- R3-anvandare ser bara R3 och far bara R3-toggle tills `ANNAT` laggs till for R3 i Verksamheter-vyn.
 - Super User kan se alla verksamheter. I sidebar betyder `∞` globalt allt for Super User.
 - Vid skapande/import behover vanliga anvandare inte ange verksamhet; backend anvander anvandarens verksamhet. Super User maste valja verksamhet om den inte kan harledas fran omrade, person eller aktivitet.
 - API ska svara 404/403 for frammande id utan att exponera den andra verksamhetens data.

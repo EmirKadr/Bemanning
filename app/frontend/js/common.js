@@ -319,11 +319,20 @@ function areaFocusValueForArea(area) {
   return Number.isInteger(id) ? `AREA:${id}` : "";
 }
 
+function isAllAreasMarker(area) {
+  return String(area?.code || "").trim().toUpperCase() === "ANNAT";
+}
+
+function hasAllAreasMarker(areas = []) {
+  return (areas || []).some((area) => area?.is_active !== false && isAllAreasMarker(area));
+}
+
 function buildAreaFocusOptions(areas = [], user = null) {
   const preferredOrder = ["MG", "GG", "AS", "EH", "R3"];
-  const visibleAreas = (areas || [])
-    .filter((area) => area?.is_active !== false)
-    .filter((area) => String(area?.code || "").trim().toUpperCase() !== "ANNAT")
+  const activeAreas = (areas || [])
+    .filter((area) => area?.is_active !== false);
+  const visibleAreas = activeAreas
+    .filter((area) => !isAllAreasMarker(area))
     .slice()
     .sort((a, b) => {
       const ac = String(a?.code || "").trim().toUpperCase();
@@ -339,8 +348,7 @@ function buildAreaFocusOptions(areas = [], user = null) {
     code: String(area?.code || "").trim().toUpperCase(),
     areaId: Number(area?.id),
   })).filter((option) => option.value && option.label);
-  const isStigamo = String(user?.business_code || "").toUpperCase() === "STIGAMO";
-  if (user?.is_super_user || (isStigamo && options.length > 1)) {
+  if (user?.is_super_user || hasAllAreasMarker(activeAreas)) {
     options.push({ value: "ALLT", label: "∞", title: "Alla områden", code: null, areaId: null });
   }
   return options.length ? options : AREA_FOCUS_OPTIONS;

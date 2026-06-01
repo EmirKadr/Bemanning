@@ -1,7 +1,7 @@
 ---
 title: Anvandare och installningar
 status: aktiv
-updated: 2026-05-29
+updated: 2026-06-01
 tags: [anvandare, settings, roller, ui]
 ---
 
@@ -9,7 +9,7 @@ tags: [anvandare, settings, roller, ui]
 
 Kort svar: Anvandare-sidan hanterar konton, roller, omrade, forsta losenord, verksamhetsspecifik cell-lasning och rollernas globala vyatkomst. Anvandare ar alltid aktiva; konton som inte ska finnas kvar tas bort. Super User har dessutom vyn Verksamheter dar verksamheter och deras omraden administreras.
 
-Omradesfokus i sidebar filtrerar anvandarlistan inom anvandarens verksamhet. `∞` visar alla omraden i den verksamheten; for Super User betyder `∞` globalt allt. Nar en ny anvandare skapas forvalt valt omradesfokus som anvandarens omrade, men omradet kan fortfarande andras i modalen eller lamnas tomt.
+Omradesfokus i sidebar filtrerar anvandarlistan inom anvandarens verksamhet. `∞` visar alla omraden i den verksamheten nar verksamheten har aktivt `ANNAT`; for Super User betyder `∞` globalt allt. Nar en ny anvandare skapas forvalt valt omradesfokus som anvandarens omrade, men omradet kan fortfarande andras i modalen eller lamnas tomt.
 
 ## Knappar och kontroller
 
@@ -24,7 +24,7 @@ Omradesfokus i sidebar filtrerar anvandarlistan inom anvandarens verksamhet. `�
 | Las bemanningsceller... | Checkbox | Sparar setting per verksamhet | `PUT /api/settings` | Nar aktiv kan ledare stoppas fran celler andra fyllt i aktuell verksamhet. |
 | Redigera | Oppnar modal | Uppdaterar konto | `PUT /api/users/{id}` | Sista admin kan inte nedgraderas. |
 | Ta bort | Bekraftar borttagning | Tar bort konto permanent och nollar gamla `updated_by`/audit-referenser | `DELETE /api/users/{id}` | Eget konto, sista admin i en verksamhet och demo-användaren skyddas. |
-| Verksamheter | Sidebar-vy for Super User | Skapar/redigerar verksamheter och omraden | `GET/POST/PUT /api/businesses`, `GET/POST/PUT/DELETE /api/areas` | Vanliga anvandare ser inte vyn. Omraden med kopplad data inaktiveras i stallet for att hardraderas. |
+| Verksamheter | Sidebar-vy for Super User | Skapar verksamheter och omraden, redigerar celler inline och kan lagga till `∞`/`ANNAT` per verksamhet | `GET/POST/PUT /api/businesses`, `GET/POST/PUT/DELETE /api/areas` | Vanliga anvandare ser inte vyn. Omraden med kopplad data inaktiveras i stallet for att hardraderas. |
 
 Andringar i anvandare, forsta losenord och verksamhetens installningar skrivs till Historik. Loggen visar till exempel `user/set_password`, `app_setting/update_lock`, `app_setting/update_sidebar_layout` och `app_setting/update_role_access`, men aldrig sjalva losenordet.
 
@@ -82,14 +82,15 @@ Knappar:
 
 ## Verksamheter-vy
 
-Vyn finns bara for Super User och visar `code`, `name`, `sort_order` och aktiv-status for verksamheter. Under varje verksamhet visas dess omraden.
+Vyn finns bara for Super User och visar `code`, `name`, `sort_order` och aktiv-status for verksamheter. Under varje verksamhet visas dess omraden. Rubrikerna sorterar listan visuellt, och celler for kod, namn, sortering och aktiv-status kan andras direkt i tabellen.
 
 Knappar:
 
 - `Ny verksamhet`: oppnar modal och skapar via `POST /api/businesses`; kod skapas automatiskt från namnet.
-- `Redigera`: uppdaterar namn, sortering eller aktiv-status via `PUT /api/businesses/{business_id}`.
+- Klick i verksamhetscell: uppdaterar kod, namn, sortering eller aktiv-status via `PUT /api/businesses/{business_id}`.
 - `Nytt omrade`: skapar omrade pa vald verksamhet via `POST /api/areas` med `business_id`; kod skapas automatiskt från namnet.
-- `Redigera` under Omraden: uppdaterar kod, namn, sortering eller aktiv-status via `PUT /api/areas/{area_id}`.
+- `Lagg till ∞`: skapar eller ateraktiverar omradet `ANNAT`/`Annat` for vald verksamhet. Nar det ar aktivt far vanliga anvandare i verksamheten `∞` som alla-omraden-lage.
+- Klick i omradescell: uppdaterar kod, namn, sortering eller aktiv-status via `PUT /api/areas/{area_id}`.
 - `Ta bort` under Omraden: anropar `DELETE /api/areas/{area_id}`. Tomma omraden tas bort; omradet inaktiveras om personer, aktiviteter eller anvandare redan ar kopplade till det.
 - `Visa inaktiva`: laddar aven inaktiva verksamheter och omraden.
 

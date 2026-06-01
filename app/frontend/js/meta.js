@@ -217,7 +217,7 @@ function renderShipmentRows() {
   if (!tbody || !summary) return;
   summary.textContent = `${shipmentItems.length} sändningsrader`;
   if (!shipmentItems.length) {
-    tbody.innerHTML = '<tr><td colspan="11" class="meta-admin-empty-cell">Inga sändningsanalyser ännu.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="meta-admin-empty-cell">Inga sändningsanalyser ännu.</td></tr>';
     return;
   }
 
@@ -235,6 +235,7 @@ function renderShipmentRows() {
     return `
       <tr>
         <td>${escapeHtml(item.order_number || "-")}</td>
+        <td>${escapeHtml(item.shipment_number || "-")}</td>
         <td>${escapeHtml(item.username || "-")}</td>
         <td>${escapeHtml(item.customer_name || "-")}</td>
         <td>${escapeHtml(item.pallet_id || "-")}</td>

@@ -1,7 +1,7 @@
 ---
 title: UI-karta och alla kontroller
 status: aktiv
-updated: 2026-05-31
+updated: 2026-06-01
 tags: [ui, knappar, funktioner, chat-stod]
 ---
 
@@ -18,7 +18,7 @@ Sidebaren ar fast i vansterkanten och byter inte position nar sidans innehall sk
 | Sidebar-lankar | Vanster meny | Filtreras per vybehorighet | Navigerar till Bemanning, Oversikt, Produktivitet, Hamta data, Bearbeta, Dela, Personer, Aktiviteter, Historik, Anvandare | Om en vy saknas har rollen troligen `none` for vyn. Be admin/Super User kontrollera `Vybehorigheter`; vanlig anvandare kan ofta inte gora det sjalv. |
 | Hamburgare | Sidebar topp | Alla inloggade | Faller ihop/oppnar sidebar och sparar `sidebar-collapsed` i `localStorage` | Om menyn ser "for liten" ut ar den troligen hopfallen. |
 | Redigera meny | Sidebar topp, pennikon | Anvandare med edit pa `sidebarLayout` | Oppnar modal dar menyordning, rubriker och undervyer kan andras for aktuell verksamhet | Andringen galler aktuell verksamhet efter sparning. |
-| Omradesfokus | Sidebar footer | Alla inloggade | Byggs dynamiskt fran synliga omraden. Vanligt klick stegar mellan fokuslagen; hogerklick oppnar en meny dar anvandaren kan valja omrade direkt. Vanliga anvandare ser omraden i egen verksamhet, och Super User ser alla aktiva omraden plus globalt `∞`. Filtrerar Bemanning, Oversikt, Produktivitet, Aktiviteter och Anvandare. | Om "fel" omrade visas kan fokus ligga pa annat omrade eller verksamhet an forvantat. Gammalt lokalt fokus migreras fran kod till omrades-id. |
+| Omradesfokus | Sidebar footer | Alla inloggade | Byggs dynamiskt fran synliga omraden. Vanligt klick stegar mellan fokuslagen; hogerklick oppnar en meny dar anvandaren kan valja omrade direkt. Vanliga anvandare ser omraden i egen verksamhet och far `∞` om verksamheten har aktivt `ANNAT`; Super User ser alla aktiva omraden plus globalt `∞`. Filtrerar Bemanning, Oversikt, Produktivitet, Aktiviteter och Anvandare. | Om "fel" omrade visas kan fokus ligga pa annat omrade eller verksamhet an forvantat. Gammalt lokalt fokus migreras fran kod till omrades-id. |
 | Apphjalp/pratbubblor | Sidebar footer, direkt under omradesfokus/infinity | Alla inloggade | Oppnar/stanger en liten chattpanel. Dialog, oppet lage och utkast sparas i aktuell session. | Max 10 lyckade fragor per session. `Rensa dialog` nollstaller dialog och kvot. Se [Apphjalp och LLM-chatt](app-chat.md). |
 | Logg | Sidebar footer | Alla inloggade | Oppnar sidopanel med app-logg for t.ex. observations-uppdatering | Tom logg betyder bara att inget har loggats i aktuell session. |
 | Uppladdningar/databasikon | Sidebar utility | Roller med `allocationUploads` | Genvag till `uppladdningar.html`; visar badge nar filer lagts in | Hogerklick pa ikonen visar "Rensa filer". |
@@ -38,14 +38,14 @@ Sidebaren ar fast i vansterkanten och byter inte position nar sidans innehall sk
 | Personer | `personer.html` | Ny person, Flera nya personer, importmall, importera Excel, hjalp, filter/sortering, Schema, Ta bort | [Personer](persons.md) |
 | Aktiviteter | `aktiviteter.html` | Ny aktivitet, Flera nya aktiviteter, importmall, importera Excel, hjalp, Redigera, Ta bort | [Aktiviteter och omraden](activities-areas.md) |
 | Anvandare | `anvandare.html` | Ny anvandare, Flera nya anvandare, importmall, importera Excel, Vybehorigheter, cell-las, Visa inaktiva | [Anvandare och installningar](users-settings.md) |
-| Verksamheter | `verksamheter.html` | Ny verksamhet, Redigera, Visa inaktiva, Nytt omrade, Redigera/Ta bort omrade | [Anvandare och installningar](users-settings.md) |
+| Verksamheter | `verksamheter.html` | Ny verksamhet, klickbara celler, rubriksortering, Visa inaktiva, Nytt omrade, Lagg till `∞`, Ta bort omrade | [Anvandare och installningar](users-settings.md) |
 | Historik | `historik.html` | Vy-toggle, period, anvandare, typ, atgard, objekt-id, Uppdatera | [Historik och audit](history-audit.md) |
 | Hamta data | `hamta-data.html` | Prompt, max rader, Tolka, Hamta data, Exportera Excel | [Hamta data](data-fetch.md) |
 | Produktivitet | `produktivitet.html` | Datum, prev/next, sok, filkrav/drag-drop | [Produktivitet](productivity.md) |
 | Uppladdningar | `uppladdningar.html` | Valj filer, Rensa alla, per-slot Valj/rensa, drag-drop | [Lagerverktyg](warehouse-tools.md) |
 | Bearbeta | `bearbeta.html` | Valj filer, flodesknappar, info, resultat, Excel/CSV | [Lagerverktyg](warehouse-tools.md) |
 | Dela | `dela.html` | Textfil/textarea, antal per kolumn, Dela varden | [Lagerverktyg](warehouse-tools.md) |
-| Meta | `meta.html` | Typfilter, Uppdatera, Sändningsanalys med Video-ID/längd, Analysera, Visa, Ladda ner och Radera media | [Meta-uppladdning](meta-upload.md) |
+| Meta | `meta.html` | Typfilter, Uppdatera, Sändningsanalys med ordernummer, sändningsnummer, Video-ID/längd, Analysera, Visa, Ladda ner och Radera media | [Meta-uppladdning](meta-upload.md) |
 | Meta-uppladdning | `meta-upload.html` | Valj flera bilder/videor, visa vald videolangd nar metadata finns, automatisk uppladdning | [Meta-uppladdning](meta-upload.md) |
 
 ## Generella UI-regler

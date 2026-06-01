@@ -481,3 +481,19 @@ Meta-vyn visar nu samma korta Video-ID i sändningstabellen och i videokorten, p
 ## [2026-06-01] feature | Automatisk Meta-uppladdning
 
 Den publika Meta-uppladdningen startar nu direkt nar anvandaren valt eller dragit in filer. Den separata `Ladda upp`-knappen ar borttagen, medan progress, kvarvarande mangd, per-filstatus, dubblettbesked och felmeddelanden fortsatter visas pa samma sida.
+
+## [2026-06-01] change | NoMan kravs for nya personer
+
+Personregistret kraver nu `NoMan` nar en ny person skapas via modal, direktimport eller Excelimport. Personvyn visar toasten `NoMan kravs` vid tomt falt, importresultat visar radfelet `NoMan saknas`, och backend stoppar nya personer utan NoMan samt rensning av ett redan satt NoMan-varde.
+
+## [2026-06-01] polish | Verksamhet i Personer
+
+Personregistret visar nu kolumnen `Verksamhet` mellan NoMan och Hemomrade. Kolumnen kan sorteras och filtreras, anvander personens `business_id` mot verksamhetslistan eller aktuell anvandares verksamhet, och visar `Utan verksamhet` for gamla rader som saknar verksamhet.
+
+## [2026-06-01] feature | Per-verksamhet infinity och inline Verksamheter
+
+Verksamheters `∞`-lage styrs nu av ett aktivt omrade med kod `ANNAT` i respektive verksamhet, i stallet for en hardkodad Stigamo-regel. Verksamheter-vyn har fatt `Lagg till ∞`, klickbara celler for kod/namn/sortering/aktiv-status och rubriksortering for bade verksamheter och omraden.
+
+## [2026-06-01] feature | Meta sändningsnummer från etiketter
+
+Meta-analysen har fått `shipment_number`/sändningsnummer i `meta_shipment_observations`, API-svaret och Super User-tabellen. Gemini-prompten beskriver nu både transportetikett och innehållsförteckning: `Sändnings-ID` på transportetiketten blir sändningsnummer, `Avs. ref.` kan bli ordernummer, `Godsmärks`/`Box ID` kan bli pall-id och innehållsförteckningens ordernummerlista kan användas när den är tydligare. `record_hash` räknas om med sändningsnummer så tabellraden fortsatt kopplas till rätt video och etikettdata.

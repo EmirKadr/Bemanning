@@ -1,7 +1,7 @@
 ---
 title: Datamodell
 status: aktiv
-updated: 2026-05-31
+updated: 2026-06-01
 tags: [databas, modeller]
 ---
 
@@ -24,7 +24,7 @@ Kort svar: bemanningen bygger pa verksamheter, personer, aktiviteter, omraden, s
 | `user_wait_metrics` | `UserWaitMetric` | Tyst vantetids- och klientprestanda for Historik/Halsa | `business_id`, `user_id`, `event_type`, `view_id`, `target`, `duration_ms`, `status`, `detail`, `created_at` |
 | `app_settings` | `AppSetting` | Verksamhetsspecifika settings JSON/text | `business_id`, `key`, `value`, `updated_by` |
 | `meta_media_uploads` | `MetaMediaUpload` | Publikt uppladdade bilder/videor for senare LLM-analys | `batch_id`, `original_filename`, `stored_filename`, `content_type`, `media_type`, `size_bytes`, `duration_seconds`, `content_hash`, `data`, `status`, `analysis`, `source`, `created_at` |
-| `meta_shipment_observations` | `MetaShipmentObservation` | Sändningsrader extraherade från Meta-videor | `media_upload_id`, `label_image_upload_id`, `video_hash`, `label_image_hash`, `record_hash`, `order_number`, `username`, `customer_name`, `pallet_id`, `deviations`, `analysis_status` |
+| `meta_shipment_observations` | `MetaShipmentObservation` | Sändningsrader extraherade från Meta-videor | `media_upload_id`, `label_image_upload_id`, `video_hash`, `label_image_hash`, `record_hash`, `order_number`, `shipment_number`, `username`, `customer_name`, `pallet_id`, `deviations`, `analysis_status` |
 
 ## Verksamheter
 
@@ -74,8 +74,8 @@ Viktiga settings:
 - `data` innehaller sjalva bilden/videon som blob. List-endpointen returnerar inte blobben; Super User hamtar/visar en fil via separat content-endpoint.
 - Super User kan radera en meta-rad via Meta-vyn. Da tas blobben bort och audit-loggen sparar bara metadata, inte filens bytes.
 - `status=pending_analysis` betyder att filen finns redo for ett senare LLM-flode. `analysis` ar reserverat for analysresultat.
-- `meta_shipment_observations` skapas for videor. Raden länkar till videon med `media_upload_id` och `video_hash`, kan länka till en stillbild på etiketten med `label_image_upload_id`, och har `record_hash` som hash av video-hash plus de normaliserade tabellfälten. API:t returnerar ocksa videons filnamn och langd via relationen till `meta_media_uploads`.
-- Gemini-analysen ska fylla ordernummer, användarnamn, kund, pall-id och avvikelser genom att väga ihop både videobild och ljud. Osäkra fält ger `analysis_status=manual_review` och `uncertainty_notes`.
+- `meta_shipment_observations` skapas for videor. Raden länkar till videon med `media_upload_id` och `video_hash`, kan länka till en stillbild på etiketten med `label_image_upload_id`, och har `record_hash` som hash av video-hash plus de normaliserade tabellfälten. `shipment_number` är sändningsnumret från `Sändnings-ID` på transportetiketten och ingår i `record_hash`. API:t returnerar ocksa videons filnamn och langd via relationen till `meta_media_uploads`.
+- Gemini-analysen ska fylla ordernummer, sändningsnummer, användarnamn, kund, pall-id och avvikelser genom att väga ihop både videobild och ljud. Transportetiketten är primär källa för `Sändnings-ID`, användare och avsändarreferens; innehållsförteckningen kan ge ordernummerlista, kund och Box ID/pall-id. Osäkra fält ger `analysis_status=manual_review` och `uncertainty_notes`.
 
 ## Kallor
 
@@ -84,3 +84,4 @@ Viktiga settings:
 - `../app/backend/template_service.py`
 - `../app/backend/schedule_locks.py`
 - `../app/backend/settings_service.py`
+- `../app/alembic/versions/0027_meta_shipment_number.py`
